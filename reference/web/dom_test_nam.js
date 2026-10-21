@@ -1,0 +1,64 @@
+// Click through the NAM steps of the built page in jsdom, with real WAV files.
+const { JSDOM, VirtualConsole } = require("jsdom");
+const fs = require("fs"), path = require("path");
+const dir = process.argv[2] || "../sim_nam_out/gold";
+const html = "<!doctype html><html><head></head><body>" + fs.readFileSync("ir-capture.html", "utf8") + "</body></html>";
+const vc = new VirtualConsole(); let errors = 0;
+vc.on("jsdomError", (e) => { errors++; console.log("JSDOM ERROR:", e.message); });
+const saved = []; let lastBlob = null;
+const dom = new JSDOM(html, { runScripts: "dangerously", virtualConsole: vc, pretendToBeVisual: true,
+  beforeParse(w) { w.TextEncoder = TextEncoder; w.matchMedia = () => ({ matches: false }); w.HTMLElement.prototype.scrollIntoView = () => {};
+    w.claude = { use: async () => ({ save: async (r) => { saved.push([r.filename, r.data.size]); lastBlob = r.data; return { status: "saved" }; } }) }; } });
+const w = dom.window, d = w.document;
+let ok = true; const check = (c, m) => { console.log((c ? "PASS " : "FAIL ") + m); ok = ok && !!c; };
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+(async () => {
+  await wait(300);
+  check(!d.getElementById("mode-ir").hidden && d.getElementById("mode-nam").hidden, "page opens on Cab IRs");
+  check(d.querySelectorAll("#diag-body tr").length > 0, "IR example results still render");
+  d.getElementById("tab-nam").click();
+  check(d.getElementById("mode-ir").hidden && !d.getElementById("mode-nam").hidden, "NAM tab shows the NAM steps");
+  const mk = (f) => { const b = fs.readFileSync(path.join(dir, f)); const file = new w.File([b], f, { type: "audio/wav" });
+    file.arrayBuffer = async () => b.buffer.slice(b.byteOffset, b.byteOffset + b.length); return file; };
+  const input = d.getElementById("nam-file");
+  Object.defineProperty(input, "files", { value: [mk("SM57.wav"), mk("Room96.wav")], configurable: true });
+  input.dispatchEvent(new w.Event("change"));
+  await wait(1500);
+  check(d.querySelectorAll("#nam-chan-body tr").length === 2, "two files listed");
+  check(!d.getElementById("nam-go").disabled, "Prepare button enabled");
+  d.querySelector('input[name="nam-kind"][value="full"]').checked = true;
+  d.querySelector('input[name="nam-kind"][value="full"]').dispatchEvent(new w.Event("change"));
+  d.getElementById("nam-name").value = "412 JCM800"; d.getElementById("nam-name").dispatchEvent(new w.Event("input"));
+  const t = Date.now();
+  d.getElementById("nam-go").click();
+  for (let i = 0; i < 600 && d.getElementById("nam-table").hidden && d.getElementById("nam-run-err").hidden; i++) await wait(200);
+  console.log(`  processed in ${((Date.now() - t) / 1000).toFixed(1)} s`);
+  check(d.getElementById("nam-run-err").hidden, "no error: " + d.getElementById("nam-run-err").textContent);
+  const rows = [...d.querySelectorAll("#nam-diag-body tr")].map((r) => r.textContent);
+  console.log("  " + rows.join("\n  "));
+  check(rows.length === 2, "results table has a row per mic");
+  check(d.getElementById("nam-pill").textContent === "Ready to upload", "status: " + d.getElementById("nam-pill").textContent);
+  const btns = [...d.querySelectorAll("#nam-files button")];
+  check(btns.length === 1, "save button: " + btns.map((b) => b.textContent).join(" | "));
+  for (const b of btns) { b.click(); await wait(300); }
+  console.log("  saved:", JSON.stringify(saved));
+  check(saved.length === 1 && saved[0][0] === "412_JCM800_NAM.zip" && saved[0][1] > 2 * 27360044, "zip saved through the downloads capability");
+  const zb = Buffer.from(await new Promise((res) => { const fr = new w.FileReader(); fr.onload = () => res(fr.result); fr.readAsArrayBuffer(lastBlob); })); fs.writeFileSync("/tmp/claude_nam.zip", zb);
+  const ls = require("child_process").execSync("cd /tmp && rm -rf nz && mkdir nz && cd nz && unzip -q ../claude_nam.zip && find . -type f | sort && cmp 412_JCM800/412_JCM800_SM57.wav /dev/null 2>/dev/null; true").toString();
+  check(ls.includes("412_JCM800_SM57.wav") && ls.includes("UPLOAD-STEPS.txt") && ls.includes("report.json"), "zip unzips with the WAVs, report and steps:\n" + ls.trim());
+  // bad input: noise only
+  const noise = Buffer.alloc(44 + 48000 * 190 * 2); noise.write("RIFF", 0); noise.writeUInt32LE(noise.length - 8, 4); noise.write("WAVEfmt ", 8);
+  noise.writeUInt32LE(16, 16); noise.writeUInt16LE(1, 20); noise.writeUInt16LE(1, 22); noise.writeUInt32LE(48000, 24); noise.writeUInt32LE(96000, 28);
+  noise.writeUInt16LE(2, 32); noise.writeUInt16LE(16, 34); noise.write("data", 36); noise.writeUInt32LE(48000 * 190 * 2, 40);
+  for (let i = 44; i < noise.length; i += 2) noise.writeInt16LE(Math.round((Math.random() - 0.5) * 3000), i);
+  d.querySelectorAll("#nam-chan-body .x").forEach((x) => x.click());
+  const nf = new w.File([noise], "Wrong.wav"); nf.arrayBuffer = async () => noise.buffer.slice(noise.byteOffset, noise.byteOffset + noise.length);
+  Object.defineProperty(input, "files", { value: [nf], configurable: true });
+  input.dispatchEvent(new w.Event("change")); await wait(800);
+  d.getElementById("nam-go").click();
+  for (let i = 0; i < 300 && d.getElementById("nam-run-err").hidden; i++) await wait(200);
+  check(/couldn't find the training signal/.test(d.getElementById("nam-run-err").textContent), "wrong recording explained: " + d.getElementById("nam-run-err").textContent);
+  check(errors === 0, `no page errors (${errors})`);
+  console.log(ok ? "\nALL PASS" : "\nSOME CHECKS FAILED");
+  process.exit(ok ? 0 : 1);
+})();

@@ -6,3 +6,7 @@ reference/web/example.json
 .swiftpm/
 .DS_Store
 __pycache__/
+reference/sim_nam_out/
+reference/web/node_modules/
+reference/web/package*.json
+reference/web/ir-capture.html

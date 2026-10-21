@@ -32,21 +32,30 @@ struct ContentView: View {
             Picker("", selection: $tab) {
                 Text("Capture with the app").tag(0)
                 Text("Use Logic recordings").tag(1)
+                Text("Amp capture (NAM)").tag(2)
             }
-            .pickerStyle(.segmented).labelsHidden().frame(maxWidth: 420).padding(.vertical, 12)
+            .pickerStyle(.segmented).labelsHidden().frame(maxWidth: 600).padding(.vertical, 12)
             Divider()
             ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    if tab == 0 { CaptureTab() } else { LogicTab() }
-                    if let r = m.result { ResultsView(r: r).id("results") }
-                    Text("Method: exponential sine sweeps (Farina), averaged, with harmonic distortion windowed out. With a reference tap each IR is the speaker-terminal voltage to microphone response. IR Capture \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev").")
-                        .font(.footnote).foregroundStyle(.secondary)
+                    if tab == 2 {
+                        NAMTab()
+                        if let r = m.namResult { NAMResultsView(r: r).id("namresults") }
+                    } else {
+                        if tab == 0 { CaptureTab() } else { LogicTab() }
+                        if let r = m.result { ResultsView(r: r).id("results") }
+                    }
+                    if tab != 2 { Text("Method: exponential sine sweeps (Farina), averaged, with harmonic distortion windowed out. With a reference tap each IR is the speaker-terminal voltage to microphone response. IR Capture \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev").")
+                        .font(.footnote).foregroundStyle(.secondary) }
                 }
                 .padding(22).frame(maxWidth: 880, alignment: .leading).frame(maxWidth: .infinity)
             }
             .onChange(of: m.result?.folder) { _ in
                 withAnimation { proxy.scrollTo("results", anchor: .top) }
+            }
+            .onChange(of: m.namResult?.folder) { _ in
+                withAnimation { proxy.scrollTo("namresults", anchor: .top) }
             }
             }
         }
@@ -65,6 +74,16 @@ struct ContentView: View {
                     }
                 }
                 m.processLogic()
+            } else if let i = args.firstIndex(of: "--nam-demo"), i + 1 < args.count {
+                // CI smoke test: process the simulated NAM recordings (sim_nam_out/gold).
+                tab = 2
+                let dir = URL(fileURLWithPath: args[i + 1])
+                m.outputFolder = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("IRCaptureDemo")
+                m.namName = "namdemo"
+                m.namKind = .full
+                m.addNAMFiles(["Suhr", "SM57", "Room96"].map { dir.appendingPathComponent($0 + ".wav") })
+                for k in m.namInputs.indices where m.namInputs[k].name == "Room96" { m.namInputs[k].name = "Room" }
+                m.prepareNAM()
             } else if args.contains("--logic-tab") {
                 tab = 1
             }
@@ -482,6 +501,163 @@ struct LogicGrid: View {
                     } else { Text("") }
                 }
             }
+        }
+    }
+}
+
+// ------------------------------------------------------------------ NAM tab
+struct NAMTab: View {
+    @EnvironmentObject var m: AppModel
+    @State private var dropping = false
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Step(n: 1, title: "Training signal") {
+                Checklist(items: [
+                    "Log in at tone3000.com. Choose Create Tone, then Capture, and download the sweep file. It's called T3K-sweep-v3.wav (190 seconds, 48 kHz).",
+                    "Use that file exactly as it is. Don't trim, normalize or convert it. The app knows its layout, so you don't need to give it the file.",
+                ])
+                Button("Open tone3000.com/capture") { m.openTONE3000() }
+            }
+
+            Step(n: 2, title: "Record in Logic") {
+                Checklist(items: [
+                    "Make a new Logic project at 48 kHz. Drag T3K-sweep-v3.wav onto an audio track at bar 1.",
+                    "Send that track to the interface output that goes to the reamp box, and the reamp box into the amp's input. Turn off noise gates, reverb, delay and anything in the effects loop.",
+                    "Amp only: speaker output into the load box (the Suhr Reactive Load), and its line out into an interface input. Leave any cab sim or EQ on the load box off. Full chain: amp into the cab as usual, with mics on the cab. Mute the studio monitors.",
+                    "Make one audio track per input and name it (Suhr, SM57, R121…); the exported files take these names. Input monitoring off, no plug-ins.",
+                    "Set the reamp level so the amp is hit about as hard as by a guitar. Play the first 20 seconds and set each input so the loudest part peaks around −8 dBFS, with nothing clipping.",
+                    "Warm the amp up for about 20 minutes first. Then record one full pass, all 3 minutes 10 seconds, and a second or two past the end. Don't touch any knobs while it runs.",
+                    "Choose File › Export › All Tracks as Audio Files: WAV, 24-bit, 48 kHz, Normalize off.",
+                ])
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("WHICH MODEL TO MAKE").font(.caption.weight(.semibold)).kerning(0.8).foregroundStyle(.secondary)
+                    Note("Amp only is the flexible one: pair the model with this app's cab IRs. Use IRs captured with the speaker-terminal reference tap. The load box's line out already carries the speaker's impedance bump, so a sweep-referenced IR would add it twice.", color: .primary)
+                    Note("Full chain captures amp, cab and mic together. Each mic becomes its own model. Close mics work best: NAM only models a short stretch of time, so room sound won't carry over well.", color: .primary)
+                }
+                .padding(12).frame(maxWidth: .infinity, alignment: .leading)
+                .background(RoundedRectangle(cornerRadius: 6).fill(Color.secondary.opacity(0.1)))
+            }
+
+            Step(n: 3, title: "Prepare the files", subtitle: "Add the exported WAV files, check the names, and click Prepare files.") {
+                VStack(spacing: 6) {
+                    Text("Drag the exported WAV files here").bold()
+                    Button("or choose them…") { m.chooseNAMFiles() }.buttonStyle(.link)
+                    Text("The sweep track's own file is skipped automatically.").font(.callout).foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity).padding(.vertical, 18)
+                .background(RoundedRectangle(cornerRadius: 6).strokeBorder(dropping ? lamp : Color.secondary.opacity(0.4), style: StrokeStyle(lineWidth: 2, dash: [6])))
+                .onDrop(of: [.fileURL], isTargeted: $dropping) { providers in
+                    for p in providers {
+                        _ = p.loadObject(ofClass: URL.self) { url, _ in
+                            if let url { DispatchQueue.main.async { m.addNAMFiles([url]) } }
+                        }
+                    }
+                    return true
+                }
+                if let msg = m.namMessage { Note(msg, color: badColor) }
+                if !m.namInputs.isEmpty { NAMGrid() }
+                Picker("Capture type", selection: $m.namKind) {
+                    Text("Amp only (load box line out)").tag(NAMKind.amp)
+                    Text("Full chain (mics on the cab)").tag(NAMKind.full)
+                }.pickerStyle(.radioGroup)
+                HStack {
+                    Text("Capture name").foregroundStyle(.secondary)
+                    TextField("e.g. JCM800_Gain6_Bass5", text: $m.namName).frame(maxWidth: 320)
+                }
+                Note("The amp and its settings, e.g. JCM800_Gain6_Bass5. Every file name starts with this.")
+                SaveFolderRow()
+                HStack {
+                    Button("Prepare files") { m.prepareNAM() }
+                        .buttonStyle(.borderedProminent).tint(lamp).controlSize(.large)
+                        .disabled(m.busy != nil || m.namProblem != nil)
+                    if let p = m.namProblem, m.busy == nil, !m.namInputs.isEmpty { Note(p, color: warnColor) }
+                }
+                if let e = m.namError { Note(e, color: badColor) }
+                BusyLine()
+            }
+        }
+    }
+}
+
+struct NAMGrid: View {
+    @EnvironmentObject var m: AppModel
+    var body: some View {
+        Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 8) {
+            GridRow {
+                Text("FILE").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                Text("NAME").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                Text("USE").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                Text("")
+            }
+            ForEach($m.namInputs) { $c in
+                GridRow {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(c.label).font(.system(.callout, design: .monospaced)).lineLimit(1).truncationMode(.middle)
+                        Text(c.meta).font(.caption).foregroundStyle(.secondary)
+                    }.frame(maxWidth: 280, alignment: .leading)
+                    TextField("", text: $c.name).frame(width: 180).disabled(!c.use)
+                    Picker("", selection: $c.use) { Text("Use").tag(true); Text("Skip").tag(false) }.labelsHidden().frame(width: 110)
+                    if c.channel == 0 {
+                        Button { m.removeNAMFile(c.url) } label: { Image(systemName: "xmark.circle") }.buttonStyle(.borderless).help("Remove this file")
+                    } else { Text("") }
+                }
+            }
+        }
+    }
+}
+
+struct NAMResultsView: View {
+    @EnvironmentObject var m: AppModel
+    let r: NAMSummary
+    var body: some View {
+        GroupBox {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack {
+                    Text("UPLOAD FOR TRAINING — \(r.title)").font(.system(size: 15, weight: .semibold)).kerning(0.8)
+                    Spacer()
+                    if r.warnings.isEmpty { Pill(text: "Ready to upload", color: goodColor) }
+                    else { Pill(text: r.warnings.count == 1 ? "1 thing to check" : "\(r.warnings.count) things to check", color: warnColor) }
+                }
+                ForEach(r.warnings, id: \.self) { w in
+                    Text(w).padding(.horizontal, 10).padding(.vertical, 7).frame(maxWidth: .infinity, alignment: .leading)
+                        .background(warnColor.opacity(0.15)).overlay(Rectangle().fill(warnColor).frame(width: 3), alignment: .leading)
+                }
+                Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 8) {
+                    GridRow {
+                        ForEach(["CHANNEL", "PEAK", "NOISE", "START VS END", "LINED UP"], id: \.self) {
+                            Text($0).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                        }
+                    }
+                    Divider().gridCellUnsizedAxes(.horizontal)
+                    ForEach(r.names, id: \.self) { n in
+                        let d = r.diagnostics[n]!
+                        GridRow {
+                            Text(n)
+                            Pill(text: String(format: "%.1f dBFS", d.peakDBFS),
+                                 color: d.clippedSamples > 0 || d.peakDBFS > -3 ? badColor : d.peakDBFS < -24 ? warnColor : goodColor)
+                            Pill(text: String(format: "%.0f dBFS", d.noiseDBFS) + (d.humHz.map { " · \($0) Hz hum" } ?? ""),
+                                 color: (d.noiseBelowPeakDB ?? 99) < 40 ? badColor : d.humHz != nil ? warnColor : goodColor)
+                            Pill(text: d.replicateESR < 0.0001 ? "< 0.0001" : String(format: "%.4f", d.replicateESR),
+                                 color: d.replicateESR > 0.005 ? badColor : d.replicateESR > 0.001 ? warnColor : goodColor)
+                            Text(String(format: "%.1f ms", d.offsetMs) + (d.polarityInverted ? " · inverted" : "")
+                                 + (abs(d.driftSamples) > 1 ? " · drift \(d.driftSamples)" : "")
+                                 + (r.names.count > 1 ? String(format: " · +%.2f ms", d.delayVsFirstMs) : "")).monospacedDigit()
+                        }
+                    }
+                }
+                Checklist(items: [
+                    "Click Show in Finder. The folder holds one WAV per channel (48 kHz, 24-bit, mono), plus report.json and UPLOAD-STEPS.txt.",
+                    "At tone3000.com/capture, upload the WAV files, one model per file.",
+                    "Settings: Model Standard, Best Fit on, 400 max epochs (TONE3000's suggestion). Name each model with the amp, its knob settings and, for mics, the mic and its position. Keep it private unless you mean to share it.",
+                    "Training takes about 5–20 minutes. Check the ESR when it's done: under 0.01 is great; 0.3 or more means something went wrong. Download the .nam file to use in any NAM player.",
+                ])
+                Note("“Start vs end” compares the opening 9 seconds of the take with the closing 9, which are the same signal. It shows how much the amp drifted while you recorded, and a model can't be much more accurate than that. Under 0.001 is excellent.")
+                HStack {
+                    Button("Show in Finder") { m.revealNAM() }.buttonStyle(.borderedProminent).tint(lamp)
+                    Button("Open tone3000.com/capture") { m.openTONE3000() }
+                    Text(r.folder.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")).font(.callout).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                }
+            }.padding(8)
         }
     }
 }

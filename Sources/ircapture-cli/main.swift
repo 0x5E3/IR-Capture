@@ -9,11 +9,12 @@ import IRCaptureCore
 //                         --names Close,Room --name logic --outdir out
 //                         [--rates 44100,48000,88200,96000] [--lengths full,1024,2048,4096]
 //                         [--bits 24,32f] [--trim set,individual] [--full-ms 500]
+//   ircapture-cli nam-prep --rec Suhr.wav SM57.wav --names Suhr,SM57 --kind amp|full --name cap --outdir out
 
 func fail(_ m: String) -> Never { FileHandle.standardError.write((m + "\n").data(using: .utf8)!); exit(2) }
 
 var args = Array(CommandLine.arguments.dropFirst())
-guard let cmd = args.first else { fail("usage: ircapture-cli make-signal|process ...") }
+guard let cmd = args.first else { fail("usage: ircapture-cli make-signal|process|nam-prep ...") }
 args.removeFirst()
 var opts: [String: [String]] = [:]
 var key: String? = nil
@@ -62,6 +63,24 @@ do {
                                       progress: { if opts["verbose"] != nil { print("  . " + $0) } })
         print(summaryText(out.result))
         print("wrote \(out.fileCount) IR files and \(out.folder.appendingPathComponent("report.json").path) in \(String(format: "%.1f", Date().timeIntervalSince(t0))) s")
+
+    case "nam-prep":
+        guard let recs = opts["rec"], !recs.isEmpty, let name = one("name") else { fail("nam-prep needs --rec and --name") }
+        guard let kind = NAMKind(rawValue: one("kind") ?? "amp") else { fail("--kind must be amp or full") }
+        var chans: [(name: String, x: [Double], fs: Int)] = []
+        for p in recs {
+            let info = try WavInfo(Data(contentsOf: URL(fileURLWithPath: p)))
+            for c in 0..<info.channels { chans.append(("", try info.channel(c), info.fs)) }
+        }
+        let names = list("names") ?? (chans.count == recs.count ? recs.map { URL(fileURLWithPath: $0).deletingPathExtension().lastPathComponent }
+                                                                 : (1...chans.count).map { "ch\($0)" })
+        if names.count != chans.count { fail("\(chans.count) channels but \(names.count) names") }
+        for i in chans.indices { chans[i].name = names[i] }
+        let t0 = Date()
+        let res = try NAMPrep.prepare(chans, kind: kind, progress: { if opts["verbose"] != nil { print("  . " + $0) } })
+        let folder = try NAMPrep.write(res, capture: name, outDir: URL(fileURLWithPath: one("outdir") ?? "nam_out"))
+        for w in res.warnings { print("! " + w) }
+        print("wrote \(res.names.count) files to \(folder.path) in \(String(format: "%.1f", Date().timeIntervalSince(t0))) s")
 
     default:
         fail("unknown command \(cmd)")

@@ -42,6 +42,31 @@ struct ResultSummary {
     var fileCount: Int
 }
 
+struct NAMInput: Identifiable {
+    let id = UUID()
+    let url: URL
+    let channel: Int
+    let channels: Int
+    let fs: Int
+    let frames: Int
+    let bits: Int
+    var use: Bool
+    var name: String
+    var label: String { url.lastPathComponent + (channels > 1 ? " · ch \(channel + 1)" : "") }
+    var meta: String { "\(rateTag(fs).dropLast()) kHz · \(bits)-bit · " + String(format: "%.1f s", Double(frames) / Double(fs)) }
+}
+
+struct NAMSummary {
+    var title: String
+    var kind: NAMKind
+    var names: [String]
+    var diagnostics: [String: NAMChannelInfo]
+    var warnings: [String]
+    var notes: [String]
+    var folder: URL
+    var files: [String]
+}
+
 enum Busy: Equatable {
     case preparing(String)
     case recording(Double)
@@ -99,6 +124,14 @@ final class AppModel: ObservableObject {
     @Published var logicMessage: String?
     @Published var signalMessage: String?
 
+    // ---------------------------------------------------------------- NAM tab
+    @Published var namInputs: [NAMInput] = []
+    @Published var namKind: NAMKind { didSet { defaults.set(namKind.rawValue, forKey: "namKind") } }
+    @Published var namName: String { didSet { defaults.set(namName, forKey: "namName") } }
+    @Published var namMessage: String?
+    @Published var namError: String?
+    @Published var namResult: NAMSummary?
+
     init() {
         let d = UserDefaults.standard
         deviceUID = d.string(forKey: "deviceUID") ?? ""
@@ -116,6 +149,8 @@ final class AppModel: ObservableObject {
         fullMs = d.object(forKey: "fullMs") as? Double ?? 500
         captureName = d.string(forKey: "captureName") ?? "Cab_Position1"
         logicRate = d.object(forKey: "logicRate") as? Int ?? 96000
+        namKind = NAMKind(rawValue: d.string(forKey: "namKind") ?? "amp") ?? .amp
+        namName = d.string(forKey: "namName") ?? "Amp_Settings1"
         let music = FileManager.default.urls(for: .musicDirectory, in: .userDomainMask).first ?? URL(fileURLWithPath: NSHomeDirectory())
         outputFolder = d.string(forKey: "outputFolder").map { URL(fileURLWithPath: $0) } ?? music.appendingPathComponent("IR Captures")
         refreshDevices()
@@ -454,6 +489,95 @@ final class AppModel: ObservableObject {
                 errorText = error.localizedDescription
             }
         }
+    }
+    // ---------------------------------------------------------------- NAM: files
+    func chooseNAMFiles() {
+        let p = NSOpenPanel()
+        p.allowsMultipleSelection = true; p.allowedContentTypes = [.wav]
+        p.message = "Select the WAV files Logic exported (load box line out or mics)"
+        if p.runModal() == .OK { addNAMFiles(p.urls) }
+    }
+
+    func addNAMFiles(_ urls: [URL]) {
+        namMessage = nil
+        for u in urls where u.pathExtension.lowercased() == "wav" {
+            do {
+                let info = try WavInfo(Data(contentsOf: u, options: .mappedIfSafe))
+                _ = try info.channel(0).count
+                let stem = safeName(u.deletingPathExtension().lastPathComponent)
+                let seconds = Double(info.frames) / Double(info.fs)
+                let isSweep = stem.range(of: "t3k|sweep|^input|v3_0_0", options: [.regularExpression, .caseInsensitive]) != nil && abs(seconds - 190) < 0.05
+                for c in 0..<info.channels {
+                    namInputs.append(NAMInput(url: u, channel: c, channels: info.channels, fs: info.fs, frames: info.frames, bits: info.bits,
+                                              use: !isSweep, name: stem + (info.channels > 1 ? "_\(c + 1)" : "")))
+                }
+            } catch {
+                namMessage = "\(u.lastPathComponent): \(error.localizedDescription). Export WAV files from Logic (16, 24 or 32-bit)."
+            }
+        }
+    }
+
+    func removeNAMFile(_ url: URL) { namInputs.removeAll { $0.url == url } }
+
+    var namProblem: String? {
+        let used = namInputs.filter(\.use)
+        guard !namInputs.isEmpty else { return "Add the exported WAV files." }
+        guard !used.isEmpty else { return "Choose Use for at least one channel." }
+        var seen = Set<String>()
+        for c in used {
+            let k = NAMPrep.safe(c.name).lowercased()
+            if seen.contains(k) { return "Two channels are both named “\(c.name)”. Give each a different name." }
+            seen.insert(k)
+        }
+        for c in used where Double(c.frames) / Double(c.fs) < 180 {
+            return "\(c.url.lastPathComponent) is only \(Int(Double(c.frames) / Double(c.fs))) s long. The training signal is 190 s: record the whole pass."
+        }
+        return nil
+    }
+
+    func prepareNAM() {
+        if let p = namProblem { namError = p; return }
+        namError = nil
+        let used = namInputs.filter(\.use), kind = namKind, outDir = outputFolder
+        let capture = uniqueCaptureName(NAMPrep.safe(namName.isEmpty ? "Amp" : namName))
+        busy = .processing("Reading the recordings")
+        captureTask = Task {
+            defer { busy = nil; captureTask = nil }
+            do {
+                let report = { (t: String) in Task { @MainActor in self.busy = .processing(t) } }
+                let (res, folder) = try await Task.detached(priority: .userInitiated) { () -> (NAMResult, URL) in
+                    var cache: [URL: WavInfo] = [:]
+                    var done: [(name: String, result: NAMChannelResult)] = []
+                    for c in used {
+                        let info = try cache[c.url] ?? WavInfo(Data(contentsOf: c.url, options: .mappedIfSafe))
+                        cache[c.url] = info
+                        let name = NAMPrep.safe(c.name)
+                        done.append((name, try NAMPrep.prepareChannel(try info.channel(c.channel), fs: info.fs, label: name, progress: { report($0) })))
+                    }
+                    let res = NAMPrep.finish(kind: kind, channels: done)
+                    report("Saving files")
+                    let extra: [(String, JSON)] = [
+                        ("channels", .array(used.map { c in JSON.object([("file", .string(c.url.lastPathComponent)), ("channel", .int(c.channel + 1)),
+                                                                     ("name", .string(NAMPrep.safe(c.name)))]) })),
+                        ("app", .string("IR Capture (Mac) \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "")")),
+                    ]
+                    return (res, try NAMPrep.write(res, capture: capture, outDir: outDir, extra: extra))
+                }.value
+                namResult = NAMSummary(title: capture, kind: res.kind, names: res.names, diagnostics: res.diagnostics, warnings: res.warnings,
+                                       notes: res.notes, folder: folder, files: res.names.map { NAMPrep.fileName(capture, $0) })
+            } catch {
+                namError = error.localizedDescription
+            }
+        }
+    }
+
+    func revealNAM() {
+        guard let r = namResult else { return }
+        NSWorkspace.shared.activateFileViewerSelecting(r.files.map { r.folder.appendingPathComponent($0) })
+    }
+
+    func openTONE3000() {
+        if let u = URL(string: "https://www.tone3000.com/capture") { NSWorkspace.shared.open(u) }
     }
 }
 #endif

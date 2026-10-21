@@ -66,4 +66,25 @@ final class CoreTests: XCTestCase {
         XCTAssertEqual(o["c"] as? String, "q\"x\n")
         XCTAssertTrue(o["b"] is NSNull)
     }
+
+    func testNAMWavAndResample() throws {
+        let x = (0..<2000).map { Double(Int(0.7 * sin(Double($0) * 0.01) * 8388608)) / 8388608 }
+        let info = try WavInfo(NAMPrep.wav24(x))
+        XCTAssertEqual(info.fs, 48000); XCTAssertEqual(info.bits, 24); XCTAssertEqual(info.channels, 1)
+        XCTAssertEqual(try info.channel(0), x)              // 24-bit values pass through bit for bit
+        XCTAssertEqual(NAMPrep.resample(x, 48000, 48000), x)
+        let up = NAMPrep.resample(x, 48000, 96000), back = NAMPrep.resample(up, 96000, 48000)
+        XCTAssertEqual(up.count, 4000); XCTAssertEqual(back.count, 2000)
+        for i in 200..<1800 { XCTAssertEqual(back[i], x[i], accuracy: 1e-3) }
+        XCTAssertEqual(NAMPrep.fileName("JCM800 ch2", "SM57 / cap"), "JCM800_ch2_SM57_cap.wav")
+        XCTAssertEqual(NAMPrep.safe("!!"), "capture")
+    }
+
+    func testNAMRefusesNoise() {
+        var g = SystemRandomNumberGenerator()
+        let noise = (0..<(48000 * 195)).map { _ in Double.random(in: -0.1...0.1, using: &g) }
+        XCTAssertThrowsError(try NAMPrep.prepareChannel(noise, fs: 48000, label: "noise")) { e in
+            XCTAssertTrue("\(e)".contains("couldn't find the training signal"))
+        }
+    }
 }

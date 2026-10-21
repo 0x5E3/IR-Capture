@@ -118,17 +118,35 @@ svg.plot { width: 100%; height: auto; display: block; }
 .plot .frame { fill: var(--sunk); stroke: none; }
 .dl-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
 footer { color: var(--muted); font-size: 0.85rem; }
+.modes { display: flex; gap: 0; border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; width: max-content; max-width: 100%; background: var(--panel); }
+.modes button { border-radius: 0; background: transparent; color: var(--muted); border: none; padding: 9px 16px; font-family: var(--display); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; font-size: 0.92rem; }
+.modes button[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); }
+.modes button:not([aria-selected="true"]):hover { color: var(--ink); }
+.mode { display: grid; gap: 22px; min-width: 0; }
+.mode[hidden] { display: none; }
+.kind { display: flex; flex-wrap: wrap; gap: 10px 22px; }
+.kind label { display: inline-flex; gap: 8px; align-items: flex-start; cursor: pointer; max-width: 36ch; }
+.kind label span { display: grid; }
+.kind small { color: var(--muted); font-size: 0.86rem; }
+.files-out { display: grid; gap: 8px; }
+.files-out .row { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
 @media (max-width: 520px) { h1 { font-size: 1.7rem; } .step { padding: 16px; } }
 </style>
 
 <div class="wrap">
   <header>
     <h1><span class="lamp" aria-hidden="true"></span>Cab IR Capture</h1>
-    <p class="lede">Record the test sweeps in Logic, drop the recordings here, and download finished impulse responses at every sample rate and length. Everything runs in this page; nothing is uploaded.</p>
+    <p class="lede" id="lede-ir">Record the test sweeps in Logic, drop the recordings here, and download finished impulse responses at every sample rate and length. Everything runs in this page; nothing is uploaded.</p>
+    <p class="lede" id="lede-nam" hidden>Record TONE3000's training signal through the amp in Logic, drop the recordings here, and get files lined up to the sample and cut to the exact length, ready to upload for NAM training. Everything runs in this page.</p>
   </header>
+  <div class="modes" role="tablist" aria-label="What to capture">
+    <button type="button" role="tab" id="tab-ir" aria-selected="true" aria-controls="mode-ir">Cab IRs</button>
+    <button type="button" role="tab" id="tab-nam" aria-selected="false" aria-controls="mode-nam">Amp capture (NAM)</button>
+  </div>
 
   <p class="err" id="page-err" role="alert" hidden></p>
   <p class="note" id="dl-help" hidden></p>
+  <div class="mode" id="mode-ir" role="tabpanel" aria-labelledby="tab-ir">
   <section class="step" aria-labelledby="s1">
     <div class="step-head"><span class="num">1</span><div><h2 id="s1">Test signal</h2></div></div>
     <p>Pick the sample rate your Logic project will run at. All the other rates are made from this one capture, so use the highest your interface does well.</p>
@@ -243,11 +261,97 @@ footer { color: var(--muted); font-size: 0.85rem; }
     </div>
   </section>
 
+  </div>
+
+  <div class="mode" id="mode-nam" role="tabpanel" aria-labelledby="tab-nam" hidden>
+  <section class="step" aria-labelledby="n1">
+    <div class="step-head"><span class="num">1</span><div><h2 id="n1">Training signal</h2></div></div>
+    <ol class="checklist">
+      <li>Log in at <a href="https://www.tone3000.com" target="_blank" rel="noopener">tone3000.com</a>. Choose Create Tone, then Capture, and download the sweep file. It's called <code>T3K-sweep-v3.wav</code> (190 seconds, 48 kHz).</li>
+      <li>Use that file exactly as it is. Don't trim, normalize or convert it. This page knows its layout, so you don't need to give it the file.</li>
+    </ol>
+  </section>
+
+  <section class="step" aria-labelledby="n2">
+    <div class="step-head"><span class="num">2</span><div><h2 id="n2">Record in Logic</h2></div></div>
+    <ol class="checklist">
+      <li>Make a new Logic project at <strong>48 kHz</strong>. Drag <code>T3K-sweep-v3.wav</code> onto an audio track at bar 1.</li>
+      <li>Send that track to the interface output that goes to the reamp box, and the reamp box into the amp's input. Turn off noise gates, reverb, delay and anything in the effects loop.</li>
+      <li><strong>Amp only:</strong> speaker output into the load box (the Suhr Reactive Load), and its line out into an interface input. Leave any cab sim or EQ on the load box off.<br><strong>Full chain:</strong> amp into the cab as usual, with mics on the cab. Mute the studio monitors.</li>
+      <li>Make one audio track per input and name it (Suhr, SM57, R121…); the exported files take these names. Input monitoring off, no plug-ins.</li>
+      <li>Set the reamp level so the amp is hit about as hard as by a guitar. Play the first 20 seconds and set each input so the loudest part peaks around −8 dBFS, with nothing clipping.</li>
+      <li>Warm the amp up for about 20 minutes first. Then record one full pass, all 3 minutes 10 seconds, and a second or two past the end. Don't touch any knobs while it runs.</li>
+      <li>Choose File › Export › All Tracks as Audio Files: WAV, 24-bit, 48 kHz, Normalize off.</li>
+    </ol>
+    <div class="aside">
+      <h3>Which model to make</h3>
+      <p><strong>Amp only</strong> is the flexible one: pair the model with this tool's cab IRs. Use IRs captured with the speaker-terminal reference tap. The load box's line out already carries the speaker's impedance bump, so a sweep-referenced IR would add it twice.</p>
+      <p><strong>Full chain</strong> captures amp, cab and mic together. Each mic becomes its own model. Close mics work best: NAM only models a short stretch of time, so room sound won't carry over well.</p>
+    </div>
+  </section>
+
+  <section class="step" aria-labelledby="n3">
+    <div class="step-head"><span class="num">3</span><div><h2 id="n3">Prepare the files</h2></div></div>
+    <ol class="checklist">
+      <li>Drag the exported WAV files onto the box below, or click it and pick them. The sweep track's own file is skipped automatically.</li>
+      <li>Check the names, choose amp only or full chain, type a capture name, and click Prepare files.</li>
+    </ol>
+    <div class="drop" id="nam-drop" tabindex="0" role="button" aria-label="Add recorded WAV files for NAM">
+      <strong>Drag the exported WAV files here</strong><br>or click to choose them
+    </div>
+    <input type="file" id="nam-file" accept=".wav,audio/wav,audio/x-wav" multiple hidden>
+    <div id="nam-chan-area" hidden>
+      <div class="scroll"><table>
+        <thead><tr><th>File</th><th>Name</th><th>Use</th><th><span hidden>Remove</span></th></tr></thead>
+        <tbody id="nam-chan-body"></tbody>
+      </table></div>
+    </div>
+    <p class="err" id="nam-file-err" hidden></p>
+    <div class="kind" role="radiogroup" aria-label="Capture type">
+      <label><input type="radio" name="nam-kind" value="amp" checked><span>Amp only<small>Load box line out</small></span></label>
+      <label><input type="radio" name="nam-kind" value="full"><span>Full chain<small>Mics on the cab</small></span></label>
+    </div>
+    <div class="fields">
+      <div class="field" style="flex:1 1 260px"><label for="nam-name">Capture name</label>
+        <input type="text" id="nam-name" value="Amp_Settings1" spellcheck="false">
+        <span class="note">The amp and its settings, e.g. JCM800_Gain6_Bass5. Every file name starts with this.</span></div>
+    </div>
+    <div class="actions">
+      <button class="primary" id="nam-go" type="button" disabled>Prepare files</button>
+      <div class="progress" id="nam-progress" hidden><span class="spinner" aria-hidden="true"></span><span id="nam-progress-text">Working</span></div>
+    </div>
+    <p class="err" id="nam-run-err" hidden></p>
+  </section>
+
+  <section class="step" aria-labelledby="n4" id="nam-results">
+    <div class="result-head">
+      <h2 id="n4">Upload for training</h2>
+      <span class="pill example" id="nam-pill">Waiting for a recording</span>
+    </div>
+    <ul class="warnings" id="nam-warnings" hidden></ul>
+    <div class="scroll" id="nam-table" hidden><table>
+      <thead><tr><th>Channel</th><th>Peak</th><th>Noise</th><th>Start vs end</th><th>Lined up</th></tr></thead>
+      <tbody id="nam-diag-body"></tbody>
+    </table></div>
+    <div class="files-out" id="nam-files" hidden></div>
+    <ol class="checklist">
+      <li>Save the zip above and double-click it in Finder to unzip it. It holds one WAV per channel, plus the report and these steps.</li>
+      <li>At <a href="https://www.tone3000.com/capture" target="_blank" rel="noopener">tone3000.com/capture</a>, upload the WAV files, one model per file.</li>
+      <li>Settings: Model Standard, Best Fit on, 400 max epochs (TONE3000's suggestion). Name each model with the amp, its knob settings and, for mics, the mic and its position. Keep it private unless you mean to share it.</li>
+      <li>Training takes about 5–20 minutes. Check the ESR when it's done: under 0.01 is great; 0.3 or more means something went wrong. Download the <code>.nam</code> file to use in any NAM player.</li>
+    </ol>
+    <p class="note">“Start vs end” compares the opening 9 seconds of the take with the closing 9, which are the same signal. It shows how much the amp drifted while you recorded, and a model can't be much more accurate than that. Under 0.001 is excellent.</p>
+  </section>
+  </div>
+
   <footer>Method: exponential sine sweeps (Farina), averaged, with harmonic distortion windowed out. With a reference tap each IR is the speaker-terminal voltage to microphone response. Version __VERSION__.</footer>
 </div>
 
 <script id="dsp">
 __DSP__
+</script>
+<script id="nam">
+__NAM__
 </script>
 <script id="handler">
 async function ircHandle(m, emit) {
@@ -309,14 +413,14 @@ async function ircHandle(m, emit) {
     downloads = d;
     if (!d) { var h = $("dl-help"); h.textContent = "Saving files isn't available in this view. Open the page from the Claude app or claude.ai while signed in. The test signal files are also attached in your chat with Claude."; h.hidden = false; }
   });
-  async function offer(blob, filename, statusEl, okText) {
+  async function offer(blob, filename, statusEl, okText, isNam) {
     var d = downloads || await Promise.race([dlReady, new Promise(function (r) { setTimeout(function () { r(null); }, 4000); })]);
     if (!d) { statusEl.textContent = "Saving files isn't available in this view. Open the page from the Claude app or claude.ai while signed in."; return; }
     try { await d.save({ filename: filename, data: blob }); statusEl.textContent = okText; }
     catch (e) {
       var c = e && e.code;
       statusEl.textContent = c === "declined" ? "Download cancelled." : c === "rate_limited" ? "Another download prompt is open. Finish that one and try again." :
-        c === "too_large" ? "The file is too large to save here. Choose fewer sample rates, lengths or bit depths." : "The download didn't go through (" + (c || "unknown error") + ").";
+        c === "too_large" ? (isNam ? "The file is too large to save here. Prepare fewer channels at a time." : "The file is too large to save here. Choose fewer sample rates, lengths or bit depths.") : "The download didn't go through (" + (c || "unknown error") + ").";
     }
   }
 
@@ -562,6 +666,151 @@ async function ircHandle(m, emit) {
       var item = document.createElement("span"), sw = document.createElement("span");
       sw.className = "swatch"; sw.style.background = col; item.append(sw, document.createTextNode(m)); leg.appendChild(item);
     });
+  }
+
+  // ================= mode switch
+  function setMode(m) {
+    var nam = m === "nam";
+    $("tab-ir").setAttribute("aria-selected", String(!nam)); $("tab-nam").setAttribute("aria-selected", String(nam));
+    $("mode-ir").hidden = nam; $("mode-nam").hidden = !nam;
+    $("lede-ir").hidden = nam; $("lede-nam").hidden = !nam;
+    store.set("mode", m);
+  }
+  $("tab-ir").addEventListener("click", function () { setMode("ir"); });
+  $("tab-nam").addEventListener("click", function () { setMode("nam"); });
+  if (store.get("mode") === "nam") setMode("nam");
+
+  // ================= NAM prep
+  var nfiles = [], nchans = [], nbusy = false, nres = null, ncapture = "";
+  (function () { var v = store.get("nam-name"); if (v) $("nam-name").value = v; var k = store.get("nam-kind");
+    if (k) document.querySelectorAll('input[name="nam-kind"]').forEach(function (r) { r.checked = r.value === k; }); })();
+  function nkind() { var r = document.querySelector('input[name="nam-kind"]:checked'); return r ? r.value : "amp"; }
+  async function naddFiles(list) {
+    var err = $("nam-file-err"); err.hidden = true;
+    for (var i = 0; i < list.length; i++) {
+      var f = list[i];
+      try {
+        var buf = await f.arrayBuffer(), info = IRC.readWav(buf);
+        IRC.wavChannel(info, 0).length;
+        var idx = nfiles.length;
+        nfiles.push({ name: f.name, buf: buf, info: { fs: info.fs, channels: info.channels, frames: info.frames, bits: info.bits } });
+        var isSweep = /t3k|sweep|^input|v3_0_0/i.test(f.name) && Math.abs(info.frames / info.fs - 190) < 0.05;
+        for (var c = 0; c < info.channels; c++)
+          nchans.push({ file: idx, ch: c, name: stem(f.name) + (info.channels > 1 ? "_" + (c + 1) : ""), use: !isSweep });
+      } catch (e) { err.textContent = f.name + ": " + e.message + ". Export WAV files from Logic (16, 24 or 32-bit)."; err.hidden = false; }
+    }
+    nrender();
+  }
+  function nrender() {
+    var body = $("nam-chan-body"); body.textContent = "";
+    $("nam-chan-area").hidden = !nfiles.length;
+    nchans.forEach(function (c, i) {
+      var f = nfiles[c.file], tr = document.createElement("tr");
+      var td1 = document.createElement("td"); td1.className = "file-cell";
+      td1.textContent = f.name + (f.info.channels > 1 ? " · ch " + (c.ch + 1) : "");
+      var meta = document.createElement("div"); meta.className = "file-meta";
+      meta.textContent = (f.info.fs / 1000) + " kHz · " + f.info.bits + "-bit · " + (f.info.frames / f.info.fs).toFixed(1) + " s";
+      td1.appendChild(meta);
+      var td2 = document.createElement("td"), inp = document.createElement("input");
+      inp.type = "text"; inp.value = c.name; inp.spellcheck = false; inp.disabled = !c.use; inp.setAttribute("aria-label", "Name for " + f.name);
+      inp.addEventListener("input", function () { c.name = inp.value; nvalidate(); });
+      td2.appendChild(inp);
+      var td3 = document.createElement("td"), sel = document.createElement("select");
+      sel.setAttribute("aria-label", "Use this channel");
+      [["1", "Use"], ["0", "Skip"]].forEach(function (o) { var op = document.createElement("option"); op.value = o[0]; op.textContent = o[1]; sel.appendChild(op); });
+      sel.value = c.use ? "1" : "0";
+      sel.addEventListener("change", function () { c.use = sel.value === "1"; nrender(); });
+      td3.appendChild(sel);
+      var td4 = document.createElement("td"), x = document.createElement("button");
+      x.type = "button"; x.className = "x"; x.textContent = "×"; x.setAttribute("aria-label", "Remove " + f.name);
+      x.addEventListener("click", function () { nfiles.splice(c.file, 1); var gone = c.file;
+        nchans = nchans.filter(function (k) { return k.file !== gone; }).map(function (k) { if (k.file > gone) k.file--; return k; }); nrender(); });
+      if (c.ch === 0) td4.appendChild(x);
+      tr.append(td1, td2, td3, td4); body.appendChild(tr);
+    });
+    nvalidate();
+  }
+  function nvalidate() {
+    var msg = "", used = nchans.filter(function (c) { return c.use; }), seen = {};
+    if (nfiles.length && !used.length) msg = "Choose Use for at least one channel.";
+    used.forEach(function (c) { var k = NAMPREP.safeName(c.name).toLowerCase(); if (!msg && seen[k]) msg = "Two channels are both named “" + c.name + "”. Give each a different name."; seen[k] = 1; });
+    used.forEach(function (c) { var f = nfiles[c.file]; if (!msg && f.info.frames / f.info.fs < 180) msg = f.name + " is only " + (f.info.frames / f.info.fs).toFixed(0) + " s long. The training signal is 190 s: record the whole pass."; });
+    var err = $("nam-file-err"); if (msg || err.textContent.indexOf("Export WAV") < 0) { err.textContent = msg; err.hidden = !msg; }
+    $("nam-go").disabled = !used.length || !!msg || nbusy;
+  }
+  $("nam-name").addEventListener("input", function () { store.set("nam-name", $("nam-name").value); });
+  document.querySelectorAll('input[name="nam-kind"]').forEach(function (r) { r.addEventListener("change", function () { store.set("nam-kind", nkind()); }); });
+  var ndrop = $("nam-drop"), nfileIn = $("nam-file");
+  ndrop.addEventListener("click", function () { nfileIn.click(); });
+  ndrop.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); nfileIn.click(); } });
+  nfileIn.addEventListener("change", function () { naddFiles(nfileIn.files); nfileIn.value = ""; });
+  ["dragenter", "dragover"].forEach(function (t) { ndrop.addEventListener(t, function (e) { e.preventDefault(); ndrop.classList.add("over"); }); });
+  ["dragleave", "drop"].forEach(function (t) { ndrop.addEventListener(t, function (e) { e.preventDefault(); ndrop.classList.remove("over"); }); });
+  ndrop.addEventListener("drop", function (e) { if (e.dataTransfer && e.dataTransfer.files.length) naddFiles(e.dataTransfer.files); });
+
+  $("nam-go").addEventListener("click", async function () {
+    nbusy = true; nvalidate();
+    $("nam-run-err").hidden = true; $("nam-progress").hidden = false;
+    var prog = function (t) { $("nam-progress-text").textContent = t + "…"; };
+    ncapture = NAMPREP.safeName($("nam-name").value || "Amp");
+    try {
+      prog("Reading the recordings"); await tick();
+      var used = nchans.filter(function (c) { return c.use; }), inputs = [];
+      for (var i = 0; i < used.length; i++) {
+        var c = used[i], f = nfiles[c.file], info = IRC.readWav(f.buf);
+        inputs.push({ name: NAMPREP.safeName(c.name), x: IRC.wavChannel(info, c.ch), fs: info.fs, file: f.name, ch: c.ch });
+      }
+      var outs = {}, diag = {}, warns = [], names = [];
+      for (i = 0; i < inputs.length; i++) {          // one channel at a time so the progress text repaints
+        await tick();
+        var r1 = NAMPREP.prepareChannel(inputs[i].x, inputs[i].fs, inputs[i].name, prog);
+        var n = inputs[i].name; outs[n] = r1.y; diag[n] = r1.info; warns = warns.concat(r1.warn); names.push(n);
+        inputs[i].x = null;
+      }
+      nres = NAMPREP.finish(nkind(), names, outs, diag, warns);
+      nres.channels = inputs.map(function (x) { return { file: x.file, channel: x.ch + 1, name: x.name }; });
+      nshow();
+      $("nam-results").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+    } catch (e) {
+      $("nam-run-err").textContent = e.message; $("nam-run-err").hidden = false;
+    }
+    $("nam-progress").hidden = true; nbusy = false; nvalidate();
+  });
+
+  function nshow() {
+    var r = nres, pill = $("nam-pill");
+    if (r.warnings.length) { pill.className = "pill warn"; pill.textContent = r.warnings.length === 1 ? "1 thing to check" : r.warnings.length + " things to check"; }
+    else { pill.className = "pill good"; pill.textContent = "Ready to upload"; }
+    var ul = $("nam-warnings"); ul.textContent = "";
+    r.warnings.forEach(function (w) { var li = document.createElement("li"); li.textContent = w; ul.appendChild(li); });
+    ul.hidden = !r.warnings.length;
+    var body = $("nam-diag-body"); body.textContent = "";
+    r.names.forEach(function (n) {
+      var d = r.diagnostics[n], tr = document.createElement("tr");
+      var pk = d.peak_dbfs, pkKind = d.clipped_samples > 0 || pk > -3 ? "bad" : pk < -24 ? "warn" : "good";
+      var nb = d.noise_below_peak_db, nz = chip(nb !== null && nb < 40 ? "bad" : d.hum_hz ? "warn" : "good", d.noise_dbfs.toFixed(0) + " dBFS" + (d.hum_hz ? " · " + d.hum_hz + " Hz hum" : ""));
+      var e = d.replicate_esr, ek = e > 0.005 ? "bad" : e > 0.001 ? "warn" : "good";
+      var es = chip(ek, e < 0.0001 ? "< 0.0001" : e.toFixed(4));
+      var lined = (d.offset_ms >= 0 ? "" : "−") + Math.abs(d.offset_ms).toFixed(1) + " ms" + (d.polarity === "inverted" ? " · inverted" : "") +
+        (Math.abs(d.drift_samples) > 1 ? " · drift " + d.drift_samples : "") + (r.names.length > 1 ? " · +" + d.delay_vs_first_ms.toFixed(2) + " ms" : "");
+      tr.append(td(n), td(chip(pkKind, pk.toFixed(1) + " dBFS")), td(nz), td(es), td(lined, "num-cell"));
+      body.appendChild(tr);
+    });
+    $("nam-table").hidden = false;
+    var box = $("nam-files"); box.textContent = "";
+    var row = document.createElement("div"); row.className = "row";
+    var zipName = ncapture + "_NAM.zip";
+    var b = document.createElement("button"); b.type = "button"; b.className = "primary"; b.textContent = "Save " + zipName;
+    var st = document.createElement("span"); st.className = "readout";
+    st.textContent = r.names.map(function (n) { return NAMPREP.fileName(ncapture, n); }).join(", ") + " (48 kHz, 24-bit, mono), report.json and UPLOAD-STEPS.txt";
+    b.addEventListener("click", function () {
+      var enc = new TextEncoder(), parts = r.names.map(function (n) { return { path: ncapture + "/" + NAMPREP.fileName(ncapture, n), data: NAMPREP.wav24(r.outputs[n]) }; });
+      parts.push({ path: ncapture + "/report.json", data: enc.encode(NAMPREP.report(r, ncapture, { channels: r.channels })) });
+      parts.push({ path: ncapture + "/UPLOAD-STEPS.txt", data: enc.encode(NAMPREP.uploadNotes(r, ncapture)) });
+      offer(IRC.makeZip(parts), zipName, st, "Saved " + zipName + ". Double-click it in Finder to unzip.", true);
+    });
+    row.append(b, st); box.appendChild(row);
+    box.hidden = false;
   }
 
   showResult(EXAMPLE, true);
