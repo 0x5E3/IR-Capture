@@ -36,8 +36,9 @@ final class DuplexIO {
         self.outChannel = outChannel
         self.inputs = inputs
         playCount = signal.count
-        play = .allocate(capacity: max(signal.count, 1))
-        signal.withUnsafeBufferPointer { play.initialize(from: $0.baseAddress!, count: signal.count) }
+        let buf = UnsafeMutablePointer<Float>.allocate(capacity: max(signal.count, 1))
+        signal.withUnsafeBufferPointer { buf.initialize(from: $0.baseAddress!, count: signal.count) }
+        play = buf
         recCapacity = signal.count + Int(extraSeconds * Double(fs))
         rec = inputs.map { _ in
             let p = UnsafeMutablePointer<Float>.allocate(capacity: signal.count + Int(extraSeconds * Double(fs)))
