@@ -1,0 +1,569 @@
+<title>Cab IR Capture</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one bench-manual column, three numbered steps (a real sequence), results panel last.
+   Look: amp control-panel silkscreen labels, pilot-lamp amber accent, cool tolex-grey neutrals. */
+:root {
+  --bg: #eceff2; --panel: #f9fafb; --sunk: #e3e7eb; --ink: #16202a; --muted: #56616d; --line: #cfd5dc;
+  --accent: #a85a0c; --accent-strong: #8c4a08; --accent-ink: #ffffff; --lamp: #e8902a;
+  --good: #26734a; --warn: #8f5c00; --bad: #b0261d;
+  --good-bg: #dcefe3; --warn-bg: #f6e8c9; --bad-bg: #f7dcd8;
+  --c1: #c46a12; --c2: #2d5f8c; --c3: #5d8a1f; --c4: #8b4a7e; --c5: #2f8585; --c6: #7a6a2a;
+  --display: "Barlow Semi Condensed", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  --body: "IBM Plex Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --r: 6px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #14181c; --panel: #1b2025; --sunk: #11151a; --ink: #e5e8eb; --muted: #9aa4ae; --line: #2c343c;
+  --accent: #e8962f; --accent-strong: #f2a94d; --accent-ink: #1a1208; --lamp: #f0a040;
+  --good: #63c48d; --warn: #e5ad45; --bad: #f2786d;
+  --good-bg: #183324; --warn-bg: #3a2c10; --bad-bg: #3d1b18;
+  --c1: #eb9a3c; --c2: #6fa3d6; --c3: #9ccb5a; --c4: #cf8cc0; --c5: #5cc2c2; --c6: #c9b86a;
+  color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #14181c; --panel: #1b2025; --sunk: #11151a; --ink: #e5e8eb; --muted: #9aa4ae; --line: #2c343c;
+  --accent: #e8962f; --accent-strong: #f2a94d; --accent-ink: #1a1208; --lamp: #f0a040;
+  --good: #63c48d; --warn: #e5ad45; --bad: #f2786d;
+  --good-bg: #183324; --warn-bg: #3a2c10; --bad-bg: #3d1b18;
+  --c1: #eb9a3c; --c2: #6fa3d6; --c3: #9ccb5a; --c4: #cf8cc0; --c5: #5cc2c2; --c6: #c9b86a;
+  color-scheme: dark; }
+
+body { background: var(--bg); color: var(--ink); font: 15px/1.55 var(--body); }
+.wrap { max-width: 900px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 28px 64px; display: grid; gap: 22px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; }
+h1 { font-size: 2.1rem; font-weight: 700; letter-spacing: 0.01em; line-height: 1.1; }
+h2 { font-size: 1.3rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+h3 { font-size: 0.95rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+p { margin: 0; max-width: 66ch; }
+a { color: var(--accent); }
+code, .mono { font-family: var(--mono); font-size: 0.88em; }
+header { display: grid; gap: 8px; }
+.lede { color: var(--muted); font-size: 1.02rem; }
+.lamp { display: inline-block; width: 11px; height: 11px; border-radius: 50%; background: var(--lamp); box-shadow: 0 0 0 3px color-mix(in srgb, var(--lamp) 25%, transparent), 0 0 12px color-mix(in srgb, var(--lamp) 60%, transparent); margin-right: 10px; vertical-align: 0.12em; }
+
+.step { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 20px; display: grid; gap: 16px; min-width: 0; }
+.step-head { display: flex; align-items: baseline; gap: 12px; }
+.num { font-family: var(--display); font-weight: 700; font-size: 1rem; color: var(--accent-ink); background: var(--accent); border-radius: 50%; width: 28px; height: 28px; display: inline-grid; place-items: center; flex: none; transform: translateY(-2px); }
+.step-head p { color: var(--muted); }
+
+.fields { display: flex; flex-wrap: wrap; gap: 14px 18px; align-items: flex-end; }
+.field { display: grid; gap: 5px; min-width: 0; }
+.field label, .group-label { font-family: var(--display); font-weight: 600; font-size: 0.8rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted); }
+input[type="text"], input[type="number"], select {
+  font: 15px var(--body); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 7px 9px; min-width: 0; }
+input[type="number"] { width: 6.5em; font-family: var(--mono); font-size: 14px; }
+input:focus-visible, select:focus-visible, button:focus-visible, summary:focus-visible, .drop:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+details { border-top: 1px dashed var(--line); padding-top: 12px; }
+summary { cursor: pointer; font-weight: 500; color: var(--muted); width: max-content; max-width: 100%; }
+details[open] summary { margin-bottom: 12px; }
+
+button { font: 600 15px var(--body); border-radius: 4px; padding: 10px 16px; cursor: pointer; border: 1px solid transparent; }
+.primary { background: var(--accent); color: var(--accent-ink); }
+.primary:hover:not(:disabled) { background: var(--accent-strong); }
+.secondary { background: transparent; color: var(--ink); border-color: var(--line); }
+.secondary:hover:not(:disabled) { border-color: var(--muted); }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+.actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.note { color: var(--muted); font-size: 0.92rem; }
+.readout { font-family: var(--mono); font-size: 0.9rem; color: var(--muted); }
+
+ol.checklist { margin: 0; padding-left: 1.4em; display: grid; gap: 8px; max-width: 70ch; }
+ol.checklist li::marker { font-family: var(--display); font-weight: 700; color: var(--accent); }
+.aside { background: var(--sunk); border-radius: var(--r); padding: 14px 16px; display: grid; gap: 6px; }
+.aside p { font-size: 0.93rem; }
+
+.drop { border: 2px dashed var(--line); border-radius: var(--r); padding: 22px 16px; text-align: center; color: var(--muted); cursor: pointer; background: var(--bg); }
+.drop.over { border-color: var(--accent); color: var(--ink); }
+.drop strong { color: var(--ink); }
+.scroll { overflow-x: auto; min-width: 0; }
+table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+th { font-family: var(--display); font-weight: 600; font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); text-align: left; padding: 6px 10px 6px 0; border-bottom: 1px solid var(--line); white-space: nowrap; }
+td { padding: 8px 10px 8px 0; border-bottom: 1px solid var(--line); vertical-align: middle; font-variant-numeric: tabular-nums; }
+td.num-cell { font-family: var(--mono); font-size: 0.86rem; white-space: nowrap; }
+td input[type="text"] { width: 100%; min-width: 8em; }
+.file-cell { font-family: var(--mono); font-size: 0.84rem; word-break: break-all; }
+.file-meta { color: var(--muted); font-size: 0.8rem; font-family: var(--body); }
+.x { background: none; border: none; color: var(--muted); padding: 4px 8px; font-size: 1.1rem; }
+.x:hover { color: var(--bad); }
+.err { color: var(--bad); font-size: 0.9rem; }
+
+.checks { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+.checks label { display: inline-flex; gap: 6px; align-items: center; font-size: 0.94rem; cursor: pointer; }
+.opt-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px 24px; }
+.opt-grid > div { display: grid; gap: 6px; min-width: 0; }
+
+.progress { display: flex; gap: 10px; align-items: center; color: var(--muted); font-size: 0.93rem; }
+.spinner { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--accent); animation: spin 0.8s linear infinite; flex: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
+
+.result-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; align-items: center; }
+.pill { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 3px 10px; font-size: 0.82rem; font-weight: 600; white-space: nowrap; }
+.pill.good { background: var(--good-bg); color: var(--good); }
+.pill.warn { background: var(--warn-bg); color: var(--warn); }
+.pill.bad { background: var(--bad-bg); color: var(--bad); }
+.pill.example { background: var(--sunk); color: var(--muted); border: 1px dashed var(--line); }
+ul.warnings { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+ul.warnings li { border-left: 3px solid var(--warn); background: var(--warn-bg); color: var(--ink); padding: 8px 12px; border-radius: 0 4px 4px 0; font-size: 0.93rem; }
+.swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 7px; vertical-align: 0; }
+.plot-wrap { display: grid; gap: 8px; min-width: 0; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 0.9rem; }
+svg.plot { width: 100%; height: auto; display: block; }
+.plot text { font-family: var(--mono); font-size: 11px; fill: var(--muted); }
+.plot .grid { stroke: var(--line); stroke-width: 1; }
+.plot .frame { fill: var(--sunk); stroke: none; }
+.dl-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+footer { color: var(--muted); font-size: 0.85rem; }
+@media (max-width: 520px) { h1 { font-size: 1.7rem; } .step { padding: 16px; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1><span class="lamp" aria-hidden="true"></span>Cab IR Capture</h1>
+    <p class="lede">Record the test sweeps in Logic, drop the recordings here, and download finished impulse responses at every sample rate and length. Everything runs in this page; nothing is uploaded.</p>
+  </header>
+
+  <p class="err" id="page-err" role="alert" hidden></p>
+  <p class="note" id="dl-help" hidden></p>
+  <section class="step" aria-labelledby="s1">
+    <div class="step-head"><span class="num">1</span><div><h2 id="s1">Test signal</h2></div></div>
+    <p>Pick the sample rate your Logic project will run at. All the other rates are made from this one capture, so use the highest your interface does well.</p>
+    <div class="fields">
+      <div class="field"><label for="rate">Capture rate</label>
+        <select id="rate"><option value="44100">44.1 kHz</option><option value="48000">48 kHz</option><option value="88200">88.2 kHz</option><option value="96000" selected>96 kHz</option></select></div>
+      <div class="field"><label for="level">Sweep level</label>
+        <select id="level"><option value="-6">−6 dBFS</option><option value="-12" selected>−12 dBFS</option><option value="-18">−18 dBFS</option><option value="-24">−24 dBFS</option></select></div>
+    </div>
+    <details>
+      <summary>Sweep timing</summary>
+      <div class="fields">
+        <div class="field"><label for="nsw">Sweeps</label><input type="number" id="nsw" min="2" max="16" step="1" value="5"></div>
+        <div class="field"><label for="dur">Sweep length, s</label><input type="number" id="dur" min="2" max="20" step="0.5" value="6"></div>
+        <div class="field"><label for="gap">Gap, s</label><input type="number" id="gap" min="1" max="10" step="0.5" value="2"></div>
+        <div class="field"><label for="disc">Warm-up sweeps</label><input type="number" id="disc" min="0" max="4" step="1" value="1"></div>
+      </div>
+      <p class="note">The gap has to be longer than the room's reverb tail. The first sweep is a warm-up and isn't used. More sweeps lower the noise floor by about 3 dB each time you double them.</p>
+    </details>
+    <div class="actions">
+      <button class="primary" id="dl-signal" type="button">Download test signal</button>
+      <span class="readout" id="sig-readout"></span>
+    </div>
+    <p class="note" id="sig-status">Keep these settings when you process the recording in step 3. This page remembers them.</p>
+  </section>
+
+  <section class="step" aria-labelledby="s2">
+    <div class="step-head"><span class="num">2</span><div><h2 id="s2">Record in Logic</h2></div></div>
+    <ol class="checklist">
+      <li>Set the Logic project to the capture rate above. Unzip the download and drag the sweep WAV onto a new audio track at bar 1.</li>
+      <li>Send that track only to the interface output that feeds the power amp. Mute the studio monitors so the room mic doesn't hear them.</li>
+      <li>Make one audio track per mic and one for the reference tap if you have it. Name each track after its mic (SM57, R121, Room…) and name the reference track “Ref”; the exported files take these names. Record-enable them all, with input monitoring off and no plug-ins.</li>
+      <li>Play the sweep track and watch the meters. Set each mic preamp so the loudest point of the sweep peaks around −6 dBFS. Nothing should clip.</li>
+      <li>Record one full pass, about the length shown in step 1. Keep the room quiet and don't touch the mics.</li>
+      <li>Choose File › Export › All Tracks as Audio Files. Pick WAV, 24-bit or 32-bit float, at the project sample rate, with Normalize off, and note which folder it saves to. Leave the faders at 0 dB.</li>
+    </ol>
+    <div class="aside">
+      <h3>Reference tap (recommended)</h3>
+      <p>Pad the voltage across the speaker terminals by about 20 dB (for example 10 kΩ in series, 1.1 kΩ to ground) and record it on its own line input. The IRs then come out as speaker, mic and room only, whatever power amp you use, and the interface latency cancels.</p>
+      <p>If the amp's speaker output is bridged (neither terminal is ground), or the tap brings in hum, use an isolation transformer or a balanced input. Without a reference the IRs still work, but they include the power amp's own response.</p>
+    </div>
+  </section>
+
+  <section class="step" aria-labelledby="s3">
+    <div class="step-head"><span class="num">3</span><div><h2 id="s3">Make the IRs</h2></div></div>
+    <ol class="checklist">
+      <li>In Finder, open the folder Logic exported to. You'll see one WAV per track, named after the Logic tracks.</li>
+      <li>Select the mic files and the reference file, then drag them onto the box below, or click the box and pick them. If the sweep track's file comes along too, that's fine; it's skipped automatically.</li>
+      <li>Check the list that appears. Each mic needs a short name (it goes into the IR file names), and the reference file should say “Reference tap”.</li>
+      <li>Type a capture name for this cab and mic position, then click Make IRs.</li>
+    </ol>
+    <div class="drop" id="drop" tabindex="0" role="button" aria-label="Add recorded WAV files">
+      <strong>Drag the exported WAV files here</strong><br>or click to choose them
+    </div>
+    <input type="file" id="file" accept=".wav,audio/wav,audio/x-wav" multiple hidden>
+    <div id="chan-area" hidden>
+      <div class="scroll"><table>
+        <thead><tr><th>File</th><th>Mic name</th><th>Role</th><th><span class="sr" hidden>Remove</span></th></tr></thead>
+        <tbody id="chan-body"></tbody>
+      </table></div>
+      <p class="err" id="file-err" hidden></p>
+    </div>
+    <div class="fields">
+      <div class="field" style="flex:1 1 260px"><label for="cap-name">Capture name</label>
+        <input type="text" id="cap-name" value="Cab_Position1" spellcheck="false">
+        <span class="note">Which cab and where the mics were, e.g. 412_V30_PosA. Every file in the download starts with this.</span></div>
+    </div>
+    <details>
+      <summary>Output files</summary>
+      <div class="opt-grid">
+        <div><span class="group-label">Sample rates</span><div class="checks" id="opt-rates">
+          <label><input type="checkbox" value="44100" checked>44.1k</label><label><input type="checkbox" value="48000" checked>48k</label>
+          <label><input type="checkbox" value="88200" checked>88.2k</label><label><input type="checkbox" value="96000" checked>96k</label></div></div>
+        <div><span class="group-label">Lengths (samples)</span><div class="checks" id="opt-lengths">
+          <label><input type="checkbox" value="full" checked>Full room</label><label><input type="checkbox" value="1024" checked>1024</label>
+          <label><input type="checkbox" value="2048" checked>2048</label><label><input type="checkbox" value="4096" checked>4096</label></div></div>
+        <div><span class="group-label">Bit depth</span><div class="checks" id="opt-bits">
+          <label><input type="checkbox" value="16">16-bit</label><label><input type="checkbox" value="24" checked>24-bit</label>
+          <label><input type="checkbox" value="32f">32-bit float</label></div></div>
+        <div><span class="group-label">Trimming</span><div class="checks" id="opt-trim">
+          <label><input type="checkbox" value="set" checked>Keep mic timing</label><label><input type="checkbox" value="individual">Trim each mic</label></div></div>
+        <div><span class="group-label"><label for="full-ms">Full room length, ms</label></span><input type="number" id="full-ms" min="50" max="1000" step="50" value="500"></div>
+      </div>
+      <p class="note">“Keep mic timing” trims every mic by the same amount and gives them one shared gain, so they blend the way the real mics did. “Trim each mic” starts each file at its own first arrival and normalizes it on its own. Level is matched across sample rates.</p>
+    </details>
+    <div class="actions">
+      <button class="primary" id="go" type="button" disabled>Make IRs</button>
+      <div class="progress" id="progress" hidden><span class="spinner" aria-hidden="true"></span><span id="progress-text">Working</span></div>
+    </div>
+    <p class="err" id="run-err" hidden></p>
+  </section>
+
+  <section class="step" aria-labelledby="sr" id="results">
+    <div class="result-head">
+      <h2 id="sr">Results</h2>
+      <span class="pill example" id="status-pill">Example: simulated 4×12, two mics</span>
+    </div>
+    <p class="note" id="result-note">This is what a finished capture looks like, using a simulated cab with a close mic, a room mic and a reference tap. Your own results replace it.</p>
+    <ul class="warnings" id="warnings" hidden></ul>
+    <div class="scroll"><table>
+      <thead><tr><th>Channel</th><th>Recorded peak</th><th>Noise floor</th><th>Usable tail</th><th>Distortion</th><th>Arrival</th></tr></thead>
+      <tbody id="diag-body"></tbody>
+    </table></div>
+    <div class="plot-wrap">
+      <h3>Frequency response, 1/6 octave</h3>
+      <div class="legend" id="legend"></div>
+      <svg class="plot" id="plot" viewBox="0 0 860 330" role="img" aria-label="Frequency response of each mic"></svg>
+    </div>
+    <div class="dl-row">
+      <button class="primary" id="dl-irs" type="button" disabled>Download IRs</button>
+      <span class="readout" id="ir-readout">Example only, no files.</span>
+    </div>
+  </section>
+
+  <footer>Method: exponential sine sweeps (Farina), averaged, with harmonic distortion windowed out. With a reference tap each IR is the speaker-terminal voltage to microphone response. Version __VERSION__.</footer>
+</div>
+
+<script id="dsp">
+__DSP__
+</script>
+<script id="handler">
+async function ircHandle(m, emit) {
+  var post = function (t) { emit({ type: "progress", text: t }); };
+  try {
+    if (m.cmd === "signal") {
+      var s = IRC.makeSpec(m.spec), x = IRC.makeTestSignal(s), tag = IRC.rateTag(s.fs);
+      var base = "ircapture_sweeps_" + tag;
+      var howto = "Cab IR Capture test signal\n\n" + s.n_sweeps + " sweeps of " + s.duration + " s, " + s.gap + " s gaps, " +
+        s.f1 + " Hz to " + Math.round(s.f2) + " Hz, peak " + s.level_dbfs + " dBFS, " + tag + ".\nLength " + (x.length / s.fs).toFixed(1) +
+        " s.\n\nPut " + base + ".wav at bar 1 of a " + tag + " Logic project, record the mics while it plays,\nthen process the recordings on the Cab IR Capture page with the same settings.\nThe .json file records these settings.\n";
+      var zip = IRC.makeZip([
+        { path: base + ".wav", data: IRC.writeWav(x, s.fs, "32f") },
+        { path: base + ".json", data: new TextEncoder().encode(JSON.stringify(IRC.specJSON(s), null, 2)) },
+        { path: "How to use.txt", data: new TextEncoder().encode(howto) }]);
+      emit({ type: "signal", zip: zip, name: base + ".zip" });
+    } else if (m.cmd === "process") {
+      var s = IRC.makeSpec(m.spec), rec = [], names = [], refIndex = null;
+      post("Reading the recordings");
+      var infos = m.files.map(function (f) { return IRC.readWav(f.buf); });
+      infos.forEach(function (inf, i) { if (inf.fs !== s.fs) throw new Error(m.files[i].name + " is " + (inf.fs / 1000) + " kHz, but the test signal setting is " + (s.fs / 1000) + " kHz. Change the capture rate in step 1 to match the recording."); });
+      var n = Infinity;
+      m.channels.forEach(function (c) { n = Math.min(n, infos[c.file].frames); });
+      m.channels.forEach(function (c) {
+        var x = IRC.wavChannel(infos[c.file], c.ch);
+        rec.push(x.length > n ? x.slice(0, n) : x);
+        if (c.role === "ref") refIndex = rec.length - 1; else names.push(c.name);
+      });
+      m.files = null; infos = null;
+      var res = IRC.analyse(rec, s, names, refIndex, { ir_max: Math.max(1.0, m.export.full_ms / 1000 + 0.05) }, post);
+      rec = null;
+      var files = IRC.exportFiles(res, m.capture, m.export, post);
+      var gain = res.gains.set ? res.gains.set[names[0]] : res.gains.individual[names[0]];
+      var curves = IRC.responseCurves(res, gain);
+      post("Packing the zip");
+      files.push({ path: m.capture + "/report.json", data: new TextEncoder().encode(IRC.reportJSON(res, s, m.capture, { channels: m.channels.map(function (c) { return { file: c.fileName, channel: c.ch + 1, role: c.role, name: c.name }; }) })) });
+      var zip = IRC.makeZip(files);
+      emit({ type: "done", zip: zip, name: m.capture + "_IRs.zip", count: files.length - 1,
+        result: { diagnostics: res.diagnostics, warnings: res.warnings, mode: res.mode, sweeps_used: res.sweeps_used, names: res.names, curves: curves } });
+    }
+  } catch (err) { emit({ type: "error", text: err && err.message ? err.message : String(err) }); }
+}
+</script>
+<script>
+(function () {
+  "use strict";
+  var EXAMPLE = __EXAMPLE__;
+  var files = [], chans = [], busy = false, lastZip = null;   // declared first: validate() runs during setup
+  var $ = function (id) { return document.getElementById(id); };
+  var store = {
+    get: function (k) { try { return JSON.parse(localStorage.getItem("ircap:" + k)); } catch (e) { return null; } },
+    set: function (k, v) { try { localStorage.setItem("ircap:" + k, JSON.stringify(v)); } catch (e) {} }
+  };
+
+  // ---------------- downloads capability
+  var downloads = null;
+  var dlReady = (window.claude && window.claude.use) ? window.claude.use("downloads").catch(function () { return null; }) : Promise.resolve(null);
+  dlReady.then(function (d) {
+    downloads = d;
+    if (!d) { var h = $("dl-help"); h.textContent = "Saving files isn't available in this view. Open the page from the Claude app or claude.ai while signed in. The test signal files are also attached in your chat with Claude."; h.hidden = false; }
+  });
+  async function offer(blob, filename, statusEl, okText) {
+    var d = downloads || await Promise.race([dlReady, new Promise(function (r) { setTimeout(function () { r(null); }, 4000); })]);
+    if (!d) { statusEl.textContent = "Saving files isn't available in this view. Open the page from the Claude app or claude.ai while signed in."; return; }
+    try { await d.save({ filename: filename, data: blob }); statusEl.textContent = okText; }
+    catch (e) {
+      var c = e && e.code;
+      statusEl.textContent = c === "declined" ? "Download cancelled." : c === "rate_limited" ? "Another download prompt is open. Finish that one and try again." :
+        c === "too_large" ? "The file is too large to save here. Choose fewer sample rates, lengths or bit depths." : "The download didn't go through (" + (c || "unknown error") + ").";
+    }
+  }
+
+  // ---------------- processing (main thread; yields so progress text repaints)
+  function tick() { return new Promise(function (r) { setTimeout(r, 30); }); }
+  async function run(msg, transfer, onProgress) {
+    await tick();
+    var out = null;
+    await ircHandle(msg, function (d) { if (d.type === "progress") onProgress(d.text); else out = d; });
+    if (!out) throw new Error("Processing stopped without a result.");
+    if (out.type === "error") throw new Error(out.text);
+    return out;
+  }
+  window.addEventListener("error", function (e) {
+    var b = $("page-err"); b.textContent = "Something went wrong on the page: " + (e.message || "unknown error") + ". Reload and try again, and tell Claude this message if it repeats."; b.hidden = false;
+  });
+
+  // ---------------- step 1: settings
+  var numIds = ["nsw", "dur", "gap", "disc"];
+  function readSpec() {
+    return { fs: +$("rate").value, level_dbfs: +$("level").value, n_sweeps: Math.round(+$("nsw").value), duration: +$("dur").value,
+      gap: +$("gap").value, discard: Math.round(+$("disc").value) };
+  }
+  function signalSeconds(sp) { return 1 + sp.n_sweeps * (sp.duration + sp.gap) + 0.5; }
+  function updateReadout() {
+    var sp = readSpec(), sec = signalSeconds(sp);
+    $("sig-readout").textContent = sp.n_sweeps + " × " + sp.duration + " s sweeps · " + Math.floor(sec / 60) + ":" + String(Math.round(sec % 60)).padStart(2, "0") + " to record · " + IRC.rateTag(sp.fs);
+    store.set("spec", sp);
+    validate();
+  }
+  (function restore() {
+    var sp = store.get("spec");
+    if (sp) {
+      if (sp.fs) $("rate").value = String(sp.fs);
+      if (sp.level_dbfs !== undefined) $("level").value = String(sp.level_dbfs);
+      if (sp.n_sweeps) $("nsw").value = sp.n_sweeps;
+      if (sp.duration) $("dur").value = sp.duration;
+      if (sp.gap) $("gap").value = sp.gap;
+      if (sp.discard !== undefined) $("disc").value = sp.discard;
+    }
+    var nm = store.get("capture"); if (nm) $("cap-name").value = nm;
+  })();
+  ["rate", "level"].concat(numIds).forEach(function (id) { $(id).addEventListener("change", updateReadout); $(id).addEventListener("input", updateReadout); });
+  updateReadout();
+
+  $("dl-signal").addEventListener("click", async function () {
+    var btn = this; btn.disabled = true;
+    var st = $("sig-status");
+    try {
+      IRC.makeSpec(readSpec());
+      st.textContent = "Generating the sweeps…";
+      await tick();
+      var d = await run({ cmd: "signal", spec: readSpec() }, [], function (t) { st.textContent = t; });
+      await offer(d.zip, d.name, st, "Saved " + d.name + ". Keep these settings for step 3.");
+    } catch (e) { st.textContent = e.message; }
+    btn.disabled = false;
+  });
+
+  // ---------------- step 3: files and channels
+  function stem(n) { return IRC.safeName(n.replace(/\.wav$/i, "").replace(/^.*[\\/]/, "")); }
+  async function addFiles(list) {
+    var err = $("file-err"); err.hidden = true;
+    for (var i = 0; i < list.length; i++) {
+      var f = list[i];
+      try {
+        var buf = await f.arrayBuffer(), info = IRC.readWav(buf);
+        IRC.wavChannel(info, 0).length; // confirms the sample format is readable
+        var idx = files.length;
+        files.push({ name: f.name, buf: buf, info: { fs: info.fs, channels: info.channels, frames: info.frames, bits: info.bits } });
+        for (var c = 0; c < info.channels; c++) {
+          var base = stem(f.name) + (info.channels > 1 ? "_" + (c + 1) : "");
+          var isSweep = /sweep|ircapture/i.test(f.name);
+          var isRef = !isSweep && /ref|tap|terminal|speaker.?out/i.test(f.name) && !chans.some(function (x) { return x.role === "ref"; });
+          chans.push({ file: idx, ch: c, name: base, role: isSweep ? "skip" : isRef ? "ref" : "mic" });
+        }
+      } catch (e) {
+        err.textContent = f.name + ": " + e.message + ". Export WAV files from Logic (16, 24 or 32-bit).";
+        err.hidden = false;
+      }
+    }
+    renderChans();
+  }
+  function renderChans() {
+    var body = $("chan-body"); body.textContent = "";
+    $("chan-area").hidden = !files.length;
+    chans.forEach(function (c, i) {
+      var f = files[c.file], tr = document.createElement("tr");
+      var td1 = document.createElement("td"); td1.className = "file-cell";
+      td1.textContent = f.name + (f.info.channels > 1 ? " · ch " + (c.ch + 1) : "");
+      var meta = document.createElement("div"); meta.className = "file-meta";
+      meta.textContent = (f.info.fs / 1000) + " kHz · " + f.info.bits + "-bit · " + (f.info.frames / f.info.fs).toFixed(1) + " s";
+      td1.appendChild(meta);
+      var td2 = document.createElement("td"), inp = document.createElement("input");
+      inp.type = "text"; inp.id = "chan-name-" + i; inp.value = c.name; inp.spellcheck = false; inp.setAttribute("aria-label", "Name for " + td1.firstChild.textContent);
+      inp.disabled = c.role !== "mic";
+      inp.addEventListener("input", function () { c.name = inp.value; validate(); });
+      td2.appendChild(inp);
+      var td3 = document.createElement("td"), sel = document.createElement("select");
+      sel.id = "chan-role-" + i; sel.setAttribute("aria-label", "Role");
+      [["mic", "Mic"], ["ref", "Reference tap"], ["skip", "Skip"]].forEach(function (o) { var op = document.createElement("option"); op.value = o[0]; op.textContent = o[1]; sel.appendChild(op); });
+      sel.value = c.role;
+      sel.addEventListener("change", function () {
+        if (sel.value === "ref") chans.forEach(function (x) { if (x !== c && x.role === "ref") x.role = "mic"; });
+        c.role = sel.value; renderChans();
+      });
+      td3.appendChild(sel);
+      var td4 = document.createElement("td"), x = document.createElement("button");
+      x.type = "button"; x.className = "x"; x.textContent = "×"; x.setAttribute("aria-label", "Remove " + f.name);
+      x.addEventListener("click", function () { removeFile(c.file); });
+      if (c.ch === 0) td4.appendChild(x);
+      tr.append(td1, td2, td3, td4); body.appendChild(tr);
+    });
+    validate();
+  }
+  function removeFile(idx) {
+    files.splice(idx, 1);
+    chans = chans.filter(function (c) { return c.file !== idx; }).map(function (c) { if (c.file > idx) c.file--; return c; });
+    renderChans();
+  }
+  function checked(id) { return Array.prototype.map.call($(id).querySelectorAll("input:checked"), function (i) { return i.value; }); }
+  function validate() {
+    var err = $("file-err"), msg = "", sp = readSpec();
+    var mics = chans.filter(function (c) { return c.role === "mic"; });
+    var rates = {}; files.forEach(function (f) { rates[f.info.fs] = 1; });
+    if (files.length && Object.keys(rates).length > 1) msg = "These files have different sample rates. They need to come from the same take.";
+    else if (files.length && !rates[sp.fs]) msg = "The recordings are " + (files[0].info.fs / 1000) + " kHz but the capture rate in step 1 is " + (sp.fs / 1000) + " kHz. Set step 1 to match the recording.";
+    else if (files.length && !mics.length) msg = "Mark at least one channel as a mic.";
+    else {
+      var seen = {};
+      mics.forEach(function (c) { var k = IRC.safeName(c.name).toLowerCase(); if (seen[k]) msg = "Two mics are both named “" + c.name + "”. Give each a different name."; seen[k] = 1; });
+    }
+    if (files.length) {
+      var shortest = Math.min.apply(null, files.map(function (f) { return f.info.frames / f.info.fs; }));
+      if (!msg && shortest < signalSeconds(sp) - 1.5) msg = "The recordings are " + shortest.toFixed(1) + " s long, shorter than the " + signalSeconds(sp).toFixed(1) + " s test signal. Check the sweep settings, or record the whole pass.";
+    }
+    var outsOk = checked("opt-rates").length && checked("opt-lengths").length && checked("opt-bits").length && checked("opt-trim").length;
+    if (!msg && files.length && !outsOk) msg = "Choose at least one sample rate, length, bit depth and trimming option under Output files.";
+    err.textContent = msg; err.hidden = !msg || !files.length;
+    $("go").disabled = !files.length || !!msg || busy;
+  }
+  ["opt-rates", "opt-lengths", "opt-bits", "opt-trim"].forEach(function (id) { $(id).addEventListener("change", validate); });
+  $("cap-name").addEventListener("input", function () { store.set("capture", $("cap-name").value); });
+
+  var drop = $("drop"), fileIn = $("file");
+  drop.addEventListener("click", function () { fileIn.click(); });
+  drop.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileIn.click(); } });
+  fileIn.addEventListener("change", function () { addFiles(fileIn.files); fileIn.value = ""; });
+  ["dragenter", "dragover"].forEach(function (t) { drop.addEventListener(t, function (e) { e.preventDefault(); drop.classList.add("over"); }); });
+  ["dragleave", "drop"].forEach(function (t) { drop.addEventListener(t, function (e) { e.preventDefault(); drop.classList.remove("over"); }); });
+  drop.addEventListener("drop", function (e) { if (e.dataTransfer && e.dataTransfer.files.length) addFiles(e.dataTransfer.files); });
+
+  // ---------------- run
+  $("go").addEventListener("click", async function () {
+    busy = true; validate();
+    $("run-err").hidden = true; $("progress").hidden = false;
+    var capture = IRC.safeName($("cap-name").value || "Cab");
+    var used = chans.filter(function (c) { return c.role !== "skip"; });
+    var fileIdx = []; used.forEach(function (c) { if (fileIdx.indexOf(c.file) < 0) fileIdx.push(c.file); });
+    var msg = {
+      cmd: "process", spec: readSpec(), capture: capture,
+      files: fileIdx.map(function (i) { return { name: files[i].name, buf: files[i].buf.slice(0) }; }),
+      channels: used.map(function (c) { return { file: fileIdx.indexOf(c.file), fileName: files[c.file].name, ch: c.ch, role: c.role, name: IRC.safeName(c.name) }; }),
+      export: { rates: checked("opt-rates").map(Number), lengths: checked("opt-lengths").map(function (v) { return v === "full" ? "full" : +v; }),
+        bits: checked("opt-bits"), trim: checked("opt-trim"), full_ms: Math.max(50, Math.min(1000, +$("full-ms").value || 500)) }
+    };
+    try {
+      var d = await run(msg, msg.files.map(function (f) { return f.buf; }), function (t) { $("progress-text").textContent = t + "…"; });
+      lastZip = d;
+      showResult(d.result, false);
+      $("dl-irs").disabled = false;
+      $("ir-readout").textContent = d.count + " IR files plus report.json in " + d.name;
+      $("results").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+    } catch (e) {
+      $("run-err").textContent = e.message; $("run-err").hidden = false;
+    }
+    $("progress").hidden = true; busy = false; validate();
+  });
+  $("dl-irs").addEventListener("click", function () {
+    if (lastZip) offer(lastZip.zip, lastZip.name, $("ir-readout"), "Saved " + lastZip.name + ".");
+  });
+
+  // ---------------- results
+  var COLORS = ["--c1", "--c2", "--c3", "--c4", "--c5", "--c6"];
+  function chip(kind, text) { var s = document.createElement("span"); s.className = "pill " + kind; s.textContent = text; return s; }
+  function td(content, cls) { var t = document.createElement("td"); if (cls) t.className = cls; if (content instanceof Node) t.appendChild(content); else t.textContent = content; return t; }
+  function showResult(r, isExample) {
+    var pill = $("status-pill"), warnings = r.warnings || [];
+    if (isExample) { pill.className = "pill example"; pill.textContent = "Example: simulated 4×12, two mics"; }
+    else if (warnings.length) { pill.className = "pill warn"; pill.textContent = warnings.length === 1 ? "1 thing to check" : warnings.length + " things to check"; }
+    else { pill.className = "pill good"; pill.textContent = "Capture looks clean"; }
+    $("result-note").hidden = !isExample && r.mode === "reference";
+    if (!isExample) $("result-note").textContent = r.mode === "reference" ? "" : "No reference tap was used, so these IRs include the power amp's response.";
+    var ul = $("warnings"); ul.textContent = "";
+    warnings.forEach(function (w) { var li = document.createElement("li"); li.textContent = w; ul.appendChild(li); });
+    ul.hidden = !warnings.length || isExample;
+    var body = $("diag-body"); body.textContent = "";
+    var labels = r.names.concat(r.diagnostics.reference ? ["reference"] : []);
+    labels.forEach(function (lab, i) {
+      var d = r.diagnostics[lab], tr = document.createElement("tr"), isRef = lab === "reference";
+      var name = document.createElement("span");
+      if (!isRef) { var sw = document.createElement("span"); sw.className = "swatch"; sw.style.background = "var(" + COLORS[i % COLORS.length] + ")"; name.appendChild(sw); }
+      name.appendChild(document.createTextNode(isRef ? "Reference tap" : lab));
+      var pk = d.recording_peak_dbfs, pkKind = pk > -0.3 ? "bad" : pk < -30 ? "warn" : "good";
+      var pkCell = document.createElement("span"); pkCell.append(chip(pkKind, pk.toFixed(1) + " dBFS"));
+      var hd = d.harmonics_db, worst = null;
+      Object.keys(hd).forEach(function (k) { if (hd[k] !== null && (worst === null || hd[k] > worst)) worst = hd[k]; });
+      var dist = worst === null ? chip("good", "below noise") : chip(worst > -30 ? "bad" : worst > -40 ? "warn" : "good", "H" + Object.keys(hd).filter(function (k) { return hd[k] === worst; })[0].slice(1) + " " + Math.round(worst) + " dB");
+      tr.append(td(name), td(pkCell),
+        td(d.noise_floor_db !== undefined ? d.noise_floor_db.toFixed(0) + " dB" : "—", "num-cell"),
+        td(d.tail_above_noise_ms !== undefined ? Math.round(d.tail_above_noise_ms) + " ms" : "—", "num-cell"),
+        td(isRef ? "—" : dist),
+        td(isRef ? "—" : d.arrival_ms.toFixed(2) + " ms" + (r.mode === "reference" ? "" : " (relative)"), "num-cell"));
+      body.appendChild(tr);
+    });
+    drawPlot(r.curves, r.names);
+  }
+
+  function drawPlot(cv, names) {
+    var svg = $("plot"), NS = "http://www.w3.org/2000/svg", W = 860, H = 330, L = 48, R = 14, T = 12, B = 30;
+    svg.textContent = "";
+    function el(t, a) { var e = document.createElementNS(NS, t); for (var k in a) e.setAttribute(k, a[k]); svg.appendChild(e); return e; }
+    var fmin = 20, fmax = 20000, mx = -Infinity;
+    names.forEach(function (m) { cv.curves[m].forEach(function (v, i) { if (cv.fc[i] >= 40 && cv.fc[i] <= 12000 && v > mx) mx = v; }); });
+    var top = Math.ceil(mx / 10) * 10 + 5, bot = top - 60;
+    var X = function (f) { return L + (Math.log10(f / fmin) / Math.log10(fmax / fmin)) * (W - L - R); };
+    var Y = function (v) { return T + (top - Math.max(bot, Math.min(top, v))) / (top - bot) * (H - T - B); };
+    el("rect", { x: L, y: T, width: W - L - R, height: H - T - B, class: "frame" });
+    [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000].forEach(function (f) {
+      el("line", { x1: X(f), x2: X(f), y1: T, y2: H - B, class: "grid" });
+      var t = el("text", { x: X(f), y: H - B + 18, "text-anchor": f === 20 ? "start" : f === 20000 ? "end" : "middle" });
+      t.textContent = f >= 1000 ? (f / 1000) + "k" : String(f);
+    });
+    for (var v = bot + 5; v <= top; v += 10) {
+      el("line", { x1: L, x2: W - R, y1: Y(v), y2: Y(v), class: "grid" });
+      var t = el("text", { x: L - 6, y: Y(v) + 4, "text-anchor": "end" }); t.textContent = String(v - top + 5);
+    }
+    var ty = el("text", { x: 4, y: T + 10 }); ty.textContent = "dB";
+    var leg = $("legend"); leg.textContent = "";
+    names.forEach(function (m, i) {
+      var col = "var(" + COLORS[i % COLORS.length] + ")", d = "";
+      cv.fc.forEach(function (f, k) { d += (k ? "L" : "M") + X(f).toFixed(1) + " " + Y(cv.curves[m][k]).toFixed(1); });
+      el("path", { d: d, fill: "none", stroke: col, "stroke-width": 2, "stroke-linejoin": "round" });
+      var item = document.createElement("span"), sw = document.createElement("span");
+      sw.className = "swatch"; sw.style.background = col; item.append(sw, document.createTextNode(m)); leg.appendChild(item);
+    });
+  }
+
+  showResult(EXAMPLE, true);
+})();
+</script>

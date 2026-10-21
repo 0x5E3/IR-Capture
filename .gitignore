@@ -1,0 +1,8 @@
+.build/
+dist/
+reference/sim_out/
+reference/web/example.json
+*.xcodeproj/
+.swiftpm/
+.DS_Store
+__pycache__/

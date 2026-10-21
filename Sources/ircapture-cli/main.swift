@@ -1,0 +1,71 @@
+import Foundation
+import IRCaptureCore
+
+// Command-line front end for the Swift DSP. Mirrors `ircapture.py make-signal` and
+// `ircapture.py process`, so CI can check the Swift port against the Python reference.
+//
+//   ircapture-cli make-signal --out sweeps.wav [--fs 96000] [--level -12]
+//   ircapture-cli process --signal sweeps.json --rec a.wav b.wav ref.wav --ref 3
+//                         --names Close,Room --name logic --outdir out
+//                         [--rates 44100,48000,88200,96000] [--lengths full,1024,2048,4096]
+//                         [--bits 24,32f] [--trim set,individual] [--full-ms 500]
+
+func fail(_ m: String) -> Never { FileHandle.standardError.write((m + "\n").data(using: .utf8)!); exit(2) }
+
+var args = Array(CommandLine.arguments.dropFirst())
+guard let cmd = args.first else { fail("usage: ircapture-cli make-signal|process ...") }
+args.removeFirst()
+var opts: [String: [String]] = [:]
+var key: String? = nil
+for a in args {
+    if a.hasPrefix("--") { key = String(a.dropFirst(2)); opts[key!] = [] } else if let k = key { opts[k]!.append(a) }
+}
+func one(_ k: String) -> String? { opts[k]?.first }
+func list(_ k: String) -> [String]? { one(k).map { $0.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) } } }
+
+do {
+    switch cmd {
+    case "make-signal":
+        let out = URL(fileURLWithPath: one("out") ?? "sweeps.wav")
+        let spec = try SweepSpec(fs: Int(one("fs") ?? "96000")!, levelDBFS: Double(one("level") ?? "-12")!)
+        let x = makeTestSignal(spec)
+        try writeWavFloat([x], rate: spec.fs).write(to: out)
+        try spec.json.serialized().write(to: out.deletingPathExtension().appendingPathExtension("json"), atomically: true, encoding: .utf8)
+        print("wrote \(out.path) (\(String(format: "%.1f", Double(x.count) / Double(spec.fs))) s)")
+
+    case "process":
+        guard let sig = one("signal"), let recs = opts["rec"], !recs.isEmpty, let name = one("name") else {
+            fail("process needs --signal, --rec and --name")
+        }
+        let spec = try SweepSpec.load(jsonData: Data(contentsOf: URL(fileURLWithPath: sig)))
+        var rec: [[Double]] = []
+        for p in recs {
+            let info = try WavInfo(Data(contentsOf: URL(fileURLWithPath: p)))
+            if info.fs != spec.fs { fail("\(p) is \(info.fs) Hz but the test signal was made at \(spec.fs) Hz") }
+            for c in 0..<info.channels { rec.append(try info.channel(c)) }
+        }
+        let n = rec.map(\.count).min()!
+        rec = rec.map { Array($0.prefix(n)) }
+        let ref = one("ref").flatMap { Int($0) }.map { $0 - 1 }
+        let nMics = rec.count - (ref == nil ? 0 : 1)
+        let names = list("names") ?? (1...nMics).map { "mic\($0)" }
+        var eo = ExportOptions()
+        if let r = list("rates") { eo.rates = r.compactMap { Int($0) } }
+        if let l = list("lengths") { eo.lengths = l.compactMap { IRLength($0) } }
+        if let b = list("bits") { eo.bits = b.compactMap { BitDepth(rawValue: $0) } }
+        if let t = list("trim") { eo.trim = t.compactMap { TrimMode(rawValue: $0) } }
+        if let f = one("full-ms").flatMap(Double.init) { eo.fullMs = f }
+        let t0 = Date()
+        let out = try processAndWrite(rec: rec, spec: spec, names: names, refIndex: ref, capture: name,
+                                      outDir: URL(fileURLWithPath: one("outdir") ?? "ir_out"), export: eo,
+                                      process: ProcessOptions(irMax: Double(one("ir-max") ?? "1.0")!),
+                                      progress: { if opts["verbose"] != nil { print("  . " + $0) } })
+        print(summaryText(out.result))
+        print("wrote \(out.fileCount) IR files and \(out.folder.appendingPathComponent("report.json").path) in \(String(format: "%.1f", Date().timeIntervalSince(t0))) s")
+
+    default:
+        fail("unknown command \(cmd)")
+    }
+} catch {
+    fail("error: \(error)")
+}

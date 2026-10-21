@@ -1,0 +1,67 @@
+name: Build and test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mac:
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python reference dependencies
+        run: pip install numpy scipy soundfile
+
+      - name: Simulated rig — Python reference (known answers)
+        working-directory: reference
+        run: python sim_test.py
+
+      - name: Page DSP (dsp.js) vs Python
+        working-directory: reference/web
+        run: node test_dsp.js ../sim_out
+
+      - name: Build (universal, release)
+        run: swift build -c release --arch arm64 --arch x86_64
+
+      - name: Unit tests
+        run: swift test
+
+      - name: Golden test — Swift DSP vs Python reference
+        run: |
+          BIN="$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)"
+          python reference/compare_swift.py "$BIN/ircapture-cli" reference/sim_out
+
+      - name: Make the app
+        run: scripts/make_app.sh "${{ github.run_number }}"
+
+      - name: Upload app
+        uses: actions/upload-artifact@v4
+        with:
+          name: IR-Capture-app
+          path: dist/IR-Capture.zip
+
+      - name: Publish as the "latest" release
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest dist/IR-Capture.zip \
+            --title "IR Capture — latest build (#${{ github.run_number }})" \
+            --notes "Built from ${GITHUB_SHA::7}. Download IR-Capture.zip below, double-click to unzip, and move IR Capture to Applications. First launch: see the README." \
+            --prerelease --target "$GITHUB_SHA"
