@@ -56,6 +56,25 @@ jobs:
       - name: Make the app
         run: scripts/make_app.sh "${{ github.run_number }}"
 
+      - name: Smoke test — launch the app, process the simulated Logic recordings in it
+        run: |
+          set -x
+          EXE="dist/IR Capture.app/Contents/MacOS/IR Capture"
+          OUT="$(python -c 'import tempfile;print(tempfile.gettempdir())')/IRCaptureDemo/demo"
+          "$EXE" --demo "$PWD/reference/sim_out" & PID=$!
+          for i in $(seq 1 60); do [ -f "$OUT/report.json" ] && break; sleep 1; done
+          sleep 3
+          kill -0 $PID || { echo "::error title=Smoke test::The app quit or crashed during the demo run"; exit 1; }
+          screencapture -x dist/screenshot-results.png || echo "screenshot failed"
+          kill $PID; sleep 1
+          [ -f "$OUT/report.json" ] || { echo "::error title=Smoke test::The app didn't write report.json"; exit 1; }
+          python reference/check_app_demo.py "$OUT" reference/sim_out
+          "$EXE" & PID=$!
+          sleep 6
+          kill -0 $PID || { echo "::error title=Smoke test::The app quit or crashed on a plain launch"; exit 1; }
+          screencapture -x dist/screenshot-capture.png || echo "screenshot failed"
+          kill $PID
+
       - name: Upload app
         uses: actions/upload-artifact@v4
         with:
@@ -68,7 +87,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete latest --yes --cleanup-tag || true
-          gh release create latest dist/IR-Capture.zip \
+          gh release create latest dist/IR-Capture.zip $(ls dist/screenshot-*.png 2>/dev/null) \
             --title "IR Capture — latest build (#${{ github.run_number }})" \
             --notes "Built from ${GITHUB_SHA::7}. Download IR-Capture.zip below, double-click to unzip, and move IR Capture to Applications. First launch: see the README." \
             --prerelease --target "$GITHUB_SHA"

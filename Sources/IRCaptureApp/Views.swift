@@ -45,7 +45,25 @@ struct ContentView: View {
                 .padding(22).frame(maxWidth: 880, alignment: .leading).frame(maxWidth: .infinity)
             }
         }
-        .disabled(false)
+        .onAppear {
+            // CI smoke test: `IR Capture --demo <sim_out>` processes the simulated Logic recordings.
+            let args = ProcessInfo.processInfo.arguments
+            if let i = args.firstIndex(of: "--demo"), i + 1 < args.count {
+                tab = 1
+                let dir = URL(fileURLWithPath: args[i + 1])
+                m.outputFolder = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("IRCaptureDemo")
+                m.captureName = "demo"
+                m.addLogicFiles(["logic_close", "logic_room", "logic_ref"].map { dir.appendingPathComponent($0 + ".wav") })
+                for c in m.logicChannels where c.role == .mic {
+                    if let k = m.logicChannels.firstIndex(where: { $0.id == c.id }) {
+                        m.logicChannels[k].name = c.name.contains("close") ? "Close" : "Room"
+                    }
+                }
+                m.processLogic()
+            } else if args.contains("--logic-tab") {
+                tab = 1
+            }
+        }
     }
 }
 
