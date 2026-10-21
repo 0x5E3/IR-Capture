@@ -45,6 +45,19 @@ Files land in **Music › IR Captures** unless you pick another folder:
 <capture>/individual/...                    if "Trim each mic" is ticked
 ```
 
+## Amp capture (NAM)
+
+The **Amp capture (NAM)** tab gets recordings ready for NAM training at [TONE3000](https://www.tone3000.com/capture). The app doesn't train models itself.
+
+1. Download TONE3000's sweep file (`T3K-sweep-v3.wav`) from their Capture page.
+2. Play it from a 48 kHz Logic project through a reamp box into the amp. Record the load box's line out (**amp only**) or mics on the cab (**full chain**), following the steps on screen.
+3. Drag the exported WAVs in and click **Prepare files**. Each file is lined up to the sample on the signal's clicks and cut to the exact length. The app then checks clock drift, how much the amp changed during the take, level, clipping, noise and hum.
+4. Upload the WAVs at tone3000.com/capture.
+
+Output: `<capture>/<capture>_<input>.wav` (mono, 48 kHz, 24-bit), `report.json` and `UPLOAD-STEPS.txt`. Pair amp-only models with IRs captured with the reference tap, because the load box's line out already includes the speaker's impedance bump.
+
+Status: checked on simulated recordings only. No real model has been trained from these files yet.
+
 ## The reference tap (recommended)
 
 Pad the speaker-terminal voltage by about 20 dB (for example 10 kΩ in series and 1.1 kΩ to ground) into a line input, and mark that input **Reference tap**. The IRs are then speaker, mic and room only, whatever power amp drives the cab. Without it, a tube amp bakes about 5 dB of impedance bump into the IR. For a bridged output, or if the tap hums, use an isolation transformer or a balanced input.
@@ -59,7 +72,8 @@ scripts/make_app.sh               # macOS: dist/IR-Capture.zip
 ```
 
 - `Sources/IRCaptureCore`: the DSP, a line-for-line port of `reference/web/dsp.js`, which is itself a port of `reference/ircapture.py`. Plain Swift, so it builds and tests on Linux too. Keep all three in step.
-- `Sources/ircapture-cli`: `make-signal` and `process`, used by the golden test.
+- `Sources/ircapture-cli`: `make-signal`, `process` and `nam-prep`, used by the golden tests.
+- NAM prep: `reference/namprep.py` (reference), `reference/sim_nam_test.py` (simulated amp and mics), `reference/web/nam.js` (page), `Sources/IRCaptureCore/NAMPrep.swift` (app). `NAMLayout.swift` is generated from `reference/nam_v3_layout.json` by `scripts/gen_nam_layout.py`.
 - `Sources/IRCaptureApp`: SwiftUI app. `DuplexIO.swift` plays and records through one AUHAL unit on one device, so input and output share a clock.
 - `reference/`: the Python reference, the simulated rig (`sim_test.py`), the web page source, and `compare_swift.py`.
 - CI (`.github/workflows/build.yml`) runs on macOS: simulated rig → page DSP vs Python → universal build → unit tests → Swift vs Python golden test → app bundle → the `latest` release.
