@@ -35,14 +35,19 @@ struct ContentView: View {
             }
             .pickerStyle(.segmented).labelsHidden().frame(maxWidth: 420).padding(.vertical, 12)
             Divider()
+            ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     if tab == 0 { CaptureTab() } else { LogicTab() }
-                    if let r = m.result { ResultsView(r: r) }
+                    if let r = m.result { ResultsView(r: r).id("results") }
                     Text("Method: exponential sine sweeps (Farina), averaged, with harmonic distortion windowed out. With a reference tap each IR is the speaker-terminal voltage to microphone response. IR Capture \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev").")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
                 .padding(22).frame(maxWidth: 880, alignment: .leading).frame(maxWidth: .infinity)
+            }
+            .onChange(of: m.result?.folder) { _ in
+                withAnimation { proxy.scrollTo("results", anchor: .top) }
+            }
             }
         }
         .onAppear {
