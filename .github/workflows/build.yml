@@ -36,7 +36,14 @@ jobs:
         run: node test_dsp.js ../sim_out
 
       - name: Build (universal, release)
-        run: swift build -c release --arch arm64 --arch x86_64
+        run: |
+          set -o pipefail
+          if ! swift build -c release --arch arm64 --arch x86_64 2>&1 | tee build.log; then
+            # Surface compiler errors as one annotation (readable from the API without log access).
+            msg="$(grep -E 'error:' build.log | sed -E 's#^.*/Sources/#Sources/#' | sort -u | head -40 | awk '{printf "%s%%0A", $0}')"
+            echo "::error title=Swift build failed::${msg}"
+            exit 1
+          fi
 
       - name: Unit tests
         run: swift test
