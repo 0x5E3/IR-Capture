@@ -108,10 +108,10 @@ jobs:
           set -x
           EXE="dist/IR Capture.app/Contents/MacOS/IR Capture"
           OUT="$(python -c 'import tempfile;print(tempfile.gettempdir())')/IRCaptureDemo/demo"
-          "$EXE" --demo "$PWD/reference/sim_out" & PID=$!
+          "$EXE" --demo "$PWD/reference/sim_out" 2> dist/demo-stderr.txt & PID=$!
           for i in $(seq 1 60); do [ -f "$OUT/report.json" ] && break; sleep 1; done
           sleep 3
-          kill -0 $PID || { echo "::error title=Smoke test::The app quit or crashed during the demo run"; exit 1; }
+          kill -0 $PID || { wait $PID; echo "exit status $?" >> dist/demo-stderr.txt; ls -R "$(dirname "$OUT")" >> dist/demo-stderr.txt 2>&1; echo "::error title=Smoke test::The app quit or crashed during the demo run"; exit 1; }
           screencapture -x dist/screenshot-results.png || echo "screenshot failed"
           kill $PID; sleep 1
           [ -f "$OUT/report.json" ] || { echo "::error title=Smoke test::The app didn't write report.json"; exit 1; }
@@ -159,6 +159,36 @@ jobs:
           LOG="$HOME/Library/Logs/IR Capture/IR Capture.log"
           [ -s "$LOG" ] || { echo "::error title=Smoke test::The app didn't write its log file"; exit 1; }
           tail -5 "$LOG"
+
+      - name: On failure, report the crash and the app log as annotations
+        if: failure()
+        run: |
+          python - <<'PY'
+          import glob, os, json
+          def ann(title, text):
+              text = text[-3500:].replace('%', '%25').replace('\r', '').replace('\n', '%0A')
+              print(f"::error title={title}::{text}")
+          reps = sorted(glob.glob(os.path.expanduser('~/Library/Logs/DiagnosticReports/*IR*Capture*')) + glob.glob('/Library/Logs/DiagnosticReports/*IR*Capture*'), key=os.path.getmtime)
+          print("crash reports:", reps)
+          for r in reps[-1:]:
+              t = open(r, errors='replace').read()
+              try:
+                  first, rest = t.split('\n', 1)
+                  d = json.loads(rest)
+                  ex = d.get('exception', {}); term = d.get('termination', {})
+                  head = f"exception {ex} | termination {term} | asi {d.get('asi')}"
+                  ft = d.get('faultingThread', 0); imgs = d.get('usedImages', [])
+                  fr = d['threads'][ft]['frames']
+                  lines = [head] + [f"{imgs[f['imageIndex']].get('name','?') if f.get('imageIndex') is not None and f['imageIndex'] < len(imgs) else '?'} {f.get('symbol','?')} +{f.get('symbolLocation','')} {f.get('sourceFile','')}:{f.get('sourceLine','')}" for f in fr[:40]]
+                  ann("Crash report", '\n'.join(lines))
+              except Exception as e:
+                  ann("Crash report (raw)", t[:3500])
+          if os.path.exists('dist/demo-stderr.txt'):
+              ann("Demo stderr, exit status, output files", open('dist/demo-stderr.txt', errors='replace').read())
+          log = os.path.expanduser('~/Library/Logs/IR Capture/IR Capture.log')
+          if os.path.exists(log):
+              ann("App log tail", open(log, errors='replace').read())
+          PY
 
       - name: Wiring diagrams and Quick start PDF
         run: |
