@@ -49,14 +49,23 @@ Files land in **Music › IR Captures** unless you pick another folder:
 
 The **Amp capture (NAM)** tab gets recordings ready for NAM training at [TONE3000](https://www.tone3000.com/capture). The app doesn't train models itself.
 
-1. Download TONE3000's sweep file (`T3K-sweep-v3.wav`) from their Capture page.
-2. Play it from a 48 kHz Logic project through a reamp box into the amp. Record the load box's line out (**amp only**) or mics on the cab (**full chain**), following the steps on screen.
-3. Drag the exported WAVs in and click **Prepare files**. Each file is lined up to the sample on the signal's clicks and cut to the exact length. The app then checks clock drift, how much the amp changed during the take, level, clipping, noise and hum.
-4. Upload the WAVs at tone3000.com/capture.
+Like IR capture, it works two ways. Both start with TONE3000's sweep file (`T3K-sweep-v3.wav`), downloaded from their Capture page.
+
+**Record with the app** (no Logic):
+1. Choose the sweep file once. The app checks it's the untouched original and remembers it.
+2. Pick the interface, the output that feeds the reamp box, and the inputs to record (load box line out for **amp only**, mics for **full chain**).
+3. Run the level check. It loops the loudest 6 s of the signal and shows a live meter per input, aiming for peaks near −8 dBFS.
+4. Click **Record**. The app plays all 190 s and records every input on the same interface, so the clocks can't drift. It keeps the raw recording, then lines up and checks the files.
+
+**Use Logic recordings:**
+1. Play the sweep file from a 48 kHz Logic project through a reamp box into the amp, and record, following the steps on screen.
+2. Drag the exported WAVs in and click **Prepare files**.
+
+Either way, each file is lined up to the sample on the signal's clicks and cut to the exact length. The app then checks clock drift, how much the amp changed during the take, level, clipping, noise and hum. Upload the WAVs at tone3000.com/capture.
 
 Output: `<capture>/<capture>_<input>.wav` (mono, 48 kHz, 24-bit), `report.json` and `UPLOAD-STEPS.txt`. Pair amp-only models with IRs captured with the reference tap, because the load box's line out already includes the speaker's impedance bump.
 
-Status: checked on simulated recordings only. No real model has been trained from these files yet.
+Status: checked on simulated recordings only. No real model has been trained from these files yet. Recording with the app has run only through a simulated interface in CI, not a real one.
 
 ## The reference tap (recommended)
 
