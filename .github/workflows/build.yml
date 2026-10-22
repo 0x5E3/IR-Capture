@@ -94,6 +94,15 @@ jobs:
           kill $PID; sleep 1
           [ -f "$NAMOUT/report.json" ] || { echo "::error title=Smoke test::The app didn't write the NAM files"; exit 1; }
           python reference/compare_swift_nam.py --app "$NAMOUT" reference/sim_nam_out/gold
+          DIROUT="$(python -c 'import tempfile;print(tempfile.gettempdir())')/IRCaptureDemo/namdirect"
+          "$EXE" --nam-direct-demo "$PWD/reference/sim_nam_out" & PID=$!
+          for i in $(seq 1 120); do [ -f "$DIROUT/UPLOAD-STEPS.txt" ] && break; sleep 1; done
+          sleep 3
+          kill -0 $PID || { echo "::error title=Smoke test::The app quit or crashed during the NAM direct-capture demo"; exit 1; }
+          screencapture -x dist/screenshot-nam-record.png || echo "screenshot failed"
+          kill $PID; sleep 1
+          [ -f "$DIROUT/report.json" ] || { echo "::error title=Smoke test::The app didn't write the NAM direct-capture files"; exit 1; }
+          python reference/check_app_nam_direct.py "$DIROUT" reference/sim_nam_out
           "$EXE" & PID=$!
           sleep 6
           kill -0 $PID || { echo "::error title=Smoke test::The app quit or crashed on a plain launch"; exit 1; }

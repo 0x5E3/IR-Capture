@@ -158,6 +158,16 @@ final class DuplexIO {
         playPos += n
     }
 
+    /// Peak level of each input over frames [from, to), for the live meters (main thread, read only).
+    func peaks(from: Int, to: Int) -> [Float] {
+        let a = max(0, from), b = min(to, recCapacity)
+        return rec.map { p in
+            var pk: Float = 0
+            if b > a { for i in a..<b { let v = abs(p[i]); if v > pk { pk = v } } }
+            return pk
+        }
+    }
+
     /// Copies out what was recorded, one array per requested input.
     func recording() -> [[Float]] {
         let n = min(recPosStorage, recCapacity)
@@ -167,12 +177,14 @@ final class DuplexIO {
     /// Plays and records until the signal plus the extra time has been captured.
     static func run(device: AudioDevice, fs: Int, outChannel: Int, inputs: [Int], signal: [Float],
                     extraSeconds: Double = 1.0, cancelled: @escaping () -> Bool = { false },
-                    progress: @escaping (Double) -> Void = { _ in }) async throws -> [[Float]] {
+                    progress: @escaping (Double) -> Void = { _ in },
+                    meter: (([Float]) -> Void)? = nil) async throws -> [[Float]] {
         let io = DuplexIO(device: device, fs: fs, outChannel: outChannel, inputs: inputs, signal: signal, extraSeconds: extraSeconds)
         try io.start(deviceID: device.id)
         defer { io.stop() }
         let started = Date()
         let expected = Double(io.recCapacity) / Double(fs)
+        var metered = 0
         while !io.finished {
             try await Task.sleep(nanoseconds: 50_000_000)
             if cancelled() { throw CancellationError() }
@@ -183,6 +195,10 @@ final class DuplexIO {
             }
             if elapsed > expected * 1.5 + 10 { throw AppError("The interface stopped delivering audio part way through.") }
             progress(Double(io.recorded) / Double(io.recCapacity))
+            if let meter {
+                let pos = io.recorded
+                if pos > metered { meter(io.peaks(from: metered, to: pos)); metered = pos }
+            }
         }
         io.stop()
         return io.recording()

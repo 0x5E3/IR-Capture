@@ -361,6 +361,48 @@ public enum NAMPrep {
         return finish(kind: kind, channels: out)
     }
 
+    // ------------------------------------------------------------ direct capture (app plays the file itself)
+    /// Checks that `x` is TONE3000's sweep file as downloaded: 48 kHz, exactly 190 s, the stored layout
+    /// at offset zero, and both alignment clicks in place. The app plays this file bit for bit.
+    public static func checkSignalFile(_ x: [Double], fs inRate: Int) throws {
+        guard inRate == fs else {
+            throw IRCaptureError("This file is \(rateTag(inRate).dropLast()) kHz. TONE3000's sweep file is 48 kHz. Download it again and use it exactly as it is.")
+        }
+        guard x.count == N else {
+            throw IRCaptureError("This file is \(f(Double(x.count) / Double(fs), 2)) s long. TONE3000's sweep file (T3K-sweep-v3.wav) is exactly \(f(Double(N) / Double(fs), 2)) s. Download it again and don't trim or edit it.")
+        }
+        let (d, r) = try coarseOffset(x)
+        guard d == 0, r > 0.95 else {
+            throw IRCaptureError("This doesn't look like TONE3000's v3 sweep file (match \(f(r, 2))). Download T3K-sweep-v3.wav from tone3000.com/capture and choose that.")
+        }
+        for b in NAMLayout.blips where abs(x[b]) < 0.5 {
+            throw IRCaptureError("The alignment clicks at 10.5 s and 11.5 s are missing. This file has been edited or normalized: download T3K-sweep-v3.wav again.")
+        }
+    }
+
+    /// The loudest stretch of the training signal (clicks excluded), looped by the app's level check.
+    /// Returns (start, count) in samples.
+    public static func levelSection(_ x: [Float], seconds: Double = 6) -> (Int, Int) {
+        let step = fs / 2, nb = Int(seconds * 2)
+        let skip = (NAMLayout.blips[0] - fs, NAMLayout.blips[1] + fs)
+        let blocks = min(x.count, LAST) / step
+        var bp = [Float](repeating: 0, count: blocks)
+        x.withUnsafeBufferPointer { p in
+            for b in 0..<blocks { var pk: Float = 0; for i in (b * step)..<((b + 1) * step) { let a = abs(p[i]); if a > pk { pk = a } }; bp[b] = pk }
+        }
+        var best = (0, Float(-1))
+        var b = 0
+        while b + nb <= blocks {
+            let s = b * step
+            if !(s + nb * step > skip.0 && s < skip.1) {
+                let pk = bp[b..<(b + nb)].max()!
+                if pk > best.1 + 1e-6 { best = (s, pk) }
+            }
+            b += 1
+        }
+        return (best.0, min(nb * step, x.count - best.0))
+    }
+
     // ------------------------------------------------------------ output
     /// Mono 24-bit PCM at 48 kHz; scale 2^23 so a 24-bit recording passes through bit for bit.
     public static func wav24(_ x: [Double]) -> Data {

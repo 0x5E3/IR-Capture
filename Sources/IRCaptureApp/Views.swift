@@ -77,6 +77,7 @@ struct ContentView: View {
             } else if let i = args.firstIndex(of: "--nam-demo"), i + 1 < args.count {
                 // CI smoke test: process the simulated NAM recordings (sim_nam_out/gold).
                 tab = 2
+                m.namMode = "logic"
                 let dir = URL(fileURLWithPath: args[i + 1])
                 m.outputFolder = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("IRCaptureDemo")
                 m.namName = "namdemo"
@@ -84,6 +85,12 @@ struct ContentView: View {
                 m.addNAMFiles(["Suhr", "SM57", "Room96"].map { dir.appendingPathComponent($0 + ".wav") })
                 for k in m.namInputs.indices where m.namInputs[k].name == "Room96" { m.namInputs[k].name = "Room" }
                 m.prepareNAM()
+            } else if let i = args.firstIndex(of: "--nam-direct-demo"), i + 1 < args.count {
+                // CI smoke test: record through a simulated interface with the stand-in sweep file.
+                tab = 2
+                m.runNAMDirectDemo(URL(fileURLWithPath: args[i + 1]))
+            } else if args.contains("--nam-tab") {
+                tab = 2
             } else if args.contains("--logic-tab") {
                 tab = 1
             }
@@ -150,11 +157,11 @@ struct BusyLine: View {
     var body: some View {
         if let b = m.busy {
             VStack(alignment: .leading, spacing: 6) {
-                if case .recording(let p) = b { ProgressView(value: p).tint(lamp) } else { ProgressView().controlSize(.small) }
+                if let p = b.progress { ProgressView(value: p).tint(lamp) } else { ProgressView().controlSize(.small) }
                 HStack {
                     Text(b.text).foregroundStyle(.secondary)
                     Spacer()
-                    if case .recording = b { Button("Stop") { m.cancelCapture() } }
+                    if b.progress != nil { Button("Stop") { m.cancelCapture() } }
                 }
             }
         }
@@ -508,6 +515,184 @@ struct LogicGrid: View {
 // ------------------------------------------------------------------ NAM tab
 struct NAMTab: View {
     @EnvironmentObject var m: AppModel
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Picker("", selection: $m.namMode) {
+                Text("Record with the app").tag("app")
+                Text("Use Logic recordings").tag("logic")
+            }
+            .pickerStyle(.segmented).labelsHidden().frame(maxWidth: 420)
+            if m.namMode == "logic" { NAMLogicSteps() } else { NAMDirectSteps() }
+        }
+    }
+}
+
+struct NAMModelChoice: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("WHICH MODEL TO MAKE").font(.caption.weight(.semibold)).kerning(0.8).foregroundStyle(.secondary)
+            Note("Amp only is the flexible one: pair the model with this app's cab IRs. Use IRs captured with the speaker-terminal reference tap. The load box's line out already carries the speaker's impedance bump, so a sweep-referenced IR would add it twice.", color: .primary)
+            Note("Full chain captures amp, cab and mic together. Each mic becomes its own model. Close mics work best: NAM only models a short stretch of time, so room sound won't carry over well.", color: .primary)
+        }
+        .padding(12).frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 6).fill(Color.secondary.opacity(0.1)))
+    }
+}
+
+struct NAMNameRow: View {
+    @EnvironmentObject var m: AppModel
+    var body: some View {
+        Picker("Capture type", selection: $m.namKind) {
+            Text("Amp only (load box line out)").tag(NAMKind.amp)
+            Text("Full chain (mics on the cab)").tag(NAMKind.full)
+        }.pickerStyle(.radioGroup)
+        HStack {
+            Text("Capture name").foregroundStyle(.secondary)
+            TextField("e.g. JCM800_Gain6_Bass5", text: $m.namName).frame(maxWidth: 320)
+        }
+        Note("The amp and its settings, e.g. JCM800_Gain6_Bass5. Every file name starts with this.")
+        SaveFolderRow()
+    }
+}
+
+// Record with the app: it plays TONE3000's sweep file itself and records every input on the same interface.
+struct NAMDirectSteps: View {
+    @EnvironmentObject var m: AppModel
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Step(n: 1, title: "Training signal", subtitle: "TONE3000's sweep file. You only choose it once; the app remembers it.") {
+                Checklist(items: [
+                    "Log in at tone3000.com. Choose Create Tone, then Capture, and download the sweep file, T3K-sweep-v3.wav. Don't open it in an editor or convert it.",
+                    "Click Choose sweep file and pick T3K-sweep-v3.wav. The app checks that it's the right file.",
+                ])
+                HStack(spacing: 12) {
+                    Button("Open tone3000.com/capture") { m.openTONE3000() }
+                    Button(m.namSignal == nil ? "Choose sweep file…" : "Choose a different file…") { m.chooseNAMSignal() }
+                }
+                if m.namSignal != nil {
+                    Note("✓ \(m.namSignalName) is ready (190 s, 48 kHz). The app plays it exactly as it is.", color: goodColor)
+                } else if let s = m.namSignalStatus {
+                    Note(s, color: s.hasPrefix("Checking") ? .secondary : badColor)
+                }
+            }
+
+            Step(n: 2, title: "Interface and inputs", subtitle: "One interface does both: its output feeds the reamp box, its inputs record the amp.") {
+                if m.duplexDevices.isEmpty {
+                    Note("No audio interface with both inputs and outputs was found. Connect it, then click Refresh.", color: badColor)
+                }
+                HStack(spacing: 16) {
+                    Picker("Interface", selection: $m.deviceUID) {
+                        ForEach(m.duplexDevices) { d in Text("\(d.name)  (\(d.inputChannels) in / \(d.outputChannels) out)").tag(d.uid) }
+                    }.frame(maxWidth: 420)
+                    Button("Refresh") { m.refreshDevices() }
+                }
+                if let dev = m.device {
+                    Picker("Output to the reamp box", selection: $m.namOutChannel) {
+                        ForEach(0..<dev.outputChannels, id: \.self) { Text("Output \($0 + 1)").tag($0) }
+                    }.frame(width: 300)
+                    Note("The app switches the interface to 48 kHz when it runs, because the training signal is 48 kHz.")
+                    NAMInputsGrid()
+                    Note("Mark each input you're recording as Use and give it a name (Suhr, SM57, R121…). Each one becomes its own file and its own model.")
+                }
+                Checklist(items: [
+                    "Interface output → reamp box → the amp's input. Turn off noise gates, reverb, delay and anything in the effects loop.",
+                    "Amp only: speaker output into the load box (the Suhr Reactive Load), and its line out into an interface input. Leave any cab sim or EQ on the load box off.",
+                    "Full chain: amp into the cab as usual, with mics on the cab. Mute the studio monitors.",
+                    "Turn off any mixer or monitoring software effects on the interface's inputs (its own DSP, compressors, gates).",
+                ])
+                NAMModelChoice()
+            }
+
+            Step(n: 3, title: "Set the levels", subtitle: "The app loops the loudest 6 seconds of the training signal so you can set each input.") {
+                Checklist(items: [
+                    "Warm the amp up for about 20 minutes. Wear ear protection for full chain captures.",
+                    "Click Start level check. Set the reamp level so the amp is hit about as hard as by a guitar.",
+                    "Turn each input's gain until its line says OK (peaks around −8 dBFS). Nothing should say CLIP.",
+                    "Click Stop level check. From here on, don't touch any knobs.",
+                ])
+                HStack {
+                    Button(m.namLevelRunning ? "Stop level check" : "Start level check") { m.toggleNAMLevelCheck() }
+                        .controlSize(.large).disabled(m.busy != nil)
+                    if m.namLevelRunning { ProgressView().controlSize(.small); Text("Looping…").foregroundStyle(.secondary) }
+                }
+                if let e = m.namLevelError { Note(e, color: badColor) }
+                if !m.namMeters.isEmpty { NAMMeterTable(meters: m.namMeters) }
+            }
+
+            Step(n: 4, title: "Record", subtitle: "Plays all 3 minutes 10 seconds of the training signal and records every input at once.") {
+                NAMNameRow()
+                HStack {
+                    Button("Record (3 min 12 s)") { m.startNAMCapture() }
+                        .buttonStyle(.borderedProminent).tint(lamp).controlSize(.large)
+                        .disabled(m.busy != nil || m.namDirectProblem != nil)
+                    if let p = m.namDirectProblem, m.busy == nil { Note(p, color: warnColor) }
+                }
+                if let e = m.namError { Note(e, color: badColor) }
+                BusyLine()
+                if m.busy?.progress != nil && !m.namMeters.isEmpty { NAMMeterTable(meters: m.namMeters) }
+                Note("When it finishes, the app lines the files up, checks them and saves them in a folder ready to upload to TONE3000. The untouched recording is also kept in a “raw recording” folder inside it.")
+            }
+        }
+    }
+}
+
+struct NAMInputsGrid: View {
+    @EnvironmentObject var m: AppModel
+    var body: some View {
+        Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 8) {
+            GridRow {
+                Text("INPUT").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                Text("USE").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                Text("NAME").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            }
+            ForEach($m.namRows) { $r in
+                GridRow {
+                    Text("Input \(r.id + 1)")
+                    Picker("", selection: $r.use) { Text("Use").tag(true); Text("Not used").tag(false) }.labelsHidden().frame(width: 130)
+                    TextField("", text: $r.name).frame(width: 220).disabled(!r.use)
+                }
+            }
+        }
+    }
+}
+
+struct NAMMeterTable: View {
+    let meters: [NAMMeter]
+    static let target = -8.0
+    func advice(_ x: NAMMeter) -> (String, Color) {
+        if x.clipped { return ("CLIP — lower the input gain about 6 dB", badColor) }
+        if x.peakDB < -60 { return ("No signal — check the cable and the input", badColor) }
+        let change = NAMMeterTable.target - x.peakDB
+        if abs(change) <= 3 { return ("OK", goodColor) }
+        return (change > 0 ? "Raise about \(Int(change.rounded())) dB" : "Lower about \(Int((-change).rounded())) dB", warnColor)
+    }
+    var body: some View {
+        Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 8) {
+            ForEach(meters) { x in
+                let adv = advice(x)
+                let color = adv.1
+                GridRow {
+                    Text(x.label).frame(width: 130, alignment: .leading).lineLimit(1)
+                    GeometryReader { g in
+                        let frac = max(0, min(1, (x.peakDB + 48) / 48))
+                        ZStack(alignment: .leading) {
+                            RoundedRectangle(cornerRadius: 3).fill(Color.secondary.opacity(0.15))
+                            RoundedRectangle(cornerRadius: 3).fill(color).frame(width: g.size.width * frac)
+                            Rectangle().fill(Color.primary.opacity(0.5)).frame(width: 2)
+                                .offset(x: g.size.width * (NAMMeterTable.target + 48) / 48 - 1)
+                        }
+                    }.frame(width: 220, height: 12)
+                    Text(x.peakDB < -100 ? "—" : String(format: "%.1f dBFS", x.peakDB)).font(.system(.body, design: .monospaced)).frame(width: 100, alignment: .trailing)
+                    Text(adv.0).foregroundStyle(color)
+                }
+            }
+        }
+    }
+}
+
+// Use Logic recordings: the original route, kept as is.
+struct NAMLogicSteps: View {
+    @EnvironmentObject var m: AppModel
     @State private var dropping = false
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -529,13 +714,7 @@ struct NAMTab: View {
                     "Warm the amp up for about 20 minutes first. Then record one full pass, all 3 minutes 10 seconds, and a second or two past the end. Don't touch any knobs while it runs.",
                     "Choose File › Export › All Tracks as Audio Files: WAV, 24-bit, 48 kHz, Normalize off.",
                 ])
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("WHICH MODEL TO MAKE").font(.caption.weight(.semibold)).kerning(0.8).foregroundStyle(.secondary)
-                    Note("Amp only is the flexible one: pair the model with this app's cab IRs. Use IRs captured with the speaker-terminal reference tap. The load box's line out already carries the speaker's impedance bump, so a sweep-referenced IR would add it twice.", color: .primary)
-                    Note("Full chain captures amp, cab and mic together. Each mic becomes its own model. Close mics work best: NAM only models a short stretch of time, so room sound won't carry over well.", color: .primary)
-                }
-                .padding(12).frame(maxWidth: .infinity, alignment: .leading)
-                .background(RoundedRectangle(cornerRadius: 6).fill(Color.secondary.opacity(0.1)))
+                NAMModelChoice()
             }
 
             Step(n: 3, title: "Prepare the files", subtitle: "Add the exported WAV files, check the names, and click Prepare files.") {
@@ -556,16 +735,7 @@ struct NAMTab: View {
                 }
                 if let msg = m.namMessage { Note(msg, color: badColor) }
                 if !m.namInputs.isEmpty { NAMGrid() }
-                Picker("Capture type", selection: $m.namKind) {
-                    Text("Amp only (load box line out)").tag(NAMKind.amp)
-                    Text("Full chain (mics on the cab)").tag(NAMKind.full)
-                }.pickerStyle(.radioGroup)
-                HStack {
-                    Text("Capture name").foregroundStyle(.secondary)
-                    TextField("e.g. JCM800_Gain6_Bass5", text: $m.namName).frame(maxWidth: 320)
-                }
-                Note("The amp and its settings, e.g. JCM800_Gain6_Bass5. Every file name starts with this.")
-                SaveFolderRow()
+                NAMNameRow()
                 HStack {
                     Button("Prepare files") { m.prepareNAM() }
                         .buttonStyle(.borderedProminent).tint(lamp).controlSize(.large)

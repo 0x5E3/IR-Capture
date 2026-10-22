@@ -132,6 +132,9 @@ def main():
     work = Path(__file__).parent / "sim_nam_out"
     shutil.rmtree(work, ignore_errors=True)
     work.mkdir()
+    if not a.signal:
+        # The app's direct-capture smoke test plays this file through a simulated interface.
+        sf.write(work / "standin_signal.wav", x, FS, subtype="PCM_24")
 
     imp = np.zeros(4000)
     imp[0] = 0.99

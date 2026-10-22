@@ -56,6 +56,21 @@ struct NAMInput: Identifiable {
     var meta: String { "\(rateTag(fs).dropLast()) kHz · \(bits)-bit · " + String(format: "%.1f s", Double(frames) / Double(fs)) }
 }
 
+/// One interface input for direct NAM capture.
+struct NAMRow: Identifiable, Codable, Equatable {
+    var id: Int            // 0-based device input channel
+    var use: Bool
+    var name: String
+}
+
+/// Live level of one input during the NAM level check or capture.
+struct NAMMeter: Identifiable {
+    let id: Int
+    var label: String
+    var peakDB: Double     // highest peak over the last few seconds
+    var clipped: Bool
+}
+
 struct NAMSummary {
     var title: String
     var kind: NAMKind
@@ -70,13 +85,20 @@ struct NAMSummary {
 enum Busy: Equatable {
     case preparing(String)
     case recording(Double)
+    case namRecording(Double)
     case processing(String)
     var text: String {
         switch self {
         case .preparing(let t): return t
         case .recording(let p): return "Playing the sweeps and recording — \(Int(p * 100))%. Keep the room quiet."
+        case .namRecording(let p):
+            let left = max(0, Int(((1 - p) * Double(NAMPrep.length + 2 * NAMPrep.fs) / Double(NAMPrep.fs)).rounded()))
+            return "Playing the training signal and recording — \(left / 60):\(String(format: "%02d", left % 60)) left. Don't touch the amp or the gain knobs."
         case .processing(let t): return t + "…"
         }
+    }
+    var progress: Double? {
+        switch self { case .recording(let p), .namRecording(let p): return p; default: return nil }
     }
 }
 
@@ -132,6 +154,22 @@ final class AppModel: ObservableObject {
     @Published var namError: String?
     @Published var namResult: NAMSummary?
 
+    // ---------------------------------------------------------------- NAM: record with the app
+    @Published var namMode: String { didSet { defaults.set(namMode, forKey: "namMode") } }       // "app" or "logic"
+    @Published var namOutChannel: Int { didSet { defaults.set(namOutChannel, forKey: "namOutChannel") } }
+    @Published var namRows: [NAMRow] = [] { didSet { saveNAMRows() } }
+    @Published var namSignalPath: String { didSet { defaults.set(namSignalPath, forKey: "namSignalPath") } }
+    @Published var namSignalStatus: String?
+    @Published var namSignal: [Float]?
+    @Published var namLevelRunning = false
+    @Published var namLevelError: String?
+    @Published var namMeters: [NAMMeter] = []
+    private var namMeterHistory: [Int: [Float]] = [:]
+    private var namClipped: Set<Int> = []
+    private var namLevelTask: Task<Void, Never>?
+    /// CI only: replaces the interface with a simulated one (fixed latency and gain per input).
+    var simulateIO = false
+
     init() {
         let d = UserDefaults.standard
         deviceUID = d.string(forKey: "deviceUID") ?? ""
@@ -151,9 +189,16 @@ final class AppModel: ObservableObject {
         logicRate = d.object(forKey: "logicRate") as? Int ?? 96000
         namKind = NAMKind(rawValue: d.string(forKey: "namKind") ?? "amp") ?? .amp
         namName = d.string(forKey: "namName") ?? "Amp_Settings1"
+        namMode = d.string(forKey: "namMode") ?? "app"
+        namOutChannel = d.object(forKey: "namOutChannel") as? Int ?? 0
+        namSignalPath = d.string(forKey: "namSignalPath") ?? ""
         let music = FileManager.default.urls(for: .musicDirectory, in: .userDomainMask).first ?? URL(fileURLWithPath: NSHomeDirectory())
         outputFolder = d.string(forKey: "outputFolder").map { URL(fileURLWithPath: $0) } ?? music.appendingPathComponent("IR Captures")
         refreshDevices()
+        if !namSignalPath.isEmpty, FileManager.default.fileExists(atPath: namSignalPath),
+           !ProcessInfo.processInfo.arguments.contains("--nam-direct-demo") {
+            loadNAMSignal(URL(fileURLWithPath: namSignalPath))
+        }
     }
 
     // ---------------------------------------------------------------- devices
@@ -171,14 +216,25 @@ final class AppModel: ObservableObject {
     }
 
     private func deviceChanged() {
-        guard let dev = device else { inputs = []; return }
+        guard let dev = device else { inputs = []; namRows = []; return }
         if outChannel >= dev.outputChannels { outChannel = 0 }
+        if namOutChannel >= dev.outputChannels { namOutChannel = 0 }
+        var savedNAM: [NAMRow] = []
+        if let data = defaults.data(forKey: "naminputs." + dev.uid), let rows = try? JSONDecoder().decode([NAMRow].self, from: data) { savedNAM = rows }
+        namRows = (0..<dev.inputChannels).map { ch in
+            savedNAM.first { $0.id == ch } ?? NAMRow(id: ch, use: ch == 0, name: "Input\(ch + 1)")
+        }
         if !dev.sampleRates.isEmpty && !dev.sampleRates.contains(rate) { rate = dev.sampleRates.contains(96000) ? 96000 : dev.sampleRates.max()! }
         var saved: [InputRow] = []
         if let data = defaults.data(forKey: "inputs." + dev.uid), let rows = try? JSONDecoder().decode([InputRow].self, from: data) { saved = rows }
         inputs = (0..<dev.inputChannels).map { ch in
             saved.first { $0.id == ch } ?? InputRow(id: ch, role: ch == 0 ? .mic : .off, name: "Input\(ch + 1)")
         }
+    }
+
+    private func saveNAMRows() {
+        guard !simulateIO, let dev = device, let data = try? JSONEncoder().encode(namRows) else { return }
+        defaults.set(data, forKey: "naminputs." + dev.uid)
     }
 
     private func saveInputs() {
@@ -569,6 +625,199 @@ final class AppModel: ObservableObject {
                 namError = error.localizedDescription
             }
         }
+    }
+
+    // ---------------------------------------------------------------- NAM: record with the app
+    func chooseNAMSignal() {
+        let p = NSOpenPanel()
+        p.allowedContentTypes = [.wav]
+        p.message = "Choose T3K-sweep-v3.wav, the sweep file downloaded from TONE3000"
+        if !namSignalPath.isEmpty { p.directoryURL = URL(fileURLWithPath: namSignalPath).deletingLastPathComponent() }
+        if p.runModal() == .OK, let u = p.url { loadNAMSignal(u) }
+    }
+
+    /// Reads and checks the sweep file. The app remembers where it is for next time.
+    @discardableResult
+    func loadNAMSignal(_ u: URL) -> Task<Void, Never> {
+        namSignalStatus = "Checking \(u.lastPathComponent)…"
+        namSignal = nil
+        return Task {
+            do {
+                let x = try await Task.detached(priority: .userInitiated) { () -> [Float] in
+                    let info = try WavInfo(Data(contentsOf: u, options: .mappedIfSafe))
+                    let d = try info.channel(0)
+                    try NAMPrep.checkSignalFile(d, fs: info.fs)
+                    return d.map { Float($0) }
+                }.value
+                namSignal = x
+                namSignalPath = u.path
+                namSignalStatus = nil
+            } catch {
+                namSignalStatus = "\(u.lastPathComponent): \(error.localizedDescription)"
+            }
+        }
+    }
+
+    var namSignalName: String { URL(fileURLWithPath: namSignalPath).lastPathComponent }
+
+    var namDirectProblem: String? {
+        guard namSignal != nil else { return "Choose TONE3000's sweep file in step 1." }
+        if simulateIO { return nil }
+        guard let dev = device else { return "Choose an audio interface in step 2." }
+        if !dev.sampleRates.isEmpty && !dev.sampleRates.contains(NAMPrep.fs) {
+            return "\(dev.name) can't run at 48 kHz, which the training signal needs. Choose another interface."
+        }
+        let used = namRows.filter(\.use)
+        guard !used.isEmpty else { return "Choose Use for at least one input in step 2." }
+        var seen = Set<String>()
+        for r in used {
+            let k = NAMPrep.safe(r.name).lowercased()
+            if seen.contains(k) { return "Two inputs are both named “\(r.name)”. Give each a different name." }
+            seen.insert(k)
+        }
+        return nil
+    }
+
+    private func pushNAMMeters(_ rows: [NAMRow], _ peaks: [Float]) {
+        let keep = 140                                  // about 7 s of 50 ms readings
+        var out: [NAMMeter] = []
+        for (r, p) in zip(rows, peaks) {
+            var h = namMeterHistory[r.id] ?? []
+            h.append(p); if h.count > keep { h.removeFirst(h.count - keep) }
+            namMeterHistory[r.id] = h
+            if p >= 0.999 { namClipped.insert(r.id) }
+            let pk = h.max() ?? 0
+            out.append(NAMMeter(id: r.id, label: r.name, peakDB: pk > 0 ? 20 * log10(Double(pk)) : -120, clipped: namClipped.contains(r.id)))
+        }
+        namMeters = out
+    }
+
+    private func resetNAMMeters() { namMeterHistory = [:]; namClipped = []; namMeters = [] }
+
+    func toggleNAMLevelCheck() {
+        if namLevelRunning { namLevelTask?.cancel(); namLevelTask = nil; namLevelRunning = false; return }
+        if let p = namDirectProblem { namLevelError = p; return }
+        guard let sig = namSignal, let dev = device else { return }
+        namLevelError = nil; resetNAMMeters(); namLevelRunning = true
+        let (a, n) = NAMPrep.levelSection(sig)
+        let section = Array(sig[a..<(a + n)])
+        let out = namOutChannel
+        namLevelTask = Task {
+            defer { namLevelRunning = false }
+            guard await microphoneAllowed() else { namLevelError = micDenied; return }
+            do {
+                try await Task.detached { try CoreAudioHelper.setNominalRate(dev.id, NAMPrep.fs) }.value
+                while !Task.isCancelled {
+                    let rows = namRows.filter(\.use)
+                    if rows.isEmpty { namLevelError = "Choose Use for at least one input."; return }
+                    _ = try await DuplexIO.run(device: dev, fs: NAMPrep.fs, outChannel: out, inputs: rows.map(\.id), signal: section,
+                                               extraSeconds: 0.2, cancelled: { Task.isCancelled },
+                                               meter: { p in Task { @MainActor in if self.namLevelRunning { self.pushNAMMeters(rows, p) } } })
+                }
+            } catch is CancellationError {
+            } catch {
+                namLevelError = error.localizedDescription
+            }
+        }
+    }
+
+    /// Simulated interface for CI: input k hears the signal after 1234 + 150·k samples, at gain 0.5 or −0.3.
+    private nonisolated static func simulatedRecording(_ signal: [Float], inputs: Int, extraSeconds: Double) -> [[Float]] {
+        let total = signal.count + Int(extraSeconds * Double(NAMPrep.fs))
+        return (0..<inputs).map { k in
+            let lat = 1234 + 150 * k, g: Float = k == 0 ? 0.5 : -0.3
+            var y = [Float](repeating: 0, count: total)
+            for i in 0..<signal.count where i + lat < total { y[i + lat] = g * signal[i] }
+            return y
+        }
+    }
+
+    func startNAMCapture() {
+        if let p = namDirectProblem { namError = p; return }
+        guard let sig = namSignal else { return }
+        if namLevelRunning { namLevelTask?.cancel(); namLevelRunning = false }
+        if levelRunning { levelTask?.cancel(); levelRunning = false }
+        namError = nil
+        let rows = simulateIO ? namRows : namRows.filter(\.use)
+        let names = rows.map { NAMPrep.safe($0.name) }
+        let dev = device, out = namOutChannel, kind = namKind, outDir = outputFolder, sim = simulateIO
+        let capture = uniqueCaptureName(NAMPrep.safe(namName.isEmpty ? "Amp" : namName))
+        let rawDir = outDir.appendingPathComponent(capture).appendingPathComponent("raw recording")
+        resetNAMMeters()
+        busy = .preparing("Getting ready")
+        captureTask = Task {
+            defer { busy = nil; captureTask = nil }
+            var rawSaved = false
+            do {
+                let rec: [[Float]]
+                if sim {
+                    busy = .namRecording(0)
+                    rec = await Task.detached { AppModel.simulatedRecording(sig, inputs: rows.count, extraSeconds: 2.0) }.value
+                } else {
+                    guard let dev else { return }
+                    guard await microphoneAllowed() else { namError = micDenied; return }
+                    busy = .preparing("Setting the interface to 48 kHz")
+                    try await Task.detached { try CoreAudioHelper.setNominalRate(dev.id, NAMPrep.fs) }.value
+                    busy = .namRecording(0)
+                    rec = try await DuplexIO.run(device: dev, fs: NAMPrep.fs, outChannel: out, inputs: rows.map(\.id), signal: sig,
+                                                 extraSeconds: 2.0, cancelled: { Task.isCancelled },
+                                                 progress: { p in Task { @MainActor in if case .namRecording = self.busy { self.busy = .namRecording(p) } } },
+                                                 meter: { p in Task { @MainActor in self.pushNAMMeters(rows, p) } })
+                }
+                busy = .processing("Saving the raw recording")
+                try await Task.detached {
+                    try FileManager.default.createDirectory(at: rawDir, withIntermediateDirectories: true)
+                    for (n, x) in zip(names, rec) {
+                        try NAMPrep.wav24(x.map(Double.init)).write(to: rawDir.appendingPathComponent("\(capture)_\(n)_raw.wav"))
+                    }
+                }.value
+                rawSaved = true
+                let report = { (t: String) in Task { @MainActor in self.busy = .processing(t) } }
+                let extra: [(String, JSON)] = [
+                    ("recorded_with", .string(sim ? "simulated" : "direct")),
+                    ("channels", .object([
+                        ("interface", .string(sim ? "simulated" : dev?.name ?? "")),
+                        ("output", .int(out + 1)),
+                        ("inputs", .object(zip(names, rows).map { ($0.0, JSON.int($0.1.id + 1)) }))])),
+                    ("app", .string("IR Capture (Mac) \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "")")),
+                ]
+                try await finishNAM(channels: zip(names, rec).map { ($0.0, $0.1.map(Double.init), NAMPrep.fs) },
+                                    kind: kind, capture: capture, outDir: outDir, extra: extra, report: report)
+            } catch is CancellationError {
+                namError = "Recording stopped. Nothing was saved."
+            } catch {
+                namError = error.localizedDescription
+                    + (rawSaved ? " The raw recording is saved in “\(capture)/raw recording”. You can drop those files into Use Logic recordings to try again." : "")
+            }
+        }
+    }
+
+    /// Lines up, checks and writes the prepared files (shared by both NAM routes).
+    private func finishNAM(channels: [(String, [Double], Int)], kind: NAMKind, capture: String, outDir: URL,
+                           extra: [(String, JSON)], report: @escaping (String) -> Void) async throws {
+        let (res, folder) = try await Task.detached(priority: .userInitiated) { () -> (NAMResult, URL) in
+            var done: [(name: String, result: NAMChannelResult)] = []
+            for (name, x, fs) in channels {
+                done.append((name, try NAMPrep.prepareChannel(x, fs: fs, label: name, progress: { report($0) })))
+            }
+            let res = NAMPrep.finish(kind: kind, channels: done)
+            report("Saving files")
+            return (res, try NAMPrep.write(res, capture: capture, outDir: outDir, extra: extra))
+        }.value
+        namResult = NAMSummary(title: capture, kind: res.kind, names: res.names, diagnostics: res.diagnostics, warnings: res.warnings,
+                               notes: res.notes, folder: folder, files: res.names.map { NAMPrep.fileName(capture, $0) })
+    }
+
+    /// CI smoke test: record through the simulated interface using the stand-in sweep file in `dir`.
+    func runNAMDirectDemo(_ dir: URL) {
+        simulateIO = true
+        namMode = "app"
+        outputFolder = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("IRCaptureDemo")
+        namName = "namdirect"
+        namKind = .full
+        namRows = [NAMRow(id: 0, use: true, name: "Suhr"), NAMRow(id: 1, use: true, name: "SM57")]
+        let t = loadNAMSignal(dir.appendingPathComponent("standin_signal.wav"))
+        Task { await t.value; if namSignal != nil { startNAMCapture() } else { namError = namSignalStatus } }
     }
 
     func revealNAM() {
