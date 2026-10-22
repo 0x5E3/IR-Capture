@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """CI smoke test: the files the Mac app wrote during `--demo` must match the Python reference.
-The demo makes Universal, Everything, Helix and Iridium files in the consumer layout.
+The demo makes Universal, All sample rates and Iridium files in the consumer layout.
 Usage: check_app_demo.py <app output folder for the capture> <sim_out>"""
 import json
 import sys
@@ -41,18 +41,19 @@ def corr(a_path, b_path):
 
 
 P = sim / "logic/set"
+P200 = sim / "logic200/set"          # written by compare_swift.py, which runs first in CI
 pairs = []
 for m in ["Close", "Room"]:
     pairs += [(app / f"demo_{m}.wav", P / f"48k/logic_{m}_48k_24_full.wav"),
-              (app / f"More formats/Line 6 Helix/demo_{m}_Helix.wav", P / f"48k/logic_{m}_48k_24_2048.wav"),
               (app / f"More formats/Strymon Iridium/demo_{m}_Iridium.wav", P / f"96k/logic_{m}_96k_24_full.wav")]
-ev = sorted((app / "More formats/Everything").rglob("*.wav"))
-say(len(ev) == 32, f"{len(ev)} Everything files")
-pairs += [(f, P / f.parent.name / f.name.replace("demo_", "logic_")) for f in ev]
+ev = sorted((app / "More formats/All sample rates").rglob("*.wav"))
+say(len(ev) == 16, f"{len(ev)} files in All sample rates")
+for f in ev:
+    tag, mic = f.parent.name, f.name.split("_")[1]
+    pairs.append((f, (P / tag / f"logic_{mic}_{tag}_24_full.wav") if f.name.endswith("_500ms.wav") else (P200 / tag / f"logic200_{mic}_{tag}_24_full.wav")))
 # extras (minimum phase, mixes): compare with Python's export_extras files from sim_test.py (sim_out/xr, same mics)
 E = sim / "xr/extras"
 pairs += [(app / "More formats/Minimum phase/demo_Close_MP.wav", E / "48k/xr_Close_48k_24_full_MP.wav"),
-          (app / "More formats/Minimum phase/demo_Close_Helix_MP.wav", E / "48k/xr_Close_48k_24_2048_MP.wav"),
           (app / "More formats/Mixes/demo_Close+Room_80-20.wav", E / "48k/xr_Close+Room_80-20_48k_24_full.wav"),
           (app / "More formats/Mixes/demo_Close+Room_60-40_Iridium.wav", E / "96k/xr_Close+Room_60-40_96k_24_full.wav")]
 say(not (app / "More formats/Minimum phase/demo_Room_MP.wav").exists(), "no minimum-phase file for the room mic")

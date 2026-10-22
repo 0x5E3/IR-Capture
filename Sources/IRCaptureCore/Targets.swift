@@ -67,33 +67,18 @@ public struct ExportTarget: Identifiable, Hashable {
 
     public static let universal = ExportTarget(
         id: "universal", title: "Universal",
-        detail: "48 kHz, 24-bit, 500 ms, one file per mic at the top of the folder. Loads in any IR loader, DAW plug-in or modeler (it is also exactly the Boss IR-200's 48 kHz / 500 ms format).",
+        detail: "48 kHz, 24-bit, 500 ms. One file per mic, at the top of the capture folder. For IR loaders, DAW plug-ins, modelers and Mirror IR. Matches the Boss IR-200 48 kHz / 500 ms format. Devices that use shorter IRs (for example Line 6 Helix, 2048 samples) shorten the file on import.",
         folder: "", kind: .single(rate: 48000, length: .full, suffix: ""),
         source: "https://support.roland.com/hc/en-us/articles/4407995586459-IR-200-IR-data-types-formats-that-can-be-used")
     public static let everything = ExportTarget(
-        id: "everything", title: "Everything",
-        detail: "44.1, 48, 88.2 and 96 kHz, each at 500 ms, 1024, 2048 and 4096 samples (24-bit), in More formats › Everything.",
-        folder: "More formats/Everything", kind: .everything, source: nil)
-    public static let helix = ExportTarget(
-        id: "helix", title: "Line 6 Helix / HX",
-        detail: "48 kHz, 2048 samples, mono. Helix Edit converts every IR to this when it imports, so this file goes in unchanged.",
-        folder: "More formats/Line 6 Helix", kind: .single(rate: 48000, length: .samples(2048), suffix: "_Helix"),
-        source: "https://kb.line6.com/impulse-response-irs")
+        id: "everything", title: "All sample rates",
+        detail: "44.1, 48, 88.2 and 96 kHz, each at 500 ms and 200 ms, 24-bit. Folder: More formats › All sample rates.",
+        folder: "More formats/All sample rates", kind: .everything, source: nil)
     public static let iridium = ExportTarget(
         id: "iridium", title: "Strymon Iridium",
-        detail: "96 kHz, 24-bit, 500 ms, mono, for Strymon Impulse Manager.",
+        detail: "96 kHz, 24-bit, 500 ms, mono. Format required by Strymon Impulse Manager.",
         folder: "More formats/Strymon Iridium", kind: .single(rate: 96000, length: .full, suffix: "_Iridium"),
         source: "https://www.strymon.net/faq/using-strymon-impulse-manager-with-iridium/")
-
-    /// IRLoader3 runs 4096 taps; set its sample rate here once it's confirmed, and the target appears.
-    public static let irloader3Rate: Int? = nil
-    public static var irloader3: ExportTarget? {
-        irloader3Rate.map { r in
-            ExportTarget(id: "irloader3", title: "Swell IRLoader3",
-                         detail: "4096 taps at \(rateTag(r).dropLast()) kHz, 24-bit.",
-                         folder: "More formats/IRLoader3", kind: .single(rate: r, length: .samples(4096), suffix: "_IRLoader3"), source: nil)
-        }
-    }
 
     public static let minimumPhase = ExportTarget(
         id: "minphase", title: "Minimum-phase versions",
@@ -105,7 +90,7 @@ public struct ExportTarget: Identifiable, Hashable {
         folder: "More formats/Mixes", kind: .mixes, source: nil)
 
     /// Where the files go (destinations), and what else is made for them (extras).
-    public static var destinations: [ExportTarget] { [.universal, .everything, .helix, .iridium] + (irloader3.map { [$0] } ?? []) }
+    public static var destinations: [ExportTarget] { [.universal, .everything, .iridium] }
     public static var extras: [ExportTarget] { [.minimumPhase, .mixes] }
     public static var all: [ExportTarget] { destinations + extras }
     public var isExtra: Bool { kind == .minimumPhase || kind == .mixes }
@@ -113,7 +98,8 @@ public struct ExportTarget: Identifiable, Hashable {
 }
 
 public let standardRates = [44100, 48000, 88200, 96000]
-public let standardLengths: [IRLength] = [.full, .samples(1024), .samples(2048), .samples(4096)]
+/// Lengths in "All sample rates", in ms. Most packs ship 500 ms and 200 ms; devices shorten longer files themselves.
+public let everythingLengthsMs = [500.0, 200.0]
 /// "full" length for the named targets; Custom uses its own.
 public let targetFullMs = 500.0
 
@@ -144,10 +130,10 @@ public func exportTargets(_ res: inout AnalysisResult, capture: String, targets:
         case .everything:
             for rate in standardRates {
                 let tag = rateTag(rate)
-                for len in standardLengths {
+                for ms in everythingLengthsMs {
                     for m in names {
-                        jobs.append(Job(key: Key(mic: m, rate: rate, n: count(len, rate, targetFullMs), trim: .set), bits: .b24,
-                                        path: folder + "\(tag)/\(capture)_\(safeName(m))_\(tag)_24_\(len).wav"))
+                        jobs.append(Job(key: Key(mic: m, rate: rate, n: count(.full, rate, ms), trim: .set), bits: .b24,
+                                        path: folder + "\(tag)/\(capture)_\(safeName(m))_\(tag)_\(Int(ms))ms.wav"))
                     }
                 }
             }
@@ -386,7 +372,7 @@ func exportExtras(_ res: inout AnalysisResult, capture: String, singles: [(rate:
         if mpOn && !mpMix.isEmpty { gMixMP = min(gMix, target / peak(mpMix, mp: true)); gains.append(("mix_mp", gMixMP)) }
     }
     var notes = extrasNotes(names: names, lengthsMs: lengthsMs)
-    if singles.isEmpty { notes.append("Minimum-phase versions and mixes are made for the single-file sets (Universal, Helix, Iridium…). None of those was chosen, so none were made.") }
+    if singles.isEmpty { notes.append("Minimum-phase versions and mixes are made for the single-file sets (Universal, Strymon Iridium). None of those was chosen, so none were made.") }
     if mixOn && names.count < 2 { notes.append("Mixes need two mics; this capture has one.") }
     res.extras = JSON.object([
         ("minimum_phase", .bool(mpOn)), ("room_mics", .array(names.filter(isRoomMic).map { .string($0) })),

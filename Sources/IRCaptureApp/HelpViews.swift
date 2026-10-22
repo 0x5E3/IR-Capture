@@ -185,12 +185,15 @@ struct WelcomeSheet: View {
     }
 
     var wiring: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Note("For a cab IR the test sweep goes into the amp's FX return (or a clean power amp), not the guitar input. Mics go into the interface. Each step in the app shows the right picture again.", color: .primary)
-            WiringDiagram(wiring: .cabNoRef, compact: true)
-            WiringDiagram(wiring: .namAmp, compact: true)
-            Button("All wiring pictures…") { m.helpPage = .wiring }.buttonStyle(.link)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                ForEach(Wiring.hookups, id: \.self) { w in
+                    Text(w.title).font(.headline)
+                    WiringDiagram(wiring: w, compact: true)
+                }
+            }
         }
+        .frame(height: 360)
     }
 
     var gets: some View {

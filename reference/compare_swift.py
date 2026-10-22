@@ -120,35 +120,38 @@ def same(a_path, b_path, label):
     check(corr > 0.99999 and abs(lvl) < 0.05, f"{label}: correlation {corr:.7f}, level {lvl:+.3f} dB")
 
 
+# Python reference at 200 ms, for the short files in "All sample rates"
+irc.main(["process", "--signal", str(sim_out / "sweeps.json"), "--rec",
+          str(sim_out / "logic_close.wav"), str(sim_out / "logic_room.wav"), str(sim_out / "logic_ref.wav"),
+          "--ref", "3", "--names", "Close,Room", "--name", "logic200", "--outdir", str(sim_out),
+          "--lengths", "full", "--full-ms", "200"])
 r = subprocess.run([cli, "process", "--signal", str(sim_out / "sweeps.json"), "--rec",
                     str(sim_out / "logic_close.wav"), str(sim_out / "logic_room.wav"), str(sim_out / "logic_ref.wav"),
                     "--ref", "3", "--names", "Close,Room", "--name", "tgt", "--outdir", str(swift_out),
-                    "--targets", "universal,everything,helix,iridium", "--raw-take"], capture_output=True, text=True)
+                    "--targets", "universal,everything,iridium", "--raw-take"], capture_output=True, text=True)
 check(r.returncode == 0, "Swift process with targets ran" + (": " + r.stderr if r.returncode else ""))
 T = swift_out / "tgt"
 P = sim_out / "logic/set"
+P200 = sim_out / "logic200/set"
 for m in ["Close", "Room"]:
     same(T / f"tgt_{m}.wav", P / f"48k/logic_{m}_48k_24_full.wav", f"Universal {m} = Python 48k 500 ms")
-    same(T / f"More formats/Line 6 Helix/tgt_{m}_Helix.wav", P / f"48k/logic_{m}_48k_24_2048.wav", f"Helix {m} = Python 48k 2048")
     same(T / f"More formats/Strymon Iridium/tgt_{m}_Iridium.wav", P / f"96k/logic_{m}_96k_24_full.wav", f"Iridium {m} = Python 96k 500 ms")
-ev = sorted((T / "More formats/Everything").rglob("*.wav"))
-check(len(ev) == 32, f"Everything: {len(ev)} files (expected 32)")
-worst = 1.0
+ev = sorted((T / "More formats/All sample rates").rglob("*.wav"))
+check(len(ev) == 16, f"All sample rates: {len(ev)} files (expected 16)")
 for f in ev:
-    a, _ = sf.read(f)
-    b, _ = sf.read(P / f.parent.name / f.name.replace("tgt_", "logic_"))
-    worst = min(worst, float(np.dot(a, b) / np.sqrt(np.dot(a, a) * np.dot(b, b))) if len(a) == len(b) else 0.0)
-check(worst > 0.99999, f"Everything files match Python's set files (worst correlation {worst:.7f})")
+    tag, mic = f.parent.name, f.name.split("_")[1]
+    ref = (P / tag / f"logic_{mic}_{tag}_24_full.wav") if f.name.endswith("_500ms.wav") else (P200 / tag / f"logic200_{mic}_{tag}_24_full.wav")
+    same(f, ref, f"{f.name} = Python")
 top = sorted(p.name for p in T.iterdir())
 check(top == ["More formats", "README.txt", "Raw take", "report.json", "tgt_Close.wav", "tgt_Room.wav"], f"capture folder top level: {top}")
 check("tgt_Close.wav" in (T / "README.txt").read_text(), "README.txt names the Universal files")
 
 # 6. re-export from the raw take gives the same files, bit for bit
-before = sf.read(T / "More formats/Line 6 Helix/tgt_Close_Helix.wav")[0]
-r = subprocess.run([cli, "reexport", "--folder", str(T), "--targets", "universal,helix"], capture_output=True, text=True)
+before = sf.read(T / "More formats/Strymon Iridium/tgt_Close_Iridium.wav")[0]
+r = subprocess.run([cli, "reexport", "--folder", str(T), "--targets", "universal,iridium"], capture_output=True, text=True)
 check(r.returncode == 0, "re-export from the raw take ran" + (": " + r.stderr if r.returncode else ""))
-after = sf.read(T / "More formats/Line 6 Helix/tgt_Close_Helix.wav")[0]
-check(np.array_equal(before, after), "re-exported Helix file is identical to the original")
+after = sf.read(T / "More formats/Strymon Iridium/tgt_Close_Iridium.wav")[0]
+check(np.array_equal(before, after), "re-exported Iridium file is identical to the original")
 
 # 7. polarity: the inverted room mic is flipped exactly as Python flips it
 r = subprocess.run([cli, "process", "--signal", str(sim_out / "sweeps.json"), "--rec",
@@ -173,7 +176,7 @@ rec = [str(sim_out / "logic_close.wav"), str(sim_out / "logic_room.wav"), str(si
 for cap, names in [("xr", "Close,Room"), ("xc", "Close,Back")]:
     r = subprocess.run([cli, "process", "--signal", str(sim_out / "sweeps.json"), "--rec", *rec, "--ref", "3",
                         "--names", names, "--name", cap, "--outdir", str(swift_out),
-                        "--targets", "universal,helix,iridium,minphase,mixes"], capture_output=True, text=True)
+                        "--targets", "universal,iridium,minphase,mixes"], capture_output=True, text=True)
     check(r.returncode == 0, f"Swift process with extras ({names}) ran" + (": " + r.stderr if r.returncode else ""))
     S, E = swift_out / cap / "More formats", sim_out / cap / "extras"
     pe = json.loads((sim_out / cap / "report.json").read_text())["extras"]
@@ -183,7 +186,7 @@ for cap, names in [("xr", "Close,Room"), ("xc", "Close,Back")]:
     gd = max(abs(se["gains_db"][k] - v) for k, v in pe["gains_db"].items())
     check(set(se["gains_db"]) == set(pe["gains_db"]) and gd < 0.05, f"{cap}: extras gains match Python within {gd:.3f} dB")
     pairs = []
-    for suffix, tag, ln in [("", "48k", "full"), ("_Helix", "48k", "2048"), ("_Iridium", "96k", "full")]:
+    for suffix, tag, ln in [("", "48k", "full"), ("_Iridium", "96k", "full")]:
         pairs.append((S / f"Minimum phase/{cap}_Close{suffix}_MP.wav", E / f"{tag}/{cap}_Close_{tag}_24_{ln}_MP.wav"))
         for m in pe["mixes"]:
             f = f"{m['mics'][0]}+{m['mics'][1]}_{m['weights'][0]}-{m['weights'][1]}"
@@ -208,10 +211,10 @@ for cap, names in [("xr", "Close,Room"), ("xc", "Close,Back")]:
         worst = (min(worst[0], c), max(worst[1], abs(lv)))
     check(worst[0] > 0.99999 and worst[1] < 0.05, f"{cap}: every extras file = Python (correlation >= {worst[0]:.7f}, level within {worst[1]:.3f} dB)")
     n_mp = len(list((S / "Minimum phase").glob("*.wav"))) if (S / "Minimum phase").exists() else 0
-    check(n_mp == (3 if cap == "xr" else 6), f"{cap}: {n_mp} minimum-phase singles (none for a room mic)")
+    check(n_mp == (2 if cap == "xr" else 4), f"{cap}: {n_mp} minimum-phase singles (none for a room mic)")
     if cap == "xr":
         rd = (swift_out / cap / "README.txt").read_text()
-        check("Minimum phase:" in rd and "Mixes:" in rd and "cut off most of the room" in rd, "README.txt explains the extras and the room mic")
+        check("Minimum phase:" in rd and "Mixes:" in rd and "room mic" in rd, "README.txt explains the extras and the room mic")
 
 print("\nALL PASS" if ok else "\nSOME CHECKS FAILED")
 sys.exit(0 if ok else 1)

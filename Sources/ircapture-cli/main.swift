@@ -9,8 +9,8 @@ import IRCaptureCore
 //                         --names Close,Room --name logic --outdir out
 //                         [--rates 44100,48000,88200,96000] [--lengths full,1024,2048,4096]
 //                         [--bits 24,32f] [--trim set,individual] [--full-ms 500]
-//                         [--targets universal,everything,helix,iridium[,custom]] [--keep-polarity] [--raw-take]
-//   ircapture-cli reexport --folder <capture folder> --targets helix,... [--keep-polarity]
+//                         [--targets universal,everything,iridium[,custom]] [--keep-polarity] [--raw-take]
+//   ircapture-cli reexport --folder <capture folder> --targets iridium,... [--keep-polarity]
 //   ircapture-cli nam-prep --rec Suhr.wav SM57.wav --names Suhr,SM57 --kind amp|full --name cap --outdir out
 
 func fail(_ m: String) -> Never { FileHandle.standardError.write((m + "\n").data(using: .utf8)!); exit(2) }

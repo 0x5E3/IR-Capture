@@ -88,7 +88,7 @@ struct ContentView: View {
             let dir = URL(fileURLWithPath: args[i + 1])
             m.outputFolder = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("IRCaptureDemo")
             m.captureName = "demo"
-            m.targets = ["universal", "everything", "helix", "iridium", "minphase", "mixes"]
+            m.targets = ["universal", "everything", "iridium", "minphase", "mixes"]
             m.customOn = false
             m.keepPolarity = false
             m.addLogicFiles(["logic_close", "logic_room", "logic_ref"].map { dir.appendingPathComponent($0 + ".wav") })
