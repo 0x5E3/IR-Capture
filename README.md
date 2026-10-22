@@ -43,6 +43,8 @@ Files are saved in **Music › IR Captures** unless another folder is selected:
     More formats/                  only the sets ticked under Files to make:
         All sample rates/<rate>/…  44.1, 48, 88.2, 96 kHz × 500 ms and 200 ms
         Strymon Iridium/…          96 kHz, 500 ms
+        Minimum phase/…            minimum-phase versions of the close mics
+        Mixes/…                    two-mic blends (close+close, close+room)
         Custom/<trim>/<rate>/…     the Advanced matrix
     Raw take/                      unprocessed recording + settings
 ```
