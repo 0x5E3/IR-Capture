@@ -261,7 +261,7 @@ struct SweepSettings: View {
                     Stepper("Gap: \(String(format: "%g", m.gap)) s", value: $m.gap, in: 1...10, step: 0.5)
                     Stepper("Warm-up: \(m.discard)", value: $m.discard, in: 0...4)
                 }
-                Note("The gap has to be longer than the room's reverb tail. The first sweep is a warm-up and isn't used. More sweeps lower the noise floor by about 3 dB each time you double them.")
+                Note("Set the gap longer than the room reverb tail. The first sweep is a warm-up and is discarded. Each doubling of the sweep count lowers the noise floor by about 3 dB.")
             }.padding(.top, 8)
         }
     }
@@ -293,10 +293,10 @@ struct TargetsPicker: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("FILES TO MAKE").font(.caption.weight(.semibold)).kerning(0.8).foregroundStyle(.secondary)
             ForEach(ExportTarget.destinations) { t in row(t) }
-            Note("Not listed (Quad Cortex, ToneX, Fractal, Kemper Cab Maker…)? Use Universal; those makers don't publish a fixed format, and their own software converts on import.")
+            Note("For unlisted devices (Quad Cortex, ToneX, Fractal, Kemper Cab Maker…), use Universal. These manufacturers do not publish a fixed format. Conversion is done by their software on import.")
             Text("ALSO MAKE").font(.caption.weight(.semibold)).kerning(0.8).foregroundStyle(.secondary).padding(.top, 4)
             ForEach(ExportTarget.extras) { t in row(t) }
-            Note("Made for each single-file set ticked above (Universal, Helix, Iridium). A mic named Room or Amb (Room L, Ambient…) counts as a room mic: it gets no minimum-phase version, and is mixed with close mics at 80/20 and 60/40.")
+            Note("Made for each single-file set selected above (Universal, Strymon Iridium). A mic named Room or Amb (Room L, Ambient…) is treated as a room mic. Room mics have no minimum-phase version and are mixed with close mics at 80/20 and 60/40.")
         }
     }
 }
@@ -311,7 +311,7 @@ struct AdvancedOutput: View {
         DisclosureGroup("Advanced file options") {
             VStack(alignment: .leading, spacing: 12) {
                 Toggle("Keep polarity as recorded", isOn: $m.keepPolarity).toggleStyle(.checkbox)
-                Note("Normally every IR is made with its main peak positive, as commercial IR packs are, so mics blend without cancelling. A mic that came out inverted (a back-of-cab mic, say) is flipped and the results say so.")
+                Note("By default, each IR is made with its main peak positive, as in commercial IR packs, so mics blend without cancellation. An inverted mic (for example, a back-of-cab mic) is flipped, and the flip is listed in the results.")
                 Toggle("Custom files (pick rates, lengths, bit depth and trimming)", isOn: $m.customOn).toggleStyle(.checkbox)
                 if m.customOn {
                     Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 10) {
@@ -347,7 +347,7 @@ struct AdvancedOutput: View {
                         }
                     }
                     .toggleStyle(.checkbox)
-                    Note("Custom files go in More formats › Custom. “Keep mic timing” trims every mic by the same amount and gives them one shared gain, so they blend the way the real mics did. “Trim each mic” starts each file at its own first arrival and normalizes it on its own.")
+                    Note("Custom files are saved in More formats › Custom. “Keep mic timing”: all mics are trimmed by the same amount and share one gain, so the blend matches the original mics. “Trim each mic”: each file starts at its own first arrival and is normalized separately.")
                 }
             }.padding(.top, 8)
         }
@@ -375,7 +375,7 @@ struct CaptureNameFields: View {
                 Text("Capture name").foregroundStyle(.secondary)
                 TextField("e.g. 412_V30_PosA", text: $m.captureName).frame(maxWidth: 320)
             }
-            Note("Which cab and where the mics were, e.g. 412_V30_PosA. Every file starts with this.")
+            Note("Cab and mic position, e.g. 412_V30_PosA. All file names start with this name.")
             if withNotes {
                 HStack(alignment: .firstTextBaseline) {
                     Text("Notes").foregroundStyle(.secondary)
@@ -411,13 +411,13 @@ struct ResultsView: View {
     var quality: (String, Color) {
         if r.droppedOut { return ("Record again", badColor) }
         if r.warnings.isEmpty { return ("Excellent", goodColor) }
-        return (r.warnings.count == 1 ? "Good — 1 thing to check" : "Check these \(r.warnings.count) things", warnColor)
+        return (r.warnings.count == 1 ? "Good: 1 item to check" : "Check \(r.warnings.count) items", warnColor)
     }
     var body: some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 14) {
                 HStack {
-                    Text("RESULTS — \(r.title)").font(.system(size: 15, weight: .semibold)).kerning(0.8)
+                    Text("RESULTS: \(r.title)").font(.system(size: 15, weight: .semibold)).kerning(0.8)
                     Spacer()
                     Pill(text: quality.0, color: quality.1)
                 }
@@ -433,13 +433,13 @@ struct ResultsView: View {
                         Note("Quit other apps first (browsers, video calls, other audio software).")
                     }
                 }
-                if !r.referenced { Note("No reference tap was used, so these IRs include the power amp's response.") }
+                if !r.referenced { Note("No reference tap was used. These IRs include the power amp response.") }
                 ForEach(r.polarityNotes, id: \.self) { n in Note("Polarity: " + n, color: .primary) }
                 ForEach(r.exportNotes, id: \.self) { n in Note(n, color: .primary) }
                 if !r.topFiles.isEmpty {
                     Aside(title: "Load these") {
                         ForEach(r.topFiles, id: \.self) { f in Text(f).font(.system(.callout, design: .monospaced)) }
-                        Note("48 kHz, 24-bit, 500 ms. They load in any IR loader, DAW plug-in or modeler. Other formats are in More formats.")
+                        Note("48 kHz, 24-bit, 500 ms. Compatible with IR loaders, DAW plug-ins and modelers. Other formats are in More formats.")
                     }
                 }
                 DiagnosticsTable(r: r)
@@ -453,7 +453,7 @@ struct ResultsView: View {
                 HStack {
                     Button("Show in Finder") { m.revealResult() }.buttonStyle(.borderedProminent).tint(lamp)
                     Button("Re-export…") { m.reexportMessage = nil; m.reexportFolder = r.folder }
-                        .help("Make other formats from this capture's raw take, without recording again")
+                        .help("Make other formats from the raw take of this capture without a new recording")
                     Text("\(r.fileCount) IR files, README.txt and report.json in \(r.folder.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))")
                         .font(.callout).foregroundStyle(.secondary).lineLimit(2)
                 }
@@ -468,7 +468,7 @@ struct ReexportSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Re-export \(m.reexportFolder?.lastPathComponent ?? "")").font(.title2.weight(.semibold))
-            Note("Makes the files again from this capture's raw take, with the choices below. Nothing is recorded. The old generated files go to the Trash; the raw take and report history stay.")
+            Note("The files are rebuilt from the raw take of this capture with the settings below. No new recording is made. Previously generated files are moved to the Trash. The raw take and report history are kept.")
             TargetsPicker()
             AdvancedOutput()
             if let msg = m.reexportMessage { ErrorNote(msg) }

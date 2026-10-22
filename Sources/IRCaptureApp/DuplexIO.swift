@@ -80,17 +80,17 @@ final class DuplexIO {
     private func check(_ st: OSStatus, _ what: String) throws {
         if st != noErr {
             Log.write("CoreAudio error \(st) trying to \(what)")
-            throw AppError("Couldn't \(what). Check that the interface is connected and not in use by another app that holds it exclusively, then try again. (CoreAudio error \(st))")
+            throw AppError("Could not \(what). Check that the interface is connected and not in exclusive use by another app, then try again. (CoreAudio error \(st))")
         }
     }
 
     func start(deviceID: AudioDeviceID) throws {
         var desc = AudioComponentDescription(componentType: kAudioUnitType_Output, componentSubType: kAudioUnitSubType_HALOutput,
                                              componentManufacturer: kAudioUnitManufacturer_Apple, componentFlags: 0, componentFlagsMask: 0)
-        guard let comp = AudioComponentFindNext(nil, &desc) else { throw AppError("CoreAudio's HAL unit is missing.") }
+        guard let comp = AudioComponentFindNext(nil, &desc) else { throw AppError("CoreAudio HAL unit not found.") }
         var u: AudioUnit?
         try check(AudioComponentInstanceNew(comp, &u), "open the audio unit")
-        guard let unit = u else { throw AppError("Couldn't open the audio unit.") }
+        guard let unit = u else { throw AppError("Could not open the audio unit.") }
         self.unit = unit
 
         var one: UInt32 = 1
@@ -214,7 +214,7 @@ final class DuplexIO {
             // starting up) are logged and kept in report.json, but don't raise the warning.
             guard let g = gaps.first else { return nil }
             let s = max(0, Int(g.seconds))
-            return "Audio dropped out at \(s / 60):\(String(format: "%02d", s % 60)) while recording (\(gaps.count) time\(gaps.count == 1 ? "" : "s")). Record again with other apps closed. If it keeps happening, raise the interface's buffer size in its control panel or in Audio MIDI Setup."
+            return "Audio dropped out at \(s / 60):\(String(format: "%02d", s % 60)) during recording (\(gaps.count) time\(gaps.count == 1 ? "" : "s")). Close other apps and record again. If dropouts continue, increase the interface buffer size in the interface control panel or in Audio MIDI Setup."
         }
         var json: JSON {
             .object([("buffer_frames", .int(bufferFrames)), ("overloads", .int(overloads)),
@@ -243,12 +243,12 @@ final class DuplexIO {
         while !io.finished {
             try await Task.sleep(nanoseconds: 50_000_000)
             if cancelled() { throw CancellationError() }
-            if io.error != noErr { throw AppError("Recording stopped because the interface stopped answering. Check its cable and power, then try again. (CoreAudio error \(io.error))") }
+            if io.error != noErr { throw AppError("Recording stopped. No response from the interface. Check the interface cable and power, then try again. (CoreAudio error \(io.error))") }
             let elapsed = Date().timeIntervalSince(started)
             if elapsed > expected + 5 && io.recorded == 0 {
-                throw AppError("No audio is arriving from the interface. Check that it's connected and that IR Capture is allowed to use the microphone (System Settings › Privacy & Security › Microphone).")
+                throw AppError("No audio received from the interface. Check that the interface is connected and that IR Capture has microphone permission (System Settings › Privacy & Security › Microphone).")
             }
-            if elapsed > expected * 1.5 + 10 { throw AppError("The interface stopped delivering audio part way through. Check its cable and power, close other audio apps, and try again.") }
+            if elapsed > expected * 1.5 + 10 { throw AppError("Audio from the interface stopped during recording. Check the interface cable and power, close other audio apps, and try again.") }
             progress(Double(io.recorded) / Double(io.recCapacity))
             if let meter {
                 let pos = io.recorded

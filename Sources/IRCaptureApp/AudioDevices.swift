@@ -83,14 +83,14 @@ enum CoreAudioHelper {
         let khz = "\(rateTag(rate).dropLast()) kHz"
         if st != noErr {
             Log.write("rate switch to \(rate) failed, CoreAudio error \(st)")
-            throw AppError("The interface wouldn't switch to \(khz). Set it to \(khz) in Audio MIDI Setup, then try again. (CoreAudio error \(st))")
+            throw AppError("Could not switch the interface to \(khz). Set it to \(khz) in Audio MIDI Setup, then try again. (CoreAudio error \(st))")
         }
         for _ in 0..<40 {
             if abs(nominalRate(id) - Double(rate)) < 0.5 { Thread.sleep(forTimeInterval: 0.3); Log.write("interface now at \(rate) Hz"); return }
             Thread.sleep(forTimeInterval: 0.1)
         }
         Log.write("rate switch to \(rate) timed out; still \(nominalRate(id))")
-        throw AppError("The interface didn't switch to \(khz). Set it to \(khz) in Audio MIDI Setup, then try again.")
+        throw AppError("The interface sample rate is not \(khz). Set it to \(khz) in Audio MIDI Setup, then try again.")
     }
 
     /// Puts the interface back to the rate it had before (so the user's DAW session isn't disturbed), and

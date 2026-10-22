@@ -22,7 +22,7 @@ struct NAMJob: View {
                     HStack(alignment: .firstTextBaseline) {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Recorded in a DAW instead?").bold()
-                            Note("Record TONE3000's sweep through the amp in Logic, Reaper or any DAW, and prepare the files here.")
+                            Note("Record the TONE3000 sweep through the amp in Logic, Reaper or any other DAW. Prepare the files here.")
                         }
                         Spacer()
                         Button("Import DAW recordings…") { m.namMode = "logic" }
@@ -37,13 +37,13 @@ struct NAMModelChoice: View {
     @EnvironmentObject var m: AppModel
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Picker("What are you capturing?", selection: $m.namKind) {
-                Text("Amp only (load box line out) — use with any cab IR. Recommended.").tag(NAMKind.amp)
-                Text("Full chain (mics on the cab) — amp, cab and that mic baked into one model").tag(NAMKind.full)
+            Picker("Capture type", selection: $m.namKind) {
+                Text("Amp only (load box line out). For use with any cab IR. Recommended.").tag(NAMKind.amp)
+                Text("Full chain (mics on the cab). Amp, cab and mic in one model.").tag(NAMKind.full)
             }.pickerStyle(.radioGroup)
             Note(m.namKind == .amp
-                 ? "Pair an amp-only model with cab IRs captured with a reference (any option except None). The load box's line out already carries the speaker's impedance bump, so an IR made without a reference would add it twice."
-                 : "Each mic becomes its own model. Close mics work best: NAM only models a short stretch of time, so room sound won't carry over well.")
+                 ? "Use an amp-only model with cab IRs captured with a reference (any option except None). The load box line out already contains the speaker impedance peak. An IR made without a reference applies the peak a second time."
+                 : "Each mic produces a separate model. Use close mics. NAM models a short time window only, so room sound is not reproduced accurately.")
         }
     }
 }
@@ -55,7 +55,7 @@ struct NAMNameRow: View {
             Text("Capture name").foregroundStyle(.secondary)
             TextField("e.g. JCM800_Gain6_Bass5", text: $m.namName).frame(maxWidth: 320)
         }
-        Note("The amp and its settings, e.g. JCM800_Gain6_Bass5. Every file name starts with this.")
+        Note("Amp and settings, e.g. JCM800_Gain6_Bass5. All file names start with this name.")
         SaveFolderRow()
     }
 }
@@ -64,11 +64,11 @@ struct NAMDirectSteps: View {
     @EnvironmentObject var m: AppModel
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            Step(n: 1, title: "Training signal", subtitle: "TONE3000's sweep file. You only choose it once; the app remembers it.", done: m.namSignal != nil) {
+            Step(n: 1, title: "Training signal", subtitle: "The TONE3000 sweep file. Select it once. The selection is saved.", done: m.namSignal != nil) {
                 if m.namSignal == nil {
                     Checklist(items: [
-                        "Log in at tone3000.com. Choose Create Tone, then Capture, and download the sweep file, T3K-sweep-v3.wav. Don't open it in an editor or convert it.",
-                        "Click Find it in Downloads. (The Mac may ask to let IR Capture see your Downloads folder.) Or choose the file yourself.",
+                        "Log in at tone3000.com. Choose Create Tone, then Capture, and download the sweep file, T3K-sweep-v3.wav. Do not open the file in an editor or convert it.",
+                        "Click Find it in Downloads. (macOS may request access to the Downloads folder for IR Capture.) Alternatively, click Choose sweep file.",
                     ])
                 }
                 HStack(spacing: 12) {
@@ -77,36 +77,36 @@ struct NAMDirectSteps: View {
                     Button(m.namSignal == nil ? "Choose sweep file…" : "Choose a different file…") { m.chooseNAMSignal() }
                 }
                 if m.namSignal != nil {
-                    Note("✓ \(m.namSignalName) is ready (190 s, 48 kHz). The app plays it exactly as it is.", color: goodColor)
+                    Note("✓ \(m.namSignalName) loaded (190 s, 48 kHz). The file is played without modification.", color: goodColor)
                 } else if let s = m.namSignalStatus {
                     Note(s, color: s.hasPrefix("Checking") ? .secondary : badColor)
                 }
             }
 
-            Step(n: 2, title: "Connect", subtitle: "One interface does both: its output feeds the reamp box, its inputs record the amp.") {
+            Step(n: 2, title: "Connect", subtitle: "One interface is used for both. The output is connected to the reamp box. The inputs record the amp.") {
                 NAMModelChoice()
                 WiringDiagram(wiring: m.namKind == .amp ? .namAmp : .namFull)
                 Checklist(items: [
-                    "Interface output → reamp box → the amp's guitar input. That's where you want the preamp. Turn off noise gates, reverb, delay and anything in the effects loop.",
+                    "Interface output → reamp box → amp guitar input. The preamp is included in the capture. Turn off noise gates, reverb, delay and all effects-loop devices.",
                     m.namKind == .amp
-                        ? "Speaker output into the load box, and its line out into an interface input. Leave any cab sim or EQ on the load box off."
-                        : "Amp into the cab as usual, with mics on the cab into the interface. Mute the studio monitors.",
-                    "Turn off any mixer or monitoring software effects on the interface's inputs (its own DSP, compressors, gates).",
+                        ? "Connect the speaker output to the load box. Connect the load box line out to an interface input. Turn off any cab sim or EQ on the load box."
+                        : "Connect the amp to the cab as usual. Connect the mics on the cab to the interface. Mute the studio monitors.",
+                    "Turn off any mixer or monitoring software effects on the interface inputs (interface DSP, compressors, gates).",
                 ])
                 InterfaceRow(outputLabel: "Output to the reamp box", output: $m.namOutChannel, showRate: false)
                 if m.device != nil {
-                    Note("The app switches the interface to 48 kHz while it runs, because the training signal is 48 kHz, and puts it back afterwards.")
+                    Note("The interface is set to 48 kHz during the session to match the training signal. The previous rate is restored afterwards.")
                     NAMInputsGrid()
-                    Note("Mark each input you're recording as Use and give it a name (Suhr, SM57, R121…). Each one becomes its own file and its own model.")
+                    Note("Set each input to be recorded to Use and enter a name (Suhr, SM57, R121…). Each input produces a separate file and model.")
                 }
             }
 
-            Step(n: 3, title: "Set levels", subtitle: "The app loops the loudest 6 seconds of the training signal so you can set each input.") {
+            Step(n: 3, title: "Set levels", subtitle: "The loudest 6 seconds of the training signal are looped for setting each input.") {
                 Checklist(items: [
                     "Warm the amp up for about 20 minutes. Wear ear protection for full chain captures.",
-                    "Click Check levels. Set the reamp level so the amp is hit about as hard as by a guitar.",
-                    "Turn each input's gain until its line says OK (peaks around −8 dBFS). Nothing should say CLIP.",
-                    "Click Stop. From here on, don't touch any knobs.",
+                    "Click Check levels. Set the reamp level to about the level of a guitar.",
+                    "Adjust each input gain until its row shows OK (peaks near −8 dBFS). No row may show CLIP.",
+                    "Click Stop. Do not adjust any controls after this point.",
                 ])
                 HStack {
                     Button(m.namLevelRunning ? "Stop" : "Check levels") { m.toggleNAMLevelCheck() }
@@ -117,7 +117,7 @@ struct NAMDirectSteps: View {
                 if !m.namMeters.isEmpty { NAMMeterTable(meters: m.namMeters) }
             }
 
-            Step(n: 4, title: "Record", subtitle: "Plays all 3 minutes 10 seconds of the training signal and records every input at once.", done: m.namResult != nil) {
+            Step(n: 4, title: "Record", subtitle: "The full training signal (3 minutes 10 seconds) is played and all inputs are recorded.", done: m.namResult != nil) {
                 NAMNameRow()
                 HStack {
                     Button("Record (3 min 12 s)") { m.startNAMCapture() }
@@ -128,7 +128,7 @@ struct NAMDirectSteps: View {
                 if let e = m.namError { ErrorNote(e) }
                 BusyLine()
                 if m.busy?.progress != nil && !m.namMeters.isEmpty { NAMMeterTable(meters: m.namMeters) }
-                Note("When it finishes, the app lines the files up, checks them and saves them in a folder ready to upload to TONE3000. The untouched recording is also kept in a “raw recording” folder inside it.")
+                Note("After recording, the files are aligned, verified and saved in a folder for upload to TONE3000. The unprocessed recording is kept in a “raw recording” subfolder.")
             }
         }
     }
@@ -158,8 +158,8 @@ struct NAMMeterTable: View {
     let meters: [NAMMeter]
     static let target = -8.0
     func advice(_ x: NAMMeter) -> (String, Color) {
-        if x.clipped { return ("CLIP — lower the input gain about 6 dB", badColor) }
-        if x.peakDB < -60 { return ("No signal — check the cable and the input", badColor) }
+        if x.clipped { return ("CLIP: lower input gain about 6 dB", badColor) }
+        if x.peakDB < -60 { return ("No signal: check cable and input", badColor) }
         let change = NAMMeterTable.target - x.peakDB
         if abs(change) <= 3 { return ("OK", goodColor) }
         return (change > 0 ? "Raise about \(Int(change.rounded())) dB" : "Lower about \(Int((-change).rounded())) dB", warnColor)
@@ -196,21 +196,21 @@ struct NAMLogicSteps: View {
         VStack(alignment: .leading, spacing: 18) {
             Step(n: 1, title: "Training signal") {
                 Checklist(items: [
-                    "Log in at tone3000.com. Choose Create Tone, then Capture, and download the sweep file. It's called T3K-sweep-v3.wav (190 seconds, 48 kHz).",
-                    "Use that file exactly as it is. Don't trim, normalize or convert it. The app knows its layout, so you don't need to give it the file here.",
+                    "Log in at tone3000.com. Choose Create Tone, then Capture, and download the sweep file, T3K-sweep-v3.wav (190 seconds, 48 kHz).",
+                    "Use the file without modification. Do not trim, normalize or convert it. The file layout is built in. The file is not required here.",
                 ])
                 Button("Open tone3000.com/capture") { m.openTONE3000() }
             }
 
-            Step(n: 2, title: "Record in your DAW", subtitle: "The steps are the same in any DAW; menu names below are Logic's.") {
+            Step(n: 2, title: "Record in your DAW", subtitle: "The steps apply to any DAW. Menu names below are from Logic.") {
                 NAMModelChoice()
                 Checklist(items: [
-                    "Make a new project at 48 kHz. Drag T3K-sweep-v3.wav onto an audio track at the very start.",
-                    "Send that track to the interface output that goes to the reamp box, and the reamp box into the amp's input. Turn off noise gates, reverb, delay and anything in the effects loop.",
-                    "Amp only: speaker output into the load box, and its line out into an interface input. Leave any cab sim or EQ on the load box off. Full chain: amp into the cab as usual, with mics on the cab. Mute the studio monitors.",
-                    "Make one audio track per input and name it (Suhr, SM57, R121…); the exported files take these names. Input monitoring off, no plug-ins.",
-                    "Set the reamp level so the amp is hit about as hard as by a guitar. Play the first 20 seconds and set each input so the loudest part peaks around −8 dBFS, with nothing clipping.",
-                    "Warm the amp up for about 20 minutes first. Then record one full pass, all 3 minutes 10 seconds, and a second or two past the end. Don't touch any knobs while it runs.",
+                    "Create a new project at 48 kHz. Drag T3K-sweep-v3.wav onto an audio track at the start.",
+                    "Route that track to the interface output connected to the reamp box. Connect the reamp box to the amp input. Turn off noise gates, reverb, delay and all effects-loop devices.",
+                    "Amp only: connect the speaker output to the load box, and the load box line out to an interface input. Turn off any cab sim or EQ on the load box. Full chain: connect the amp to the cab as usual, with mics on the cab. Mute the studio monitors.",
+                    "Create one audio track per input and name it (Suhr, SM57, R121…). The exported files use these names. Turn input monitoring off. Use no plug-ins.",
+                    "Set the reamp level to about the level of a guitar. Play the first 20 seconds. Set each input so the loudest part peaks near −8 dBFS, without clipping.",
+                    "Warm up the amp for about 20 minutes. Then record one full pass (3 minutes 10 seconds) plus 1–2 seconds past the end. Do not adjust any controls during the recording.",
                     "Export every track as a WAV (in Logic: File › Export › All Tracks as Audio Files): 24-bit, 48 kHz, Normalize off.",
                 ])
             }
@@ -219,7 +219,7 @@ struct NAMLogicSteps: View {
                 VStack(spacing: 6) {
                     Text("Drag the exported WAV files here").bold()
                     Button("or choose them…") { m.chooseNAMFiles() }.buttonStyle(.link)
-                    Text("The sweep track's own file is skipped automatically.").font(.callout).foregroundStyle(.secondary)
+                    Text("The sweep track file is skipped automatically.").font(.callout).foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity).padding(.vertical, 18)
                 .background(RoundedRectangle(cornerRadius: 6).strokeBorder(dropping ? lamp : Color.secondary.opacity(0.4), style: StrokeStyle(lineWidth: 2, dash: [6])))
@@ -281,11 +281,11 @@ struct NAMResultsView: View {
         GroupBox {
             VStack(alignment: .leading, spacing: 14) {
                 HStack {
-                    Text("UPLOAD FOR TRAINING — \(r.title)").font(.system(size: 15, weight: .semibold)).kerning(0.8)
+                    Text("UPLOAD FOR TRAINING: \(r.title)").font(.system(size: 15, weight: .semibold)).kerning(0.8)
                     Spacer()
                     if r.droppedOut { Pill(text: "Record again", color: badColor) }
                     else if r.warnings.isEmpty { Pill(text: "Ready to upload", color: goodColor) }
-                    else { Pill(text: r.warnings.count == 1 ? "1 thing to check" : "\(r.warnings.count) things to check", color: warnColor) }
+                    else { Pill(text: r.warnings.count == 1 ? "1 item to check" : "\(r.warnings.count) items to check", color: warnColor) }
                 }
                 ForEach(r.warnings, id: \.self) { w in
                     Text(w).padding(.horizontal, 10).padding(.vertical, 7).frame(maxWidth: .infinity, alignment: .leading)
@@ -322,12 +322,12 @@ struct NAMResultsView: View {
                     }
                 }
                 Checklist(items: [
-                    "Click Show in Finder. The folder holds one WAV per channel (48 kHz, 24-bit, mono), plus report.json and UPLOAD-STEPS.txt.",
+                    "Click Show in Finder. The folder contains one WAV per channel (48 kHz, 24-bit, mono), report.json and UPLOAD-STEPS.txt.",
                     "At tone3000.com/capture, upload the WAV files, one model per file.",
-                    "Settings: Model Standard, Best Fit on, 400 max epochs (TONE3000's suggestion). Name each model with the amp, its knob settings and, for mics, the mic and its position. Keep it private unless you mean to share it.",
-                    "Training takes about 5–20 minutes. Check the ESR when it's done: under 0.01 is great; 0.3 or more means something went wrong. Download the .nam file to use in any NAM player.",
+                    "Settings: Model Standard, Best Fit on, 400 max epochs (TONE3000 recommendation). Name each model with the amp, its control settings and, for mics, the mic and position. Set the model to private unless it is to be shared.",
+                    "Training time: about 5–20 minutes. Check the ESR after training. Below 0.01: very good. 0.3 or higher: the capture failed. Download the .nam file for use in a NAM player.",
                 ])
-                Note("“Start vs end” compares the opening 9 seconds of the take with the closing 9, which are the same signal. It shows how much the amp drifted while you recorded, and a model can't be much more accurate than that. Under 0.001 is excellent.")
+                Note("“Start vs end” compares the first 9 seconds of the take with the last 9 seconds. Both sections contain the same signal. The value indicates amp drift during the recording. Model accuracy is limited to about this value. Below 0.001: excellent.")
                 HStack {
                     Button("Show in Finder") { m.revealNAM() }.buttonStyle(.borderedProminent).tint(lamp)
                     Button("Open tone3000.com/capture") { m.openTONE3000() }

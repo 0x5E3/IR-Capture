@@ -30,7 +30,7 @@ def background(path: Path, scale: int):
     lamp = (232, 150, 46)
     d.rectangle([0, 0, W * s, 6 * s], fill=lamp)
     d.text((W * s / 2, 44 * s), "Drag IR Capture to Applications", fill=(40, 36, 32), font=font(22 * s, True), anchor="mm")
-    d.text((W * s / 2, 72 * s), "Then open it from Applications. The Quick start has the wiring pictures.",
+    d.text((W * s / 2, 72 * s), "Then open it from Applications. Wiring diagrams are in the Quick start.",
            fill=(110, 104, 96), font=font(13 * s), anchor="mm")
     # arrow between the two icons (icons sit at x=160 and x=480, y=190)
     y = 190 * s

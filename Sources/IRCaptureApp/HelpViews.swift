@@ -66,7 +66,7 @@ enum Wiring: String, CaseIterable {
         case .cabNoRef, .cabRef: return "Studio monitors muted. Amp master low to start."
         case .namAmp: return "Gates, reverb, delay and loop effects off."
         case .namFull: return "Gates, reverb, delay and loop effects off. Studio monitors muted."
-        case .pad: return "The pad goes alongside the speaker, which stays connected. Divides the voltage by about 10 (−19 dB)."
+        case .pad: return "Connect the pad in parallel with the speaker. Keep the speaker connected. Voltage division: about 10:1 (−19 dB)."
         }
     }
 }
@@ -140,7 +140,7 @@ struct WelcomeSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text(["Welcome to \(Product.name)", "How it's wired", "What you'll get"][page]).font(.title.weight(.semibold))
+                Text(["Welcome to \(Product.name)", "Wiring", "Output files"][page]).font(.title.weight(.semibold))
                 Spacer()
                 HStack(spacing: 6) { ForEach(0..<3) { i in Circle().fill(i == page ? lamp : Color.secondary.opacity(0.3)).frame(width: 8, height: 8) } }
             }
@@ -163,13 +163,13 @@ struct WelcomeSheet: View {
             Text("WHAT YOU NEED").font(.caption.weight(.semibold)).kerning(0.8).foregroundStyle(.secondary)
             Checklist(items: [
                 "A Mac with macOS 13 or later.",
-                "An audio interface with at least 1 output and 1 input. Two or more inputs let you record several mics at once.",
+                "An audio interface with at least 1 output and 1 input. With two or more inputs, several mics can be recorded at once.",
                 "Your mic(s), amp, cab and cables.",
                 "Optional: a reference (a load box with a line out, or a reference tap). For NAM captures: a reamp box, and a load box for amp-only models.",
             ])
             Divider()
             Text("MICROPHONE ACCESS").font(.caption.weight(.semibold)).kerning(0.8).foregroundStyle(.secondary)
-            Note("macOS asks before any app can record from an interface, even one with no microphones plugged in. \(Product.name) records your mics and the reference while it plays the test sweeps, and nothing else.", color: .primary)
+            Note("macOS requires permission before any app can record from an interface, including an interface with no microphones connected. \(Product.name) records the mic and reference inputs only while the test sweeps are played.", color: .primary)
             HStack {
                 switch m.micStatus {
                 case .authorized:
@@ -199,11 +199,11 @@ struct WelcomeSheet: View {
     var gets: some View {
         VStack(alignment: .leading, spacing: 12) {
             Checklist(items: [
-                "Cab IR: one finished file per mic, at the top of the capture folder (48 kHz, 24-bit, 500 ms). It loads in any IR loader, DAW plug-in or modeler. Helix, Iridium and every-rate versions are a tick away, and you can re-export later without recording again.",
-                "A report of what the app measured: levels, room noise, speaker distortion and mic timing, with plain advice if anything needs fixing.",
-                "Amp (NAM): files lined up and checked, ready to upload to TONE3000, which trains the model for you.",
+                "Cab IR: one finished file per mic, at the top of the capture folder (48 kHz, 24-bit, 500 ms). Compatible with IR loaders, DAW plug-ins and modelers. All-sample-rate, Strymon Iridium, minimum-phase and two-mic mix versions are available as options. Files can be re-exported later without a new recording.",
+                "A measurement report: levels, room noise, speaker distortion and mic timing, with corrective steps where required.",
+                "Amp (NAM): aligned and verified files for upload to TONE3000. The model is trained on TONE3000.",
             ])
-            Note("Help › Quick Start has the four steps any time; Help › Contact Support sends your details to us.")
+            Note("The four steps are listed in Help › Quick Start. To send system details to support, use Help › Contact Support.")
         }
     }
 }
@@ -247,17 +247,17 @@ struct QuickStartPage: View {
     var body: some View {
         Text("Your first cab IR").font(.title2.weight(.semibold))
         Checklist(items: [
-            "Connect. Interface output → the amp's FX return or a clean power amp → the cab. Mics on the cab into the interface. Amp master low, studio monitors muted.",
-            "Set levels. Click Check levels. The app listens to the room for 2 seconds, finds a clean sweep level, then loops short sweeps. Turn each preamp until it says OK.",
-            "Capture. Name it (e.g. 412_V30_PosA) and click Capture. It takes about 45 seconds.",
+            "Connect. Interface output → amp FX return or clean power amp → cab. Connect the mics on the cab to the interface. Set the amp master low. Mute the studio monitors.",
+            "Set levels. Click Check levels. Room noise is measured for 2 seconds, a clean sweep level is set, and short sweeps are looped. Adjust each preamp until the meter shows OK.",
+            "Capture. Enter a name (e.g. 412_V30_PosA) and click Capture. Duration: about 45 seconds.",
             "Results. Load the file at the top of the capture folder (one per mic) into your IR loader, DAW plug-in or modeler.",
         ])
         Text("A NAM amp model").font(.title2.weight(.semibold)).padding(.top, 8)
         Checklist(items: [
             "Download T3K-sweep-v3.wav from tone3000.com/capture, then click Find it in Downloads in the Amp (NAM) tab.",
-            "Interface output → reamp box → amp input. Amp → load box; its line out → an interface input.",
-            "Check levels, then Record (3 minutes 12 seconds). Don't touch any knobs while it runs.",
-            "Upload the WAV files at tone3000.com/capture; it trains the model and gives you a .nam file.",
+            "Interface output → reamp box → amp input. Amp → load box. Load box line out → interface input.",
+            "Click Check levels, then Record (3 minutes 12 seconds). Do not adjust any controls during the recording.",
+            "Upload the WAV files at tone3000.com/capture. TONE3000 trains the model and provides a .nam file.",
         ])
     }
 }
@@ -265,39 +265,39 @@ struct QuickStartPage: View {
 struct ReferencePage: View {
     var body: some View {
         Text("What the reference does").font(.title2.weight(.semibold))
-        Note("A reference is a copy of the voltage across the speaker terminals, recorded on its own line input while the sweep plays. The app divides each mic by it, so the IR is the speaker, mic and room only, whatever amp drives it. Without one, the IR also includes the power amp, and with a tube amp that adds about 5 dB of the speaker's impedance bump around its resonance. That isn't wrong, and most commercial IRs are made that way; it just means the IR carries that amp's character.", color: .primary)
-        Note("It also matters for NAM: an amp-only model already has the impedance bump in it (the load box's line out carries it), so pair it with IRs made with a reference, or the bump is counted twice.", color: .primary)
+        Note("A reference is a copy of the voltage across the speaker terminals. It is recorded on a separate line input during the sweep. Each mic recording is divided by the reference. The resulting IR contains the speaker, mic and room only, independent of the amp. Without a reference, the IR also contains the power amp response. With a tube amp, this adds about 5 dB of the speaker impedance peak around resonance. Most commercial IRs are made this way. The IR then includes the response of that amp.", color: .primary)
+        Note("NAM: an amp-only model already contains the impedance peak, because the load box line out includes it. Use such a model with IRs made with a reference. Otherwise the peak is applied twice.", color: .primary)
         Text("Three ways to get one").font(.title3.weight(.semibold)).padding(.top, 4)
         Checklist(items: [
-            "None. Skip it. Fine for a first capture.",
-            "A load box or attenuator with a speaker-through and a line out (the kind that sits between the amp and the cab). Its line out is a tap of the amp's output voltage: one cable to a line input. Turn off any cab simulation or EQ on that output, and set any attenuation to bypass for the capture.",
+            "None. Acceptable for a first capture.",
+            "A load box or attenuator with a speaker-through and a line out, connected between the amp and the cab. The line out is a tap of the amp output voltage. Connect it to a line input with one cable. Turn off any cab simulation or EQ on that output. Set any attenuation to bypass for the capture.",
             "A reference tap or a home-made pad across the speaker terminals (below).",
         ])
         Text("Build a 20 dB pad").font(.title3.weight(.semibold)).padding(.top, 4)
         WiringDiagram(wiring: .pad, compact: true)
         Checklist(items: [
             "Parts: one 10 kΩ resistor (½ W, metal film), one 1.1 kΩ resistor (¼ W or more), a ¼\" jack, two clips or a speaker-cable splitter, and a small box.",
-            "Connect the 10 kΩ from the speaker's + terminal to a tap point, and the 1.1 kΩ from the tap point to the speaker's − terminal. That divides the voltage by about 10 (−19 dB).",
-            "Wire the tap point to the jack's tip and the speaker's − terminal to its sleeve. Plug it into a line input (not a mic or instrument input), with phantom power off.",
-            "Keep the speaker connected the whole time: the pad goes alongside it, never instead of it. A tube amp must always have its load.",
+            "Connect the 10 kΩ from the speaker's + terminal to a tap point, and the 1.1 kΩ from the tap point to the speaker's − terminal. Voltage division: about 10:1 (−19 dB).",
+            "Wire the tap point to the jack tip and the speaker − terminal to the jack sleeve. Connect the jack to a line input, not a mic or instrument input. Turn phantom power off.",
+            "Keep the speaker connected at all times. Connect the pad in parallel with the speaker, never in place of it. A tube amp must always have a load.",
         ])
-        Note("If the amp's speaker output is bridged (many class-D and some solid-state amps: neither terminal is ground), a plain pad will short it through the interface's ground. Use an isolated tap (a transformer) or a balanced input with both legs padded. If the tap brings in hum, the cure is the same.", color: badColor)
+        Note("Bridged speaker outputs (many class-D and some solid-state amps) have no grounded terminal. A plain pad shorts such an output through the interface ground. Use an isolated tap (transformer) or a balanced input with both legs padded. The same fix applies to hum on the tap.", color: badColor)
     }
 }
 
 struct TroubleshootingPage: View {
     let items: [(String, String)] = [
-        ("The app won't open", "Signed releases open with a double-click. A pre-release build needs one extra step the first time: System Settings › Privacy & Security, scroll down, Open Anyway."),
-        ("No interface found", "Plug it in and switch it on; it appears by itself. It has to have both inputs and outputs. If yours are on two devices, combine them into an aggregate device in Audio MIDI Setup."),
-        ("No signal on an input", "Check the cable and that the preamp gain isn't at zero. Phantom power on for condenser mics. Mark the input as Mic in Connect."),
-        ("CLIP", "Turn that preamp down until it says OK. If every input clips, turn the amp's master down."),
-        ("Distortion is orange or red", "The speaker is being pushed too hard for a clean IR. Turn the amp's master down. An IR is linear, so more volume gains nothing."),
-        ("Noisy input", "Something in the room: fridge, air conditioning, fans, a computer, or the studio monitors. Quieten it and check levels again."),
-        ("Hum on the reference tap", "Use an isolated tap, a balanced input, or plug the amp and the interface into the same power strip."),
-        ("The IR sounds thin or dull", "Usually mic placement (move toward or away from the cone's center), studio monitors left on, or the sweep going into the guitar input instead of the FX return."),
-        ("Audio dropped out", "Another app interrupted the interface. Quit browsers, video calls and other audio apps, then record again. If it keeps happening, raise the interface's buffer size."),
-        ("Sample rate wouldn't switch", "Set the interface to the rate the app asks for in Audio MIDI Setup (or its own control panel), then try again."),
-        ("Microphone permission", "System Settings › Privacy & Security › Microphone: turn on \(Product.name), then quit and reopen it."),
+        ("The app does not open", "Signed releases open with a double-click. Pre-release builds require one additional step on first launch: System Settings › Privacy & Security, scroll down, click Open Anyway."),
+        ("No interface found", "Connect the interface and switch it on. It is detected automatically. The interface must have both inputs and outputs. If inputs and outputs are on two devices, combine them into an aggregate device in Audio MIDI Setup."),
+        ("No signal on an input", "Check the cable. Check that the preamp gain is above zero. Turn on phantom power for condenser mics. Set the input to Mic in Connect."),
+        ("CLIP", "Turn that preamp down until the meter shows OK. If all inputs clip, turn the amp master down."),
+        ("Distortion is orange or red", "Speaker drive is too high for a clean IR. Turn the amp master down. An IR is linear. Higher volume does not improve it."),
+        ("Noisy input", "Noise source in the room: refrigerator, air conditioning, fans, a computer, or the studio monitors. Reduce the noise and check levels again."),
+        ("Hum on the reference tap", "Use an isolated tap or a balanced input, or connect the amp and the interface to the same power strip."),
+        ("The IR sounds thin or dull", "Common causes: mic placement (move toward or away from the cone center), studio monitors not muted, or the sweep connected to the guitar input instead of the FX return."),
+        ("Audio dropped out", "Another app interrupted the interface. Quit browsers, video calls and other audio apps, then record again. If dropouts continue, increase the interface buffer size."),
+        ("Sample rate did not switch", "In Audio MIDI Setup (or the interface control panel), set the interface to the requested rate, then try again."),
+        ("Microphone permission", "System Settings › Privacy & Security › Microphone: turn on \(Product.name), then quit and reopen the app."),
     ]
     var body: some View {
         Text("Troubleshooting").font(.title2.weight(.semibold))

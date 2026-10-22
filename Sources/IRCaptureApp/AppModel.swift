@@ -135,10 +135,10 @@ enum Busy: Equatable {
     var text: String {
         switch self {
         case .preparing(let t): return t
-        case .recording(let p): return "Playing the sweeps and recording — \(Int(p * 100))%. Keep the room quiet."
+        case .recording(let p): return "Playing sweeps and recording: \(Int(p * 100))%. Keep the room quiet."
         case .namRecording(let p):
             let left = max(0, Int(((1 - p) * Double(NAMPrep.length + 2 * NAMPrep.fs) / Double(NAMPrep.fs)).rounded()))
-            return "Playing the training signal and recording — \(left / 60):\(String(format: "%02d", left % 60)) left. Don't touch the amp or the gain knobs."
+            return "Playing training signal and recording: \(left / 60):\(String(format: "%02d", left % 60)) remaining. Do not adjust the amp or gain controls."
         case .processing(let t): return t + "…"
         }
     }
@@ -476,7 +476,7 @@ final class AppModel: ObservableObject {
     func layout() -> OutputLayout { .targets(chosenTargets, custom: customOn ? exportOptions() : nil) }
 
     var outputProblem: String? {
-        if !chosenTargets.contains(where: { !$0.isExtra }) && !customOn { return "Choose at least one set of files to make under Files." }
+        if !chosenTargets.contains(where: { !$0.isExtra }) && !customOn { return "Select at least one file set under Files to make." }
         if customOn {
             let e = exportOptions()
             if e.rates.isEmpty || e.lengths.isEmpty || e.bits.isEmpty || e.trim.isEmpty {
@@ -491,8 +491,8 @@ final class AppModel: ObservableObject {
         var seen = Set<String>()
         for n in names {
             let k = safeName(n).lowercased()
-            if k == "reference" { return "“reference” is kept for the reference tap. Give that mic another name." }
-            if seen.contains(k) { return "Two mics are both named “\(n)”. Give each a different name." }
+            if k == "reference" { return "The name “reference” is reserved for the reference tap. Rename the mic." }
+            if seen.contains(k) { return "Two mics have the name “\(n)”. Use a different name for each mic." }
             seen.insert(k)
         }
         return nil
@@ -504,8 +504,8 @@ final class AppModel: ObservableObject {
     func noiseNote(_ ch: Int) -> String? {
         guard let n = noise[ch] else { return nil }
         let peak = levelReadings.first { $0.channel == ch }?.peakDBFS
-        if n > -55 { return "\(label(for: ch)) is noisy (room noise at \(Int(n.rounded())) dBFS). Fridge, air conditioning, fans or the studio monitors on?" }
-        if let p = peak, p - n < 40 { return "\(label(for: ch)) is only \(Int((p - n).rounded())) dB above the room noise. Turn that preamp up, or quieten the room." }
+        if n > -55 { return "\(label(for: ch)) is noisy (room noise \(Int(n.rounded())) dBFS). Check for refrigerators, air conditioning, fans or studio monitors." }
+        if let p = peak, p - n < 40 { return "\(label(for: ch)) is only \(Int((p - n).rounded())) dB above the room noise. Turn that preamp up, or reduce room noise." }
         return nil
     }
 
@@ -516,15 +516,15 @@ final class AppModel: ObservableObject {
         else { out.append(PreflightItem(level: .ok, text: "\(mics.count) mic\(mics.count == 1 ? "" : "s") (\(mics.map(\.name).joined(separator: ", ")))")) }
         if refSource == .none { out.append(PreflightItem(level: .ok, text: "Reference: none")) }
         else if let r = refInput { out.append(PreflightItem(level: .ok, text: "Reference: Input \(r + 1)")) }
-        else { out.append(PreflightItem(level: .block, text: "Choose which input the reference is plugged into, or set the reference to None.")) }
+        else { out.append(PreflightItem(level: .block, text: "Select the reference input, or set the reference to None.")) }
         out.append(PreflightItem(level: .ok, text: "\(rateTag(captureRate).dropLast()) kHz on \(dev.name)"))
         let used = levelReadings.filter { r in inputs.contains { $0.id == r.channel && $0.role != .off } }
         if used.isEmpty {
-            out.append(PreflightItem(level: .warn, text: "Levels haven't been checked yet. Click Check levels first."))
+            out.append(PreflightItem(level: .warn, text: "Levels not checked. Click Check levels."))
         } else {
             let clipped = used.filter(\.clipped)
             if !clipped.isEmpty {
-                out.append(PreflightItem(level: .block, text: "\(clipped.map(\.label).joined(separator: ", ")) clipped in the level check. Turn \(clipped.count == 1 ? "it" : "them") down and check levels again."))
+                out.append(PreflightItem(level: .block, text: "\(clipped.map(\.label).joined(separator: ", ")) clipped in the level check. Turn the gain down and check levels again."))
             } else {
                 let off = used.filter { abs($0.changeDB) > 3 && $0.label != "Reference" }
                 if off.isEmpty { out.append(PreflightItem(level: .ok, text: "Levels OK")) }
@@ -570,7 +570,7 @@ final class AppModel: ObservableObject {
         if !ok { Log.write("microphone permission denied") }
         return ok
     }
-    let micDenied = "IR Capture isn't allowed to record. Open System Settings › Privacy & Security › Microphone, turn on IR Capture, then quit and reopen the app."
+    let micDenied = "IR Capture does not have recording permission. Open System Settings › Privacy & Security › Microphone, turn on IR Capture, then quit and reopen the app."
 
     static func rmsDB(_ x: [Float], from a: Int) -> Double {
         guard x.count > a else { return -120 }
@@ -582,7 +582,7 @@ final class AppModel: ObservableObject {
     // ---------------------------------------------------------------- level check (with auto sweep level and noise check)
     func toggleLevelCheck() {
         if levelRunning { stopLevelChecks(); return }
-        guard let dev = device else { levelError = "Choose an audio interface first."; return }
+        guard let dev = device else { levelError = "Select an audio interface."; return }
         guard busy == nil else { return }
         guard inputs.contains(where: { $0.role != .off }) else { levelError = "Mark at least one input as a mic."; return }
         levelError = nil; levelReadings = []; idleSignals = []; refCandidate = nil; noise = [:]; levelRunning = true
@@ -605,7 +605,7 @@ final class AppModel: ObservableObject {
             do {
                 try await Task.detached { try CoreAudioHelper.setNominalRate(dev.id, fs) }.value
                 // Noise check: 2 s with the output silent, every input.
-                levelPhase = "Listening to the room for 2 seconds. Keep it quiet."
+                levelPhase = "Measuring room noise for 2 seconds. Keep the room quiet."
                 let silence = [Float](repeating: 0, count: 2 * fs)
                 let nrec = try await DuplexIO.run(device: dev, fs: fs, outChannel: out, inputs: all, signal: silence,
                                                   extraSeconds: 0.1, cancelled: { Task.isCancelled })
@@ -618,7 +618,7 @@ final class AppModel: ObservableObject {
                 var check = try await Task.detached { try LevelCheck(fs: fs, levelDBFS: first) }.value
                 while !Task.isCancelled {
                     if cabLevel != lvl { lvl = cabLevel; let l = lvl; check = try await Task.detached { try LevelCheck(fs: fs, levelDBFS: l) }.value }
-                    levelPhase = auto && !autoLevelSettled ? "Finding the sweep level…" : "Playing short sweeps…"
+                    levelPhase = auto && !autoLevelSettled ? "Setting sweep level…" : "Playing short sweeps…"
                     let rec = try await DuplexIO.run(device: dev, fs: fs, outChannel: out, inputs: all,
                                                      signal: check.signal, extraSeconds: 0.4, cancelled: { Task.isCancelled })
                     let rows = inputs
@@ -756,7 +756,7 @@ final class AppModel: ObservableObject {
     func chooseReexportFolder() {
         let p = NSOpenPanel()
         p.canChooseDirectories = true; p.canChooseFiles = false
-        p.message = "Choose a capture folder (it has a Raw take folder inside)"
+        p.message = "Select a capture folder (contains a Raw take folder)"
         p.prompt = "Re-export"
         p.directoryURL = outputFolder
         if p.runModal() == .OK, let u = p.url { reexportMessage = nil; reexportFolder = u }
@@ -814,16 +814,16 @@ final class AppModel: ObservableObject {
         \(spec.nSweeps) sweeps of \(spec.duration) s, \(spec.gap) s gaps, \(Int(spec.f1)) Hz to \(Int(spec.f2.rounded())) Hz, peak \(spec.levelDBFS) dBFS, \(tag).
         Length \(String(format: "%.1f", Double(x.count) / Double(spec.fs))) s.
 
-        Put \(base).wav at the very start of a \(tag) project in your DAW (Logic, Reaper, Ableton, Pro Tools, GarageBand…),
-        record the mics while it plays, export each track as a WAV, then add them in IR Capture
-        (Cab IR › Import DAW recordings) with the same settings. The .json file records these settings.
+        Place \(base).wav at the start of a \(tag) project in the DAW (Logic, Reaper, Ableton, Pro Tools, GarageBand…).
+        Record the mics during playback. Export each track as a WAV. Add the files in IR Capture
+        (Cab IR › Import DAW recordings) with the same settings. The settings are stored in the .json file.
 
         """
         do {
             try writeWavFloat([x], rate: spec.fs).write(to: dir.appendingPathComponent(base + ".wav"))
             try spec.json.serialized().write(to: dir.appendingPathComponent(base + ".json"), atomically: true, encoding: .utf8)
             try howto.write(to: dir.appendingPathComponent("How to use.txt"), atomically: true, encoding: .utf8)
-            signalMessage = "Saved \(base).wav in \(dir.lastPathComponent). Keep these settings for step 3."
+            signalMessage = "Saved \(base).wav in \(dir.lastPathComponent). Use the same settings in step 3."
             NSWorkspace.shared.activateFileViewerSelecting([dir.appendingPathComponent(base + ".wav")])
         } catch {
             signalMessage = error.localizedDescription + " Choose another folder and try again."
@@ -846,7 +846,7 @@ final class AppModel: ObservableObject {
     func chooseLogicFiles() {
         let p = NSOpenPanel()
         p.allowsMultipleSelection = true; p.allowedContentTypes = [.wav]
-        p.message = "Select the mic and reference WAV files your DAW exported"
+        p.message = "Select the mic and reference WAV files exported from the DAW"
         if p.runModal() == .OK { addLogicFiles(p.urls) }
     }
 
@@ -866,7 +866,7 @@ final class AppModel: ObservableObject {
                                                       name: stem + (info.channels > 1 ? "_\(c + 1)" : "")))
                 }
             } catch {
-                logicMessage = "\(u.lastPathComponent): \(error.localizedDescription). Export WAV files from your DAW (16, 24 or 32-bit) and add them again."
+                logicMessage = "\(u.lastPathComponent): \(error.localizedDescription). Export WAV files from the DAW (16, 24 or 32-bit) and add them again."
             }
         }
         if let fs = logicChannels.first?.fs, Set(logicChannels.map(\.fs)).count == 1, CoreAudioHelper.captureRates.contains(fs) { logicRate = fs }
@@ -882,14 +882,14 @@ final class AppModel: ObservableObject {
     var logicProblem: String? {
         guard !logicChannels.isEmpty else { return "Add the exported WAV files." }
         let rates = Set(logicChannels.map(\.fs))
-        if rates.count > 1 { return "These files have different sample rates. They need to come from the same take." }
+        if rates.count > 1 { return "The files have different sample rates. All files must be from the same take." }
         if rates.first! != logicRate {
             return "The recordings are \(rateTag(rates.first!).dropLast()) kHz but the test signal setting is \(rateTag(logicRate).dropLast()) kHz. Set step 1 to match the recording."
         }
         if let p = AppModel.namesProblem(logicChannels.filter { $0.role == .mic }.map(\.name)) { return p }
         let shortest = logicChannels.map { Double($0.frames) / Double($0.fs) }.min()!
         if shortest < signalSeconds - 1.5 {
-            return String(format: "The recordings are %.1f s long, shorter than the %.1f s test signal. Check the sweep settings, or record the whole pass.", shortest, signalSeconds)
+            return String(format: "The recordings are %.1f s long, shorter than the %.1f s test signal. Check the sweep settings, or record the full pass.", shortest, signalSeconds)
         }
         return outputProblem
     }
@@ -942,7 +942,7 @@ final class AppModel: ObservableObject {
     func chooseNAMFiles() {
         let p = NSOpenPanel()
         p.allowsMultipleSelection = true; p.allowedContentTypes = [.wav]
-        p.message = "Select the WAV files your DAW exported (load box line out or mics)"
+        p.message = "Select the WAV files exported from the DAW (load box line out or mics)"
         if p.runModal() == .OK { addNAMFiles(p.urls) }
     }
 
@@ -960,7 +960,7 @@ final class AppModel: ObservableObject {
                                               use: !isSweep, name: stem + (info.channels > 1 ? "_\(c + 1)" : "")))
                 }
             } catch {
-                namMessage = "\(u.lastPathComponent): \(error.localizedDescription). Export WAV files from your DAW (16, 24 or 32-bit) and add them again."
+                namMessage = "\(u.lastPathComponent): \(error.localizedDescription). Export WAV files from the DAW (16, 24 or 32-bit) and add them again."
             }
         }
     }
@@ -974,11 +974,11 @@ final class AppModel: ObservableObject {
         var seen = Set<String>()
         for c in used {
             let k = NAMPrep.safe(c.name).lowercased()
-            if seen.contains(k) { return "Two channels are both named “\(c.name)”. Give each a different name." }
+            if seen.contains(k) { return "Two channels have the name “\(c.name)”. Use a different name for each channel." }
             seen.insert(k)
         }
         for c in used where Double(c.frames) / Double(c.fs) < 180 {
-            return "\(c.url.lastPathComponent) is only \(Int(Double(c.frames) / Double(c.fs))) s long. The training signal is 190 s: record the whole pass."
+            return "\(c.url.lastPathComponent) is only \(Int(Double(c.frames) / Double(c.fs))) s long. The training signal is 190 s. Record the full pass."
         }
         return nil
     }
@@ -1048,7 +1048,7 @@ final class AppModel: ObservableObject {
                 }
             }
         }
-        if inDownloads { namSignalStatus = "T3K-sweep-v3.wav isn't in Downloads or Music. Download it from TONE3000 (button above), then try again, or choose it yourself." }
+        if inDownloads { namSignalStatus = "T3K-sweep-v3.wav not found in Downloads or Music. Download the file from TONE3000 (button above) and try again, or click Choose sweep file." }
         return false
     }
 
@@ -1078,18 +1078,18 @@ final class AppModel: ObservableObject {
     var namSignalName: String { URL(fileURLWithPath: namSignalPath).lastPathComponent }
 
     var namDirectProblem: String? {
-        guard namSignal != nil else { return "Choose TONE3000's sweep file in step 1." }
+        guard namSignal != nil else { return "Select the TONE3000 sweep file in step 1." }
         if simulateIO { return nil }
-        guard let dev = device else { return "Choose an audio interface in step 2." }
+        guard let dev = device else { return "Select an audio interface in step 2." }
         if !dev.sampleRates.isEmpty && !dev.sampleRates.contains(NAMPrep.fs) {
-            return "\(dev.name) can't run at 48 kHz, which the training signal needs. Choose another interface."
+            return "\(dev.name) does not support 48 kHz. The training signal requires 48 kHz. Select another interface."
         }
         let used = namRows.filter(\.use)
         guard !used.isEmpty else { return "Choose Use for at least one input in step 2." }
         var seen = Set<String>()
         for r in used {
             let k = NAMPrep.safe(r.name).lowercased()
-            if seen.contains(k) { return "Two inputs are both named “\(r.name)”. Give each a different name." }
+            if seen.contains(k) { return "Two inputs have the name “\(r.name)”. Use a different name for each input." }
             seen.insert(k)
         }
         return nil
@@ -1228,7 +1228,7 @@ final class AppModel: ObservableObject {
             } catch {
                 Log.write("NAM record error: \(error.localizedDescription)")
                 namError = error.localizedDescription
-                    + (rawSaved ? " The raw recording is saved in “\(capture)/raw recording”. You can drop those files into Import DAW recordings to try again." : "")
+                    + (rawSaved ? " The raw recording is saved in “\(capture)/raw recording”. To try again, add those files in Import DAW recordings." : "")
             }
         }
         captureTask = t
@@ -1244,7 +1244,7 @@ final class AppModel: ObservableObject {
                 done.append((name, try NAMPrep.prepareChannel(x, fs: fs, label: name, progress: { report($0) })))
             }
             var res = NAMPrep.finish(kind: kind, channels: done)
-            if let dropout { res.warnings.insert(dropout + " A dropout misaligns the training data, so a model from this take won't be accurate.", at: 0) }
+            if let dropout { res.warnings.insert(dropout + " The dropout misaligns the training data. A model from this take is not accurate.", at: 0) }
             report("Saving files")
             return (res, try NAMPrep.write(res, capture: capture, outDir: outDir, extra: extra))
         }.value

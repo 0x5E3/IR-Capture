@@ -1,76 +1,75 @@
 # IR Capture
 
-A Mac app for capturing guitar-cab impulse responses with as little fuss as a ToneX capture: wire the rig, check levels, press one button, and get finished IRs that load anywhere. It also records amps for NAM models trained at TONE3000.
+A Mac app for capturing guitar-cab impulse responses. Wire the rig, check levels and click Capture. The result is a set of finished IRs in a standard format. The app also records amps for NAM models trained at TONE3000.
 
-It uses the same processing as the **Cab IR Capture** web page and the Python reference in `reference/`. CI checks it against both on every build.
+The processing is identical to the **Cab IR Capture** web page and the Python reference in `reference/`. CI compares the app against both on every build.
 
-> **Status:** version 1.0.0, pre-release. The processing is verified against a simulated rig (fake amp, cab, two mics and a reference tap, with known answers). The app's audio recording has **not yet been tested on real hardware**. The first real capture is also the app's first real test. Builds aren't signed by Apple until the Developer ID is set up (see `docs/SIGNING.md`).
+> **Status:** version 1.0.0, pre-release. The processing is verified against a simulated rig (simulated amp, cab, two mics and a reference tap, with known results). The audio recording functions have **not yet been tested on real hardware**. The first real capture is also the first hardware test. Builds are not signed by Apple until the Developer ID is set up (see `docs/SIGNING.md`).
 
 ## Get the app
 
 1. Go to the **[Releases page](https://github.com/0x5E3/IR-Capture/releases/tag/latest)**.
-2. Under **Assets**, click **IR-Capture.dmg**. It downloads to your Downloads folder.
-3. Double-click the DMG. A window opens: drag **IR Capture** onto **Applications**. The **Quick start.pdf** in that window has the wiring pictures.
+2. Under **Assets**, click **IR-Capture.dmg**. The file is saved to the Downloads folder.
+3. Double-click the DMG. In the window, drag **IR Capture** onto **Applications**. Wiring diagrams are in **Quick start.pdf** in the same window.
 4. Open **IR Capture** from Applications.
 
-### First launch (only while builds aren't signed)
+### First launch (unsigned builds only)
 
-1. Double-click **IR Capture**. macOS says it can't check it for malicious software. Click **Done** (or **Cancel**).
-2. Open **System Settings › Privacy & Security**. Scroll down to the message about IR Capture and click **Open Anyway**. Enter your password if asked.
-3. Click **Open** in the next box.
+1. Double-click **IR Capture**. macOS reports that the app cannot be checked for malicious software. Click **Done** (or **Cancel**).
+2. Open **System Settings › Privacy & Security**. Scroll down to the message about IR Capture and click **Open Anyway**. Enter the password if requested.
+3. Click **Open** in the next dialog.
 
-A newer unsigned build needs steps 1–3 again. Once releases are signed and notarized, none of this is needed: it opens on the first double-click.
+Repeat steps 1–3 for each new unsigned build. Signed and notarized releases open on the first double-click.
 
-The **Welcome** screen asks for permission to record from your interface, with a button. Click it, then **Allow**. If you clicked Don't Allow: **System Settings › Privacy & Security › Microphone**, turn on IR Capture, then quit and reopen the app.
+The **Welcome** screen has a button to request recording permission for the interface. Click the button, then click **Allow**. If Don't Allow was clicked: open **System Settings › Privacy & Security › Microphone**, turn on IR Capture, then quit and reopen the app.
 
 ## Cab IR
 
-**Record here** (the main way):
-1. **Connect.** Interface output → the amp's **FX return** (power amp in) or a clean power amp → the cab. Not the guitar input. Mics into the interface. The app shows the wiring picture, finds the interface when you plug it in, and picks the sample rate. Name each mic, and choose **Where's your reference?** (None is fine).
-2. **Set levels.** Click **Check levels**. The app listens to the room for 2 seconds, finds a clean sweep level by itself, then loops short sweeps while you turn each preamp until it says OK.
-3. **Capture.** Name it, check the **Before you capture** list, and click **Capture**. About 45 seconds later the results appear.
+**Record here** (main method):
+1. **Connect.** Interface output → amp **FX return** (power amp in) or clean power amp → cab. Do not use the guitar input. Connect the mics to the interface. The wiring diagram is shown in the app. The interface is detected when connected, and the sample rate is set automatically. Enter a name for each mic and select a **Reference source** (None is acceptable).
+2. **Set levels.** Click **Check levels**. Room noise is measured for 2 seconds and a clean sweep level is set automatically. Short sweeps are then looped. Adjust each preamp until the meter shows OK.
+3. **Capture.** Enter a name, check the **Before you capture** list, and click **Capture**. The results are shown after about 45 seconds.
 
-**Import DAW recordings** (secondary): save the test signal, record it in Logic, Reaper, Ableton, Pro Tools or GarageBand, and drag the exported WAVs in.
+**Import DAW recordings** (secondary method): save the test signal, record it in Logic, Reaper, Ableton, Pro Tools or GarageBand, and drag the exported WAV files into the app.
 
-Files land in **Music › IR Captures** unless you pick another folder:
+Files are saved in **Music › IR Captures** unless another folder is selected:
 
 ```
 412_V30_PosA/
     412_V30_PosA_SM57.wav          ← Universal: 48 kHz, 24-bit, 500 ms. Load these.
     412_V30_PosA_R121.wav
-    README.txt                     what everything is
-    report.json                    the measurements (send this to Claude)
-    More formats/                  only what you ticked under Files to make:
-        Everything/<rate>/…        44.1, 48, 88.2, 96 kHz × 500 ms, 1024, 2048, 4096 samples
-        Line 6 Helix/…             48 kHz, 2048 samples
+    README.txt                     description of the files
+    report.json                    measurements (send this file to Claude)
+    More formats/                  only the sets ticked under Files to make:
+        All sample rates/<rate>/…  44.1, 48, 88.2, 96 kHz × 500 ms and 200 ms
         Strymon Iridium/…          96 kHz, 500 ms
         Custom/<trim>/<rate>/…     the Advanced matrix
-    Raw take/                      the untouched recording + settings
+    Raw take/                      unprocessed recording + settings
 ```
 
-**Re-export** (in the results, or **Re-export a past capture…**) makes other formats from the raw take without recording again.
+**Re-export** (in the results, or **Re-export a past capture…**) makes other formats from the raw take without a new recording.
 
-Every IR comes out with its main peak positive, so mics blend without cancelling; a mic that recorded inverted is flipped and the results say so. **Advanced file options › Keep polarity as recorded** turns that off.
+Each IR is made with its main peak positive, so mics blend without cancellation. An inverted mic is flipped, and the flip is listed in the results. To turn this off, select **Advanced file options › Keep polarity as recorded**.
 
 ## Amp (NAM)
 
-The app gets recordings ready for NAM training at [TONE3000](https://www.tone3000.com/capture); it doesn't train models itself. Both routes start with TONE3000's sweep file, `T3K-sweep-v3.wav` (the app can find it in Downloads).
+The app prepares recordings for NAM training at [TONE3000](https://www.tone3000.com/capture). Models are not trained in the app. Both methods use the TONE3000 sweep file, `T3K-sweep-v3.wav` (to locate it, click **Find it in Downloads**).
 
-**Record here:** choose the capture type (amp only, or full chain), wire interface → reamp box → amp, check levels (live meters aiming for −8 dBFS), then **Record** (3 min 12 s). The app plays the file on the same interface it records with, so the clocks can't drift, and keeps the raw recording.
+**Record here:** select the capture type (amp only or full chain), connect interface → reamp box → amp, check levels (live meters, target −8 dBFS), then click **Record** (3 min 12 s). Playback and recording use the same interface, so there is no clock drift. The raw recording is kept.
 
-**Import DAW recordings:** record the sweep in a 48 kHz DAW project and drag the exported WAVs in.
+**Import DAW recordings:** record the sweep in a 48 kHz DAW project and drag the exported WAV files into the app.
 
-Output: `<capture>/<capture>_<input>.wav` (mono, 48 kHz, 24-bit), `report.json` and `UPLOAD-STEPS.txt`. Pair amp-only models with IRs captured with a reference, because the load box's line out already includes the speaker's impedance bump.
+Output: `<capture>/<capture>_<input>.wav` (mono, 48 kHz, 24-bit), `report.json` and `UPLOAD-STEPS.txt`. Use amp-only models with IRs captured with a reference. The load box line out already includes the speaker impedance peak.
 
 ## Help and support
 
 **Help** menu: Quick Start, Wiring, The Reference Tap (with a pad parts list), Troubleshooting, Contact Support (a mail draft with the app version, macOS version, interface and the latest report attached), Show Log File (`~/Library/Logs/IR Capture/`).
 
-## Status of what's tested
+## Test status
 
 - Simulated only: all processing, polarity, export targets and re-export (CI, every build).
-- In CI on a Mac: the app launches, processes simulated recordings through its own window, renders its diagrams, opens its help pages. NAM recording runs through a simulated interface.
-- Never on a real interface yet: the level check, the noise check, automatic sweep level, Capture, NAM Record, dropout detection, sample-rate switching and restoring.
+- In CI on a Mac: app launch, processing of simulated recordings through the app window, diagram rendering, help pages. NAM recording is tested with a simulated interface.
+- Not yet tested on a real interface: the level check, the noise check, automatic sweep level, Capture, NAM Record, dropout detection, sample-rate switching and restoring.
 
 ## For developers
 

@@ -67,7 +67,7 @@ public struct ExportTarget: Identifiable, Hashable {
 
     public static let universal = ExportTarget(
         id: "universal", title: "Universal",
-        detail: "48 kHz, 24-bit, 500 ms. One file per mic, at the top of the capture folder. For IR loaders, DAW plug-ins, modelers and Mirror IR. Matches the Boss IR-200 48 kHz / 500 ms format. Devices that use shorter IRs (for example Line 6 Helix, 2048 samples) shorten the file on import.",
+        detail: "48 kHz, 24-bit, 500 ms. One file per mic, at the top of the capture folder. For IR loaders, DAW plug-ins, modelers and Mirror IR. Matches the Boss IR-200 48 kHz / 500 ms format. On devices that use shorter IRs (for example Line 6 Helix, 2048 samples), the file is shortened on import.",
         folder: "", kind: .single(rate: 48000, length: .full, suffix: ""),
         source: "https://support.roland.com/hc/en-us/articles/4407995586459-IR-200-IR-data-types-formats-that-can-be-used")
     public static let everything = ExportTarget(
@@ -82,11 +82,11 @@ public struct ExportTarget: Identifiable, Hashable {
 
     public static let minimumPhase = ExportTarget(
         id: "minphase", title: "Minimum-phase versions",
-        detail: "The same tone with the timing removed (the sound starts on the first sample), for each close mic, in More formats › Minimum phase. Room mics don't get one.",
+        detail: "Same frequency response with the timing removed: the response starts on the first sample. Made for each close mic. Not made for room mics. Folder: More formats › Minimum phase.",
         folder: "More formats/Minimum phase", kind: .minimumPhase, source: nil)
     public static let mixes = ExportTarget(
         id: "mixes", title: "Mixes of two mics",
-        detail: "Ready-made blends with the mics' timing kept, all at the same loudness: two close mics 50/50, 70/30 and 30/70; a close mic with a room mic 80/20 and 60/40. In More formats › Mixes.",
+        detail: "Two-mic blends with the mic timing kept, all at equal loudness. Two close mics: 50/50, 70/30, 30/70. Close mic and room mic: 80/20, 60/40. Folder: More formats › Mixes.",
         folder: "More formats/Mixes", kind: .mixes, source: nil)
 
     /// Where the files go (destinations), and what else is made for them (extras).
@@ -322,7 +322,7 @@ public func makeMixes(_ res: AnalysisResult, prerollMs: Double = 0.25, fullMs: D
 public func extrasNotes(names: [String], lengthsMs: [(String, Double)]) -> [String] {
     var notes: [String] = []
     for m in names where isRoomMic(m) {
-        notes.append("\(m) is treated as a room mic: no minimum-phase version (it would smear the room).")
+        notes.append("\(m) is treated as a room mic. No minimum-phase version is made, because minimum phase moves the room reflections to the start.")
         let short = Array(Set(lengthsMs.filter { $0.1 < ROOM_SHORT_MS }.map { $0.0 })).sorted()
         if !short.isEmpty {
             notes.append("\(m): the \(short.joined(separator: ", ")) files are shorter than \(Int(ROOM_SHORT_MS)) ms and cut off most of the room. Use the 500 ms files.")
@@ -372,7 +372,7 @@ func exportExtras(_ res: inout AnalysisResult, capture: String, singles: [(rate:
         if mpOn && !mpMix.isEmpty { gMixMP = min(gMix, target / peak(mpMix, mp: true)); gains.append(("mix_mp", gMixMP)) }
     }
     var notes = extrasNotes(names: names, lengthsMs: lengthsMs)
-    if singles.isEmpty { notes.append("Minimum-phase versions and mixes are made for the single-file sets (Universal, Strymon Iridium). None of those was chosen, so none were made.") }
+    if singles.isEmpty { notes.append("Minimum-phase versions and mixes are made only for single-file sets (Universal, Strymon Iridium). No single-file set was selected, so none were made.") }
     if mixOn && names.count < 2 { notes.append("Mixes need two mics; this capture has one.") }
     res.extras = JSON.object([
         ("minimum_phase", .bool(mpOn)), ("room_mics", .array(names.filter(isRoomMic).map { .string($0) })),
@@ -407,42 +407,42 @@ func exportExtras(_ res: inout AnalysisResult, capture: String, singles: [(rate:
 public func captureReadme(capture: String, names: [String], targets: [ExportTarget], custom: Bool,
                           referenced: Bool, polarityNotes: [String], warnings: [String], notes: [String] = []) -> String {
     var t = """
-    \(capture) — cab impulse responses made with IR Capture
+    \(capture): cab impulse responses made with IR Capture
 
     START HERE
     """
     if targets.contains(where: { $0.id == "universal" }) {
-        t += "\n  These files load in any IR loader, DAW plug-in or modeler (48 kHz, 24-bit, 500 ms):\n"
+        t += "\n  Load these files in an IR loader, DAW plug-in or modeler (48 kHz, 24-bit, 500 ms):\n"
         for m in names { t += "    \(capture)_\(safeName(m)).wav   (\(m))\n" }
     } else {
         t += "\n  The files are in the More formats folder.\n"
     }
-    t += "\n  The mics were trimmed together (\"Keep mic timing\"), so blending two of these files sums the way the real mics did.\n"
+    t += "\n  All mics were trimmed by the same amount (\"Keep mic timing\"). A blend of two of these files matches the sum of the original mics.\n"
     t += referenced
-        ? "  A reference tap was used: each IR is speaker, mic and room only, whatever amp drives it.\n"
-        : "  No reference tap was used: each IR also includes the power amp's own response, like most commercial IRs.\n"
+        ? "  A reference tap was used. Each IR contains the speaker, mic and room only, independent of the amp.\n"
+        : "  No reference tap was used. Each IR also includes the power amp response, as in most commercial IRs.\n"
     for n in polarityNotes { t += "  Polarity: \(n)\n" }
     let others = targets.filter { $0.id != "universal" }
     if !others.isEmpty || custom {
         t += "\nMORE FORMATS\n"
         for o in others { t += "  \(o.folder.replacingOccurrences(of: "More formats/", with: "")): \(o.detail)\n" }
         if custom { t += "  Custom: the rates, lengths, bit depths and trimming chosen under Advanced, in Custom/<trim>/<rate>.\n" }
-        t += "  Every file has the same level for the same mic, whatever its rate or length.\n"
+        t += "  All files for the same mic have the same level, at any rate or length.\n"
         if others.contains(where: \.isExtra) {
-            t += "  Minimum-phase files and mixes play at the same loudness as the singles, unless that would clip; then each set is turned down as a whole.\n"
+            t += "  Minimum-phase files and mixes have the same loudness as the single-mic files. If that would cause clipping, the level of the whole set is reduced.\n"
         }
     }
     for n in notes { t += "  Note: \(n)\n" }
     t += """
 
     OTHER FILES
-      report.json  the measurements (levels, noise floor, distortion, arrival times) and any warnings.
-      Raw take     the untouched recording and the sweep settings. IR Capture can re-export new formats from it
-                   without recording again (Re-export in the results).
+      report.json  Measurements (levels, noise floor, distortion, arrival times) and warnings.
+      Raw take     The unprocessed recording and the sweep settings. Used to re-export new formats
+                   without a new recording (Re-export in the results).
 
     """
     if !warnings.isEmpty {
-        t += "THINGS TO CHECK\n"
+        t += "ITEMS TO CHECK\n"
         for w in warnings { t += "  - \(w)\n" }
     }
     return t
@@ -490,11 +490,11 @@ public struct RawTake {
         let dir = folder(captureFolder)
         let takeURL = dir.appendingPathComponent("take.json")
         guard FileManager.default.fileExists(atPath: takeURL.path) else {
-            throw IRCaptureError("This folder has no raw take that IR Capture can re-export (captures made before version 1.0 don't). Record it again, or choose a capture folder made by this version.")
+            throw IRCaptureError("This folder contains no raw take for re-export (captures made before version 1.0 have none). Record the capture again, or select a capture folder made with this version.")
         }
         guard let d = try JSONSerialization.jsonObject(with: Data(contentsOf: takeURL)) as? [String: Any],
               let capture = d["capture"] as? String, let names = d["names"] as? [String] else {
-            throw IRCaptureError("The raw take's take.json can't be read. Record the capture again.")
+            throw IRCaptureError("The take.json file of the raw take cannot be read. Record the capture again.")
         }
         let spec = try SweepSpec.load(jsonData: Data(contentsOf: dir.appendingPathComponent("\(capture)_signal.json")))
         let info = try WavInfo(Data(contentsOf: dir.appendingPathComponent("\(capture)_recording.wav"), options: .mappedIfSafe))
@@ -502,7 +502,7 @@ public struct RawTake {
         for c in 0..<info.channels { rec.append(try info.channel(c)) }
         let ref = (d["ref_index"] as? NSNumber)?.intValue
         guard rec.count == names.count + (ref == nil ? 0 : 1) else {
-            throw IRCaptureError("The raw take has \(rec.count) channels but take.json lists \(names.count) mics\(ref == nil ? "" : " and a reference"). Record the capture again.")
+            throw IRCaptureError("The raw take contains \(rec.count) channels, but take.json lists \(names.count) mics\(ref == nil ? "" : " and a reference"). Record the capture again.")
         }
         let take = RawTake(capture: capture, names: names, refIndex: ref, spec: spec,
                            recordedWith: d["recorded_with"] as? String ?? "", notes: d["notes"] as? String ?? "")

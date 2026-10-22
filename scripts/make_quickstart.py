@@ -64,34 +64,34 @@ def picture(c, name, y, max_w):
 
 
 c = canvas.Canvas(str(out), pagesize=letter)
-c.setTitle("IR Capture — Quick start")
+c.setTitle("IR Capture: Quick start")
 c.setFillColor(LAMP)
 c.rect(0, H - 8, W, 8, fill=1, stroke=0)
 c.setFillColor(INK)
 c.setFont("Helvetica-Bold", 22)
-c.drawString(M, H - 58, "IR Capture — Quick start")
+c.drawString(M, H - 58, "IR Capture: Quick start")
 c.setFont("Helvetica", 10)
 c.setFillColor(GREY)
-c.drawString(M, H - 74, f"Version {version}  ·  Help › Quick Start in the app has this page too." if version else "Help › Quick Start in the app has this page too.")
+c.drawString(M, H - 74, f"Version {version}  ·  This page is also in the app under Help › Quick Start." if version else "This page is also in the app under Help › Quick Start.")
 y = H - 104
 c.setFont("Helvetica-Bold", 13)
 c.setFillColor(INK)
 c.drawString(M, y, "Install")
-y = wrap(c, "Drag IR Capture to Applications and open it from there. The first time, it asks to allow recording from your interface: click Allow.", M, y - 16, W - 2 * M)
+y = wrap(c, "Drag IR Capture to Applications and open it from there. On first launch, macOS requests permission to record from the interface. Click Allow.", M, y - 16, W - 2 * M)
 y -= 8
 c.setFont("Helvetica-Bold", 13)
 c.drawString(M, y, "Your first cab IR")
 y = steps(c, [
-    ("Connect", "Interface output → the amp's FX return (power amp in) or a clean power amp → the cab. Not the guitar input. Mics on the cab into the interface. Amp master low, studio monitors muted."),
-    ("Set levels", "Click Check levels. The app listens to the room for 2 seconds, finds a clean sweep level, then loops short sweeps. Turn each preamp until it says OK."),
-    ("Capture", "Name it (for example 412_V30_PosA) and click Capture. It takes about 45 seconds."),
-    ("Results", "Load the file at the top of the capture folder (one per mic) into your IR loader, DAW plug-in or modeler. Helix, Iridium and every-rate versions are in More formats."),
+    ("Connect", "Interface output → amp FX return (power amp in) or clean power amp → cab. Do not use the guitar input. Connect the mics on the cab to the interface. Set the amp master low. Mute the studio monitors."),
+    ("Set levels", "Click Check levels. Room noise is measured for 2 seconds, a clean sweep level is set, and short sweeps are looped. Adjust each preamp until the meter shows OK."),
+    ("Capture", "Enter a name (for example 412_V30_PosA) and click Capture. Duration: about 45 seconds."),
+    ("Results", "Load the file at the top of the capture folder (one per mic) into an IR loader, DAW plug-in or modeler. Helix, Iridium and all-sample-rate versions are in More formats."),
 ], y - 20)
 y = picture(c, "cabNoRef", y - 4, W - 2 * M)
 y = picture(c, "cabRef", y, W - 2 * M)
 c.setFont("Helvetica", 8.5)
 c.setFillColor(GREY)
-c.drawString(M, 36, "Swell Amplification · swellamps.com  ·  Help › Contact Support in the app sends us your details.")
+c.drawString(M, 36, "Swell Amplification · swellamps.com  ·  To send system details to support, use Help › Contact Support in the app.")
 c.showPage()
 
 c.setFillColor(LAMP)
@@ -102,16 +102,16 @@ y = H - 50
 c.drawString(M, y, "A NAM amp model")
 y = steps(c, [
     ("Training signal", "Download T3K-sweep-v3.wav from tone3000.com/capture, then click Find it in Downloads in the app's Amp (NAM) tab."),
-    ("Connect", "Interface output → reamp box → the amp's guitar input. Amp only: amp → reactive load box, its line out → an interface input (cab sim off). Gates, reverb, delay and loop effects off."),
-    ("Set levels and record", "Click Check levels and set each input to OK, then Record (3 minutes 12 seconds). Don't touch any knobs while it runs."),
-    ("Train", "Upload the WAV files at tone3000.com/capture. It trains the model for free and gives you a .nam file for any NAM player."),
+    ("Connect", "Interface output → reamp box → amp guitar input. Amp only: amp → reactive load box. Load box line out → interface input (cab sim off). Turn off gates, reverb, delay and loop effects."),
+    ("Set levels and record", "Click Check levels and set each input to OK. Then click Record (3 minutes 12 seconds). Do not adjust any controls during the recording."),
+    ("Train", "Upload the WAV files at tone3000.com/capture. TONE3000 trains the model free of charge and provides a .nam file for use in a NAM player."),
 ], y - 20)
 y = picture(c, "namAmp", y - 4, W - 2 * M)
 y = picture(c, "namFull", y, W - 2 * M)
 c.setFont("Helvetica-Bold", 13)
 c.setFillColor(INK)
-c.drawString(M, y - 6, "If something's wrong")
-y = wrap(c, "The app explains each problem in plain words with what to do. Help › Troubleshooting covers the common ones (no signal, CLIP, distortion, noise, hum, dropouts). Help › Contact Support opens an email with the details we need.", M, y - 22, W - 2 * M)
+c.drawString(M, y - 6, "Troubleshooting")
+y = wrap(c, "Each error message states the problem and the corrective step. Common problems (no signal, CLIP, distortion, noise, hum, dropouts) are listed in Help › Troubleshooting. Help › Contact Support opens an email with the required system details.", M, y - 22, W - 2 * M)
 c.setFont("Helvetica", 8.5)
 c.setFillColor(GREY)
 c.drawString(M, 36, "Swell Amplification · swellamps.com")

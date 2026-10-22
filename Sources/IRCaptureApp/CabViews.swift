@@ -26,7 +26,7 @@ struct CabJob: View {
                     HStack(alignment: .firstTextBaseline) {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Recorded in a DAW instead?").bold()
-                            Note("Play the app's test signal from Logic, Reaper, Ableton, Pro Tools or GarageBand, record the mics there, and bring the files back here.")
+                            Note("Play the test signal from Logic, Reaper, Ableton, Pro Tools or GarageBand. Record the mics in the DAW. Import the files here.")
                         }
                         Spacer()
                         Button("Import DAW recordings…") { m.cabImport = true }
@@ -43,12 +43,12 @@ struct CabConnectStep: View {
     @EnvironmentObject var m: AppModel
     let done: Bool
     var body: some View {
-        Step(n: 1, title: "Connect", subtitle: "Wire the rig like this, then tell the app what's on each input.", done: done) {
+        Step(n: 1, title: "Connect", subtitle: "Wire the rig as shown. Then set the use of each input.", done: done) {
             WiringDiagram(wiring: m.refSource == .none ? .cabNoRef : .cabRef)
             Checklist(items: [
-                "Interface output → the amp's FX return (power amp in), or a clean power amp → the cab. Not the guitar input: with the preamp in the way, the sweeps distort and the IR comes out wrong.",
-                "Turn the amp's master down low to start. The level check sets the rest.",
-                "Mics on the cab, into the interface's mic inputs. Mute the studio monitors: the room mic hears them.",
+                "Interface output → amp FX return (power amp in) or clean power amp → cab. Do not use the guitar input. The preamp distorts the sweeps and the IR is incorrect.",
+                "Set the amp master low to start. The remaining levels are set in the level check.",
+                "Place the mics on the cab and connect them to the interface mic inputs. Mute the studio monitors. Otherwise the room mic records them.",
             ])
             InterfaceRow(outputLabel: "Output to the amp", output: $m.outChannel)
             if m.device != nil {
@@ -69,9 +69,9 @@ struct InterfaceRow: View {
     var showRate = true
     var body: some View {
         if m.duplexDevices.isEmpty {
-            Note("No audio interface with both inputs and outputs is connected. Plug it in (and switch it on); it appears here by itself.", color: badColor)
+            Note("No audio interface with both inputs and outputs is connected. Connect the interface and switch it on. It is listed here automatically.", color: badColor)
             Button("Open Audio MIDI Setup") { CoreAudioHelper.openAudioMIDISetup() }
-                .help("If inputs and outputs are on two devices, combine them into an aggregate device there")
+                .help("If inputs and outputs are on two devices, combine them into an aggregate device in Audio MIDI Setup")
         }
         HStack(spacing: 16) {
             Picker("Interface", selection: $m.deviceUID) {
@@ -86,7 +86,7 @@ struct InterfaceRow: View {
         .disabled(m.audioActive)
         .help(m.audioActive ? "Stop the level check or recording to change these" : "")
         if showRate, m.device != nil {
-            Note("Records at \(rateTag(m.captureRate).dropLast()) kHz\(m.rateChoice == 0 ? " (the best this interface does; every other rate is made from this one capture)" : ""). The interface goes back to its own rate afterwards.")
+            Note("Recording rate: \(rateTag(m.captureRate).dropLast()) kHz\(m.rateChoice == 0 ? " (highest rate of this interface; all other rates are made from this capture)" : ""). The interface is reset to its previous rate afterwards.")
         }
     }
 }
@@ -118,7 +118,7 @@ struct InputsGrid: View {
                     .foregroundStyle(row.role == .off ? .secondary : .primary)
                 }
             }
-            Note("Name each mic; the name goes into the file names.")
+            Note("Enter a name for each mic. The name is used in the file names.")
         }
     }
 }
@@ -133,7 +133,7 @@ struct IdleSignalChips: View {
                 Text("Signal on Input \(r.channel + 1) (\(Int(r.peakDBFS.rounded())) dBFS). Use it?")
                 Button("As a mic") { m.setRole(.mic, for: r.channel) }
                 if m.refCandidate == r.channel || m.refInput == nil {
-                    Button(m.refCandidate == r.channel ? "As the reference (it looks like one)" : "As the reference") { m.setRefInput(r.channel) }
+                    Button(m.refCandidate == r.channel ? "As the reference (detected)" : "As the reference") { m.setRefInput(r.channel) }
                 }
             }
             .padding(8).background(RoundedRectangle(cornerRadius: 6).fill(lamp.opacity(0.12)))
@@ -141,7 +141,7 @@ struct IdleSignalChips: View {
         if let c = m.refCandidate, m.refInput == nil, !m.idleSignals.contains(where: { $0.channel == c }) {
             HStack(spacing: 10) {
                 Image(systemName: "lightbulb").foregroundStyle(lamp)
-                Text("Input \(c + 1) looks like a reference tap: it arrives first and has no cab or room sound.")
+                Text("Input \(c + 1) is probably a reference tap. Its signal arrives first and contains no cab or room sound.")
                 Button("Use it as the reference") { m.setRefInput(c) }
             }
             .padding(8).background(RoundedRectangle(cornerRadius: 6).fill(lamp.opacity(0.12)))
@@ -154,14 +154,14 @@ struct ReferenceChooser: View {
     @EnvironmentObject var m: AppModel
     func blurb(_ s: RefSource) -> String {
         switch s {
-        case .none: return "The IR includes your power amp's character, like most commercial IRs. Best for a first capture."
-        case .loadBox: return "A load box or attenuator between amp and cab with a line out (a speaker-through). One cable to a line input."
+        case .none: return "The IR includes the power amp response, as in most commercial IRs. Recommended for a first capture."
+        case .loadBox: return "A load box or attenuator with a line out (speaker-through), connected between amp and cab. One cable to a line input."
         case .tap: return "A Swell reference tap, or a 20 dB pad across the speaker terminals, into a line input."
         }
     }
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("WHERE'S YOUR REFERENCE?").font(.caption.weight(.semibold)).kerning(0.8).foregroundStyle(.secondary)
+            Text("REFERENCE SOURCE").font(.caption.weight(.semibold)).kerning(0.8).foregroundStyle(.secondary)
             HStack(alignment: .top, spacing: 10) {
                 ForEach(RefSource.allCases) { s in
                     Button { m.refSource = s } label: {
@@ -183,19 +183,19 @@ struct ReferenceChooser: View {
             }
             if m.refSource != .none, let dev = m.device {
                 HStack {
-                    Picker("It's plugged into", selection: Binding(get: { m.refInput ?? -1 }, set: { m.setRefInput($0 < 0 ? nil : $0) })) {
+                    Picker("Connected to", selection: Binding(get: { m.refInput ?? -1 }, set: { m.setRefInput($0 < 0 ? nil : $0) })) {
                         Text("Choose…").tag(-1)
                         ForEach(0..<dev.inputChannels, id: \.self) { Text("Input \($0 + 1)").tag($0) }
                     }.frame(width: 260)
-                    Button("How it works…") { m.helpPage = .reference }.buttonStyle(.link)
+                    Button("Reference tap help…") { m.helpPage = .reference }.buttonStyle(.link)
                 }
                 if m.refSource == .loadBox {
-                    Note("Use the line out only if it carries the amp's speaker voltage: turn off any cab simulation or EQ on it. If the box attenuates before its speaker-through, the line out no longer matches what the speaker gets; set the attenuation to bypass (or 0 dB) for the capture.", color: .primary)
+                    Note("Use the line out only if its signal is the amp speaker voltage. Turn off any cab simulation or EQ on the line out. If attenuation is applied before the speaker-through, the line out does not match the speaker signal. Set the attenuation to bypass (or 0 dB) for the capture.", color: .primary)
                 } else {
-                    Note("If the amp's speaker output is bridged (neither terminal is ground), or the tap brings in hum, use an isolated tap or a balanced input. Help › The Reference Tap has a parts list.", color: .primary)
+                    Note("If the amp speaker output is bridged (no grounded terminal), or if there is hum on the tap, use an isolated tap or a balanced input. A parts list is in Help › The Reference Tap.", color: .primary)
                 }
             } else {
-                Note("With a tube amp and no reference, the IR includes about 5 dB of the speaker's impedance bump around its resonance. That's normal; it's what most commercial IRs sound like.")
+                Note("With a tube amp and no reference, the IR includes about 5 dB of the speaker impedance peak around resonance. Most commercial IRs are made this way.")
             }
         }
     }
@@ -217,7 +217,7 @@ struct CabAdvanced: View {
                     }.frame(width: 220)
                     Button("Open Audio MIDI Setup") { CoreAudioHelper.openAudioMIDISetup() }
                 }
-                Note("Automatic sweep level starts at −18 dBFS and steps up while the speaker stays clean, then backs off if distortion rises.")
+                Note("Automatic sweep level: starts at −18 dBFS and is raised in steps while speaker distortion stays low. It is reduced if distortion increases.")
                 SweepSettings()
             }.padding(.top, 8)
         }
@@ -229,13 +229,13 @@ struct CabLevelStep: View {
     @EnvironmentObject var m: AppModel
     let done: Bool
     var body: some View {
-        Step(n: 2, title: "Set levels", subtitle: "The app listens to the room, finds the sweep level, then loops short sweeps while you set each preamp.", done: done) {
+        Step(n: 2, title: "Set levels", subtitle: "Room noise is measured, the sweep level is set, and short sweeps are looped while each preamp is adjusted.", done: done) {
             Checklist(items: [
-                "Wear ear protection: the sweeps play at full amp volume.",
-                "Click Check levels. Keep the room quiet for the first 2 seconds while it listens.",
-                m.levelChoice == 0 ? "Wait for “Sweep level set”, then turn each preamp until its line says OK. Nothing should say CLIP."
-                                   : "Turn each preamp until its line says OK (the sweep peaks near −6 dBFS). Nothing should say CLIP.",
-                "If distortion shows orange or red, lower the amp volume. An IR is linear, so pushing the speaker gains nothing.",
+                "Wear ear protection. The sweeps are played at full amp volume.",
+                "Click Check levels. Keep the room quiet for the first 2 seconds during the noise measurement.",
+                m.levelChoice == 0 ? "Wait for “Sweep level set”. Then adjust each preamp until its row shows OK. No row may show CLIP."
+                                   : "Adjust each preamp until its row shows OK (sweep peak near −6 dBFS). No row may show CLIP.",
+                "If distortion is orange or red, lower the amp volume. An IR is linear. Higher speaker drive does not improve it.",
             ])
             HStack {
                 Button(m.levelRunning ? "Stop" : "Check levels") { m.toggleLevelCheck() }
@@ -244,7 +244,7 @@ struct CabLevelStep: View {
                 if m.levelRunning { ProgressView().controlSize(.small); Text(m.levelPhase ?? "").foregroundStyle(.secondary) }
                 Spacer()
                 if m.levelChoice == 0 && (m.levelRunning || !m.levelReadings.isEmpty) {
-                    Pill(text: m.autoLevelSettled ? "Sweep level set (\(Int(m.autoLevel)) dBFS)" : "Finding the sweep level (\(Int(m.autoLevel)) dBFS)",
+                    Pill(text: m.autoLevelSettled ? "Sweep level set (\(Int(m.autoLevel)) dBFS)" : "Setting sweep level (\(Int(m.autoLevel)) dBFS)",
                          color: m.autoLevelSettled ? goodColor : warnColor)
                 }
             }
@@ -259,8 +259,8 @@ struct LevelTable: View {
     let readings: [LevelReading]
     func meterColor(_ r: LevelReading) -> Color { r.clipped ? badColor : abs(r.changeDB) <= 3 ? goodColor : warnColor }
     func advice(_ r: LevelReading) -> (String, Color) {
-        if r.clipped { return ("CLIP — turn down", badColor) }
-        if r.peakDBFS < -60 { return ("No signal — check the cable", badColor) }
+        if r.clipped { return ("CLIP: turn down", badColor) }
+        if r.peakDBFS < -60 { return ("No signal: check cable", badColor) }
         let d = r.changeDB
         if abs(d) <= 3 { return ("OK", goodColor) }
         return (d > 0 ? "Turn up \(Int(d.rounded())) dB" : "Turn down \(Int((-d).rounded())) dB", warnColor)
@@ -307,7 +307,7 @@ struct LevelTable: View {
 struct CabCaptureStep: View {
     @EnvironmentObject var m: AppModel
     var body: some View {
-        Step(n: 3, title: "Capture", subtitle: String(format: "One button. It plays %d sweeps (about %.0f s), records every input, and saves finished IRs.", m.nSweeps, m.signalSeconds),
+        Step(n: 3, title: "Capture", subtitle: String(format: "Click Capture. %d sweeps are played (about %.0f s), all inputs are recorded, and the finished IRs are saved.", m.nSweeps, m.signalSeconds),
              done: m.result != nil) {
             CaptureNameFields()
             TargetsPicker()
@@ -348,7 +348,7 @@ struct CabImportSteps: View {
     @State private var dropping = false
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            Step(n: 1, title: "Test signal", subtitle: "Save the sweeps to play from your DAW. Pick the sample rate your project will run at.") {
+            Step(n: 1, title: "Test signal", subtitle: "Save the sweeps for playback from the DAW. Select the sample rate of the DAW project.") {
                 HStack(spacing: 16) {
                     Picker("Capture rate", selection: $m.logicRate) {
                         ForEach(CoreAudioHelper.captureRates, id: \.self) { Text("\(rateTag($0).dropLast()) kHz").tag($0) }
@@ -360,17 +360,17 @@ struct CabImportSteps: View {
                     Button("Save test signal…") { m.saveTestSignal() }.buttonStyle(.borderedProminent).tint(lamp)
                     Button("Load settings from a test signal…") { m.loadSignalSettings() }
                 }
-                Note(m.signalMessage ?? "Keep these settings when you add the recordings in step 3. The app remembers them.")
+                Note(m.signalMessage ?? "Use the same settings when the recordings are added in step 3. The settings are saved.")
             }
 
-            Step(n: 2, title: "Record in your DAW", subtitle: "The steps are the same in any DAW; menu names below are Logic's.") {
+            Step(n: 2, title: "Record in your DAW", subtitle: "The steps apply to any DAW. Menu names below are from Logic.") {
                 WiringDiagram(wiring: .cabRef, compact: true)
                 Checklist(items: [
-                    "Set the project to the capture rate above. Drag the sweep WAV onto a new audio track at the very start (bar 1 in Logic).",
-                    "Send that track only to the interface output that feeds the amp's FX return or a clean power amp (not the guitar input). Mute the studio monitors so the room mic doesn't hear them.",
-                    "Make one audio track per mic and one for the reference if you have one. Name each track after its mic (SM57, R121, Room…) and name the reference track “Ref”; the exported files take these names. Record-enable them all, with input monitoring off and no plug-ins.",
-                    "Play the sweep track and watch the meters. Set each mic preamp so the loudest point of the sweep peaks around −6 dBFS. Nothing should clip.",
-                    "Record one full pass. Keep the room quiet and don't touch the mics.",
+                    "Set the project to the capture rate above. Drag the sweep WAV onto a new audio track at the start (bar 1 in Logic).",
+                    "Route that track only to the interface output connected to the amp FX return or a clean power amp (not the guitar input). Mute the studio monitors. Otherwise the room mic records them.",
+                    "Create one audio track per mic, and one for the reference if used. Name each track after its mic (SM57, R121, Room…). Name the reference track “Ref”. The exported files use these names. Record-enable all tracks. Turn input monitoring off. Use no plug-ins.",
+                    "Play the sweep track and watch the meters. Set each mic preamp so the sweep peaks at about −6 dBFS. No track may clip.",
+                    "Record one full pass. Keep the room quiet. Do not move the mics.",
                     "Export every track as a WAV (in Logic: File › Export › All Tracks as Audio Files), 24-bit or 32-bit float, at the project rate, with Normalize off and faders at 0 dB.",
                 ])
             }
@@ -379,7 +379,7 @@ struct CabImportSteps: View {
                 VStack(spacing: 6) {
                     Text("Drag the exported WAV files here").bold()
                     Button("or choose them…") { m.chooseLogicFiles() }.buttonStyle(.link)
-                    Text("If the sweep track's file comes along too, that's fine; it's skipped automatically.").font(.callout).foregroundStyle(.secondary)
+                    Text("If the sweep track file is included, it is skipped automatically.").font(.callout).foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity).padding(.vertical, 18)
                 .background(RoundedRectangle(cornerRadius: 6).strokeBorder(dropping ? lamp : Color.secondary.opacity(0.4), style: StrokeStyle(lineWidth: 2, dash: [6])))
