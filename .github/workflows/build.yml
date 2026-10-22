@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   mac:
-    runs-on: macos-15-intel  # arm64 runners were unavailable (capacity); the build is universal either way
+    runs-on: macos-15  # the Intel runner has no Metal device, so the smoke test (SwiftUI) aborts there
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
