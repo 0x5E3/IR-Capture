@@ -15,13 +15,16 @@ struct DiagramNode {
 }
 
 enum Wiring: String, CaseIterable {
-    case cabNoRef, cabRef, namAmp, namFull
+    case cabNoRef, cabRef, namAmp, namFull, pad
+    /// The four hook-ups (the pad is a build drawing, shown on the reference page).
+    static var hookups: [Wiring] { [.cabNoRef, .cabRef, .namAmp, .namFull] }
     var title: String {
         switch self {
         case .cabNoRef: return "Cab IR, no reference"
         case .cabRef: return "Cab IR with a reference"
         case .namAmp: return "NAM: amp only"
         case .namFull: return "NAM: full chain"
+        case .pad: return "A 20 dB reference pad"
         }
     }
     var rows: [[DiagramNode]] {
@@ -49,6 +52,13 @@ enum Wiring: String, CaseIterable {
             return [[out, reamp, ampIn],
                     [DiagramNode(title: "Amp", sub: "speaker output", kind: .gear), DiagramNode(title: "Cab", sub: "speaker", kind: .speaker, via: "speaker cable")],
                     [mics, ins]]
+        case .pad:
+            return [[DiagramNode(title: "Speaker +", sub: "terminal", kind: .speaker),
+                     DiagramNode(title: "Tap point", sub: "between the resistors", kind: .tap, via: "10 kΩ, ½ W"),
+                     DiagramNode(title: "Speaker −", sub: "terminal", kind: .speaker, via: "1.1 kΩ")],
+                    [DiagramNode(title: "Tap point", sub: "", kind: .tap),
+                     DiagramNode(title: "¼\" jack", sub: "tip; sleeve to speaker −", kind: .gear, via: "wire"),
+                     DiagramNode(title: "Interface", sub: "a line input, phantom off", kind: .interface, via: "cable")]]
         }
     }
     var footnote: String {
@@ -56,6 +66,7 @@ enum Wiring: String, CaseIterable {
         case .cabNoRef, .cabRef: return "Studio monitors muted. Amp master low to start."
         case .namAmp: return "Gates, reverb, delay and loop effects off."
         case .namFull: return "Gates, reverb, delay and loop effects off. Studio monitors muted."
+        case .pad: return "The pad goes alongside the speaker, which stays connected. Divides the voltage by about 10 (−19 dB)."
         }
     }
 }
@@ -212,7 +223,7 @@ struct HelpSheet: View {
                 VStack(alignment: .leading, spacing: 14) {
                     switch page {
                     case .quickStart: QuickStartPage()
-                    case .wiring: ForEach(Wiring.allCases, id: \.self) { w in Text(w.title).font(.headline); WiringDiagram(wiring: w) }
+                    case .wiring: ForEach(Wiring.hookups, id: \.self) { w in Text(w.title).font(.headline); WiringDiagram(wiring: w) }
                     case .reference: ReferencePage()
                     case .troubleshooting: TroubleshootingPage()
                     }
@@ -260,7 +271,7 @@ struct ReferencePage: View {
             "A reference tap or a home-made pad across the speaker terminals (below).",
         ])
         Text("Build a 20 dB pad").font(.title3.weight(.semibold)).padding(.top, 4)
-        WiringDiagram(wiring: .cabRef, compact: true)
+        WiringDiagram(wiring: .pad, compact: true)
         Checklist(items: [
             "Parts: one 10 kΩ resistor (½ W, metal film), one 1.1 kΩ resistor (¼ W or more), a ¼\" jack, two clips or a speaker-cable splitter, and a small box.",
             "Connect the 10 kΩ from the speaker's + terminal to a tap point, and the 1.1 kΩ from the tap point to the speaker's − terminal. That divides the voltage by about 10 (−19 dB).",

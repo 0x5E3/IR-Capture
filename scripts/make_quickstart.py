@@ -57,7 +57,7 @@ def picture(c, name, y, max_w):
         return y
     img = ImageReader(str(p))
     iw, ih = img.getSize()
-    w = min(max_w, iw / 3)
+    w = min(max_w * 0.9, iw / 3)
     h = w * ih / iw
     c.drawImage(img, M, y - h, w, h, mask="auto")
     return y - h - 10

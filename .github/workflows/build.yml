@@ -164,7 +164,7 @@ jobs:
         run: |
           "dist/IR Capture.app/Contents/MacOS/IR Capture" --render-diagrams "$PWD/dist/diagrams"
           ls dist/diagrams
-          [ "$(ls dist/diagrams/*.png | wc -l)" -eq 4 ] || { echo "::error title=Diagrams::The app didn't render the 4 wiring diagrams"; exit 1; }
+          [ "$(ls dist/diagrams/*.png | wc -l)" -eq 5 ] || { echo "::error title=Diagrams::The app didn't render the 5 wiring diagrams"; exit 1; }
           python scripts/make_quickstart.py dist/diagrams "dist/Quick start.pdf" "$(tr -d '[:space:]' < VERSION) (build ${{ github.run_number }})"
 
       - name: Notarize the app
@@ -193,6 +193,14 @@ jobs:
             fi
           fi
           hdiutil verify dist/IR-Capture.dmg
+          MNT="$(mktemp -d)"
+          hdiutil attach -nobrowse -readonly -mountpoint "$MNT" dist/IR-Capture.dmg >/dev/null
+          ls -la "$MNT"
+          for f in "IR Capture.app" "Applications" "Quick start.pdf" ".background.png" ".DS_Store"; do
+            [ -e "$MNT/$f" ] || { hdiutil detach "$MNT" >/dev/null; echo "::error title=DMG::$f is missing from the DMG"; exit 1; }
+          done
+          codesign --verify --strict "$MNT/IR Capture.app"
+          hdiutil detach "$MNT" >/dev/null
           ls -la dist
 
       - name: Upload app
