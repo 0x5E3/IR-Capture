@@ -71,6 +71,8 @@ struct ResultSummary {
     var folder: URL
     var fileCount: Int
     var polarityNotes: [String] = []
+    /// Room-mic and extras notes from the export.
+    var exportNotes: [String] = []
     /// Files at the top of the capture folder (the Universal ones).
     var topFiles: [String] = []
     var droppedOut = false
@@ -271,7 +273,7 @@ final class AppModel: ObservableObject {
         duration = d.object(forKey: "duration") as? Double ?? 6
         gap = d.object(forKey: "gap") as? Double ?? 2
         discard = d.object(forKey: "discard") as? Int ?? 1
-        targets = Set(d.array(forKey: "targets") as? [String] ?? ["universal"])
+        targets = Set(d.array(forKey: "targets") as? [String] ?? ["universal", "minphase", "mixes"])
         customOn = d.bool(forKey: "customOn")
         keepPolarity = d.bool(forKey: "keepPolarity")
         exportRates = Set(d.array(forKey: "exportRates") as? [Int] ?? [44100, 48000, 88200, 96000])
@@ -474,7 +476,7 @@ final class AppModel: ObservableObject {
     func layout() -> OutputLayout { .targets(chosenTargets, custom: customOn ? exportOptions() : nil) }
 
     var outputProblem: String? {
-        if chosenTargets.isEmpty && !customOn { return "Choose at least one set of files to make under Files." }
+        if !chosenTargets.contains(where: { !$0.isExtra }) && !customOn { return "Choose at least one set of files to make under Files." }
         if customOn {
             let e = exportOptions()
             if e.rates.isEmpty || e.lengths.isEmpty || e.bits.isEmpty || e.trim.isEmpty {
@@ -740,7 +742,7 @@ final class AppModel: ObservableObject {
     private func show(_ p: ProcessedCapture, title: String, droppedOut: Bool = false) {
         result = ResultSummary(title: title, names: p.result.names, diagnostics: p.result.diagnostics, warnings: p.result.warnings,
                                referenced: p.result.referenced, curves: p.curves, folder: p.folder, fileCount: p.fileCount,
-                               polarityNotes: p.polarityNotes, topFiles: p.files.filter { !$0.contains("/") }, droppedOut: droppedOut)
+                               polarityNotes: p.polarityNotes, exportNotes: p.exportNotes, topFiles: p.files.filter { !$0.contains("/") }, droppedOut: droppedOut)
     }
 
     func revealResult() {

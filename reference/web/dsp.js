@@ -573,10 +573,145 @@ var IRC = (function () {
     return notes;
   }
 
+  // ------------------------------------------------------------ extras (readiness plan P1.3a)
+  // Port of is_room_mic(), minimum_phase(), make_mixes() and export_extras() in ircapture.py.
+  var STANDARD_RATES = [44100, 48000, 88200, 96000], LEVEL_FULL_MS = 500, ROOM_SHORT_MS = 100;
+  var CLOSE_CLOSE = [[50, 50], [70, 30], [30, 70]], CLOSE_ROOM = [[80, 20], [60, 40]];
+
+  function isRoomMic(name) {
+    return String(name).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().split(" ")
+      .some(function (w) { return w.indexOf("room") === 0 || w.indexOf("amb") === 0; });
+  }
+
+
+  // Same magnitude response, phase rebuilt by the cepstral method; keeps x's main-peak sign; end fade again.
+  function minimumPhase(x, fadeFrac) {
+    if (fadeFrac === undefined) fadeFrac = 0.10;
+    var n = x.length, N = 1, i;
+    while (N < Math.max(8 * n, 16384)) N *= 2;
+    var re = new Float64Array(N), im = new Float64Array(N), mx = 0;
+    for (i = 0; i < n; i++) re[i] = x[i];
+    fft(re, im, false);
+    for (i = 0; i < N; i++) { re[i] = Math.sqrt(re[i] * re[i] + im[i] * im[i]); if (re[i] > mx) mx = re[i]; }
+    var floor = mx * 1e-8;
+    for (i = 0; i < N; i++) { re[i] = Math.log(Math.max(re[i], floor)); im[i] = 0; }
+    fft(re, im, true);
+    for (i = 0; i < N; i++) im[i] = 0;
+    for (i = 1; i < N / 2; i++) re[i] *= 2;
+    for (i = N / 2 + 1; i < N; i++) re[i] = 0;
+    fft(re, im, false);
+    for (i = 0; i < N; i++) { var m = Math.exp(re[i]), ph = im[i]; re[i] = m * Math.cos(ph); im[i] = m * Math.sin(ph); }
+    fft(re, im, true);
+    var y = re.slice(0, n);
+    if ((y[argAbsMax(y, 0, n)] < 0) !== (x[argAbsMax(x, 0, n)] < 0)) for (i = 0; i < n; i++) y[i] = -y[i];
+    var nf = Math.max(Math.floor(fadeFrac * n), 2), w = halfHann(nf, false);
+    for (i = 0; i < nf; i++) y[n - nf + i] *= w[i];
+    return y;
+  }
+
+  function makeMixes(res, prerollMs, fullMs) {
+    var names = res.names, fs = res.fs, mixes = [];
+    if (names.length < 2) return mixes;
+    var first = Math.min.apply(null, names.map(function (m) { return res.onsets[m]; }));
+    var s0 = Math.floor(first - prerollMs / 1000 * fs + 0.5), n = Math.floor(fullMs / 1000 * fs + 0.5);
+    var a = Math.max(s0, 0), b = Math.max(s0 + n, 0);
+    var energy = function (h) { var e = 0; for (var i = a; i < Math.min(b, h.length); i++) e += h[i] * h[i]; return e; };
+    var en = {}, eRef = 0;
+    names.forEach(function (m) { en[m] = energy(res.irs[m]); eRef = Math.max(eRef, en[m]); });
+    for (var i = 0; i < names.length; i++) for (var j = i + 1; j < names.length; j++) {
+      var A = names[i], B = names[j], ra = isRoomMic(A), rb = isRoomMic(B);
+      if (ra && rb) continue;
+      if (ra) { var t = A; A = B; B = t; }
+      (ra || rb ? CLOSE_ROOM : CLOSE_CLOSE).forEach(function (r) {
+        var hA = res.irs[A], hB = res.irs[B], h = new Float64Array(Math.max(hA.length, hB.length)), k;
+        var sA = r[0] / 100 / Math.sqrt(en[A]), sB = r[1] / 100 / Math.sqrt(en[B]);
+        for (k = 0; k < hA.length; k++) h[k] += sA * hA[k];
+        for (k = 0; k < hB.length; k++) h[k] += sB * hB[k];
+        var g = Math.sqrt(eRef / energy(h));
+        for (k = 0; k < h.length; k++) h[k] *= g;
+        mixes.push({ label: A + "+" + B + " " + r[0] + "/" + r[1], file: safeName(A) + "+" + safeName(B) + "_" + r[0] + "-" + r[1],
+          mics: [A, B], weights: [r[0], r[1]], room: ra || rb, ir: h });
+      });
+    }
+    return mixes;
+  }
+
+  // Matrix-layout twin of the app's extras: <capture>/extras/<rate>/<capture>_<label>_<rate>_24_<len>[_MP].wav.
+  // Sets res.extras (report.json) and returns the files.
+  function exportExtras(res, capture, opt, progress) {
+    opt = Object.assign({ rates: [44100, 48000, 88200, 96000], lengths: ["full", 1024, 2048, 4096], full_ms: 500,
+      preroll_ms: 0.25, fade_frac: 0.10, peak_dbfs: -1, minimum_phase: true, mixes: true }, opt || {});
+    progress = progress || function () {};
+    progress("Making minimum-phase versions and mixes");
+    var fs = res.fs, names = res.names, preFs = opt.preroll_ms / 1000 * fs;
+    var mixes = opt.mixes ? makeMixes(res, opt.preroll_ms, LEVEL_FULL_MS) : [];
+    var chans = {}, cache = {}, files = [];
+    names.forEach(function (m) { chans[m] = res.irs[m]; });
+    mixes.forEach(function (x) { chans[x.file] = x.ir; });
+    var close = names.filter(function (m) { return !isRoomMic(m); });
+    var mpMix = mixes.filter(function (x) { return !x.room; }).map(function (x) { return x.file; });
+    var firstOn = Math.min.apply(null, names.map(function (m) { return res.onsets[m]; }));
+    function variant(ch, rate, n) {
+      var key = ch + "@" + rate;
+      if (!cache[key]) { var y = resampleTo(chans[ch], fs, rate), g = fs / rate; for (var i = 0; i < y.length; i++) y[i] *= g; cache[key] = y; }
+      return cut(cache[key], Math.round((firstOn - preFs) * rate / fs), n, Math.round(opt.preroll_ms / 1000 * rate), opt.fade_frac);
+    }
+    var lvl = {};
+    STANDARD_RATES.forEach(function (rate) {
+      var n = Math.round(LEVEL_FULL_MS / 1000 * rate);
+      Object.keys(chans).forEach(function (ch) { lvl[ch + "@" + rate] = variant(ch, rate, n); });
+    });
+    function peak(chs, mp) {
+      var p = 0;
+      chs.forEach(function (c) { STANDARD_RATES.forEach(function (r) { var v = lvl[c + "@" + r]; p = Math.max(p, absMax(mp ? minimumPhase(v, opt.fade_frac) : v)); }); });
+      return p;
+    }
+    var target = Math.pow(10, opt.peak_dbfs / 20), gSingle = target / peak(names), gains = {};
+    if (opt.minimum_phase && close.length) gains.mp = Math.min(gSingle, target / peak(close, true));
+    if (mixes.length) {
+      gains.mix = Math.min(gSingle, target / peak(mixes.map(function (x) { return x.file; })));
+      if (opt.minimum_phase && mpMix.length) gains.mix_mp = Math.min(gains.mix, target / peak(mpMix, true));
+    }
+    var notes = [], short = [];
+    opt.rates.forEach(function (r) { opt.lengths.forEach(function (ln) {
+      var ms = ln === "full" ? opt.full_ms : +ln / r * 1000, lab = ln === "full" ? opt.full_ms + " ms" : ln + "-sample";
+      if (ms < ROOM_SHORT_MS && short.indexOf(lab) < 0) short.push(lab);
+    }); });
+    short.sort();
+    names.forEach(function (m) {
+      if (!isRoomMic(m)) return;
+      notes.push(m + " is treated as a room mic: no minimum-phase version (it would smear the room).");
+      if (short.length) notes.push(m + ": the " + short.join(", ") + " files are shorter than " + ROOM_SHORT_MS + " ms and cut off most of the room. Use the 500 ms files.");
+    });
+    var gdb = {};
+    Object.keys(gains).forEach(function (k) { gdb[k] = 20 * Math.log10(gains[k]); });
+    res.extras = { minimum_phase: !!opt.minimum_phase, room_mics: names.filter(isRoomMic),
+      mixes: mixes.map(function (x) { return { name: x.label, mics: x.mics, weights: x.weights }; }), gains_db: gdb, notes: notes };
+    opt.rates.forEach(function (rate) {
+      opt.lengths.forEach(function (ln) {
+        var n = ln === "full" ? Math.round(opt.full_ms / 1000 * rate) : +ln, jobs = [];
+        if (opt.minimum_phase) close.forEach(function (m) { jobs.push([m, true, gains.mp]); });
+        mixes.forEach(function (x) {
+          jobs.push([x.file, false, gains.mix]);
+          if (opt.minimum_phase && !x.room) jobs.push([x.file, true, gains.mix_mp]);
+        });
+        jobs.forEach(function (j) {
+          var v = variant(j[0], rate, n);
+          if (j[1]) v = minimumPhase(v, opt.fade_frac);
+          for (var i = 0; i < v.length; i++) v[i] *= j[2];
+          files.push({ path: capture + "/extras/" + rateTag(rate) + "/" + capture + "_" + (names.indexOf(j[0]) >= 0 ? safeName(j[0]) : j[0]) +
+            "_" + rateTag(rate) + "_24_" + ln + (j[1] ? "_MP" : "") + ".wav", data: writeWav(v, rate, "24") });
+        });
+      });
+    });
+    return files;
+  }
+
   function reportJSON(res, s, capture, extra) {
     var r = { capture: capture, created: new Date().toISOString(), ircapture_version: VERSION, sweep: specJSON(s) };
     ["mode", "sweeps_used", "timing_jitter_samples", "analysis_window_s", "diagnostics", "warnings"].forEach(function (k) { r[k] = res[k]; });
     if (res.polarity) r.polarity = res.polarity;
+    if (res.extras) r.extras = res.extras;
     if (extra) for (var k in extra) r[k] = extra[k];
     return JSON.stringify(r, null, 2);
   }
@@ -586,7 +721,8 @@ var IRC = (function () {
     inverseFilter: inverseFilter, analyse: analyse, onsetIndex: onsetIndex, resampleTo: resampleTo,
     exportFiles: exportFiles, responseCurves: responseCurves, reportJSON: reportJSON, normalizePolarity: normalizePolarity,
     writeWav: writeWav, readWav: readWav, wavChannel: wavChannel, makeZip: makeZip, safeName: safeName, rateTag: rateTag,
-    fft: fft, nextPow2: nextPow2
+    fft: fft, nextPow2: nextPow2,
+    isRoomMic: isRoomMic, minimumPhase: minimumPhase, makeMixes: makeMixes, exportExtras: exportExtras
   };
 })();
 if (typeof module !== "undefined") module.exports = IRC;

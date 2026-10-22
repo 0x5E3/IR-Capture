@@ -49,6 +49,13 @@ for m in ["Close", "Room"]:
 ev = sorted((app / "More formats/Everything").rglob("*.wav"))
 say(len(ev) == 32, f"{len(ev)} Everything files")
 pairs += [(f, P / f.parent.name / f.name.replace("demo_", "logic_")) for f in ev]
+# extras (minimum phase, mixes): compare with Python's export_extras files from sim_test.py (sim_out/xr, same mics)
+E = sim / "xr/extras"
+pairs += [(app / "More formats/Minimum phase/demo_Close_MP.wav", E / "48k/xr_Close_48k_24_full_MP.wav"),
+          (app / "More formats/Minimum phase/demo_Close_Helix_MP.wav", E / "48k/xr_Close_48k_24_2048_MP.wav"),
+          (app / "More formats/Mixes/demo_Close+Room_80-20.wav", E / "48k/xr_Close+Room_80-20_48k_24_full.wav"),
+          (app / "More formats/Mixes/demo_Close+Room_60-40_Iridium.wav", E / "96k/xr_Close+Room_60-40_96k_24_full.wav")]
+say(not (app / "More formats/Minimum phase/demo_Room_MP.wav").exists(), "no minimum-phase file for the room mic")
 worst_c, worst_l = 1.0, 0.0
 for a, b in pairs:
     c, lv = corr(a, b)

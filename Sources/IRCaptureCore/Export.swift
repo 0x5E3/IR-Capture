@@ -197,6 +197,7 @@ public func reportJSON(_ res: AnalysisResult, spec: SweepSpec, capture: String, 
             res.polarity[m].map { p in (m, JSON.object([("main_peak", .string(p.mainPeakNegative ? "negative" : "positive")), ("flipped", .bool(p.flipped))])) }
         }))])))
     }
+    if let x = res.extras { o.append(("extras", x)) }
     o += extra
     return JSON.object(o).serialized()
 }

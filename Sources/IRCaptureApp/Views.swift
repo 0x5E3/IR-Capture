@@ -88,7 +88,7 @@ struct ContentView: View {
             let dir = URL(fileURLWithPath: args[i + 1])
             m.outputFolder = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("IRCaptureDemo")
             m.captureName = "demo"
-            m.targets = ["universal", "everything", "helix", "iridium"]
+            m.targets = ["universal", "everything", "helix", "iridium", "minphase", "mixes"]
             m.customOn = false
             m.keepPolarity = false
             m.addLogicFiles(["logic_close", "logic_room", "logic_ref"].map { dir.appendingPathComponent($0 + ".wav") })
@@ -280,19 +280,23 @@ struct LevelPicker: View {
 /// Which files to make (P0.8): Universal by default, plus named targets. Custom lives under Advanced.
 struct TargetsPicker: View {
     @EnvironmentObject var m: AppModel
+    func row(_ t: ExportTarget) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Toggle(t.title, isOn: on(t.id)).toggleStyle(.checkbox).fontWeight(t.id == "universal" ? .semibold : .regular)
+            Text(t.detail).font(.caption).foregroundStyle(.secondary).padding(.leading, 20).fixedSize(horizontal: false, vertical: true)
+        }
+    }
     func on(_ id: String) -> Binding<Bool> {
         Binding(get: { m.targets.contains(id) }, set: { v in if v { m.targets.insert(id) } else { m.targets.remove(id) } })
     }
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("FILES TO MAKE").font(.caption.weight(.semibold)).kerning(0.8).foregroundStyle(.secondary)
-            ForEach(ExportTarget.all) { t in
-                VStack(alignment: .leading, spacing: 1) {
-                    Toggle(t.title, isOn: on(t.id)).toggleStyle(.checkbox).fontWeight(t.id == "universal" ? .semibold : .regular)
-                    Text(t.detail).font(.caption).foregroundStyle(.secondary).padding(.leading, 20).fixedSize(horizontal: false, vertical: true)
-                }
-            }
+            ForEach(ExportTarget.destinations) { t in row(t) }
             Note("Not listed (Quad Cortex, ToneX, Fractal, Kemper Cab Maker…)? Use Universal; those makers don't publish a fixed format, and their own software converts on import.")
+            Text("ALSO MAKE").font(.caption.weight(.semibold)).kerning(0.8).foregroundStyle(.secondary).padding(.top, 4)
+            ForEach(ExportTarget.extras) { t in row(t) }
+            Note("Made for each single-file set ticked above (Universal, Helix, Iridium). A mic named Room or Amb (Room L, Ambient…) counts as a room mic: it gets no minimum-phase version, and is mixed with close mics at 80/20 and 60/40.")
         }
     }
 }
@@ -431,6 +435,7 @@ struct ResultsView: View {
                 }
                 if !r.referenced { Note("No reference tap was used, so these IRs include the power amp's response.") }
                 ForEach(r.polarityNotes, id: \.self) { n in Note("Polarity: " + n, color: .primary) }
+                ForEach(r.exportNotes, id: \.self) { n in Note(n, color: .primary) }
                 if !r.topFiles.isEmpty {
                     Aside(title: "Load these") {
                         ForEach(r.topFiles, id: \.self) { f in Text(f).font(.system(.callout, design: .monospaced)) }

@@ -284,8 +284,93 @@ def main():
     c = float(np.dot(up, fl) / np.sqrt(np.dot(up, up) * np.dot(fl, fl)))
     ok &= check(c > 0.9999, f"exported flipped Room file matches the upright capture (correlation {c:.6f})")
 
+    ok &= extras_checks(work, sig)
+
     print("\nALL PASS" if ok else "\nSOME CHECKS FAILED")
     return 0 if ok else 1
+
+
+# ------------------------------------------------------------------ 8. extras (P1.3a)
+def sixth_oct_db(h, fs, lo=80.0, hi=10000.0, nfft=1 << 18):
+    P = np.abs(np.fft.rfft(h, nfft)) ** 2
+    f = np.fft.rfftfreq(nfft, 1 / fs)
+    fc = lo * 2 ** (np.arange(int(np.log2(hi / lo) * 6) + 1) / 6)
+    return np.array([10 * np.log10(P[(f >= c * 2 ** (-1 / 12)) & (f < c * 2 ** (1 / 12))].mean()) for c in fc])
+
+
+def extras_checks(work, sig):
+    """Minimum phase, room mics and automatic mixes. Close+Room (the room mic is a room mic by name),
+    and Close+Back (the same room recording named as a close mic, so close+close mixes and their MP)."""
+    print("\n-- extras: minimum phase, room mics, automatic mixes")
+    ok = True
+    rec = [str(work / "logic_close.wav"), str(work / "logic_room.wav"), str(work / "logic_ref.wav")]
+    base = ["process", "--signal", str(sig.with_suffix(".json")), "--rec", *rec, "--ref", "3", "--outdir", str(work)]
+    ok &= check(irc.is_room_mic("Room") and irc.is_room_mic("room L") and irc.is_room_mic("Amb 2") and irc.is_room_mic("Ambient")
+                and not irc.is_room_mic("Bedroom57") and not irc.is_room_mic("SM57") and not irc.is_room_mic("Back"),
+                "room-mic names: Room, room L, Amb 2, Ambient yes; SM57, Back, Bedroom57 no")
+    irc.main(base + ["--names", "Close,Room", "--name", "xr", "--extras", "mp,mixes"])
+    irc.main(base + ["--names", "Close,Back", "--name", "xc", "--extras", "mp,mixes"])
+    X = work / "xr/extras"
+    C = work / "xc/extras"
+    rep = json.loads((work / "xr/report.json").read_text())["extras"]
+    ok &= check(rep["room_mics"] == ["Room"] and [m["name"] for m in rep["mixes"]] == ["Close+Room 80/20", "Close+Room 60/40"],
+                f"Close+Room: Room is a room mic; mixes {[m['name'] for m in rep['mixes']]}")
+    ok &= check(not list(X.rglob("*_Room_*_MP.wav")) and not list(X.rglob("*Close+Room*_MP.wav")) and list(X.rglob("xr_Close_*_MP.wav")),
+                "no minimum-phase file for the room mic or a close+room mix; the close mic has them")
+    ok &= check(any("cut off most of the room" in n for n in rep["notes"]), "room mic: short files are flagged")
+    repc = json.loads((work / "xc/report.json").read_text())["extras"]
+    ok &= check([m["name"] for m in repc["mixes"]] == ["Close+Back 50/50", "Close+Back 70/30", "Close+Back 30/70"] and repc["room_mics"] == [],
+                f"Close+Back: close+close mixes {[m['name'] for m in repc['mixes']]}")
+
+    # minimum phase: same magnitude, minimum phase, peak at the start
+    worst_mag, worst_ord = 0.0, 1.0
+    for rate, ln in [(96000, "full"), (48000, "full"), (48000, "2048"), (44100, "1024")]:
+        tag = f"{rate / 1000:g}k"
+        nat, _ = sf.read(work / f"logic/set/{tag}/logic_Close_{tag}_24_{ln}.wav")
+        mp, r = sf.read(X / f"{tag}/xr_Close_{tag}_24_{ln}_MP.wav")
+        d = sixth_oct_db(mp, rate) - sixth_oct_db(nat, rate)
+        d -= np.mean(d)
+        worst_mag = max(worst_mag, float(np.abs(d).max()))
+        # the minimum-phase signal has the most energy delay-free: its partial energy leads at every sample
+        en, em = np.cumsum(nat ** 2), np.cumsum(mp ** 2)
+        worst_ord = min(worst_ord, float(np.min((em + 1e-12 * em[-1]) / (en + 1e-12 * en[-1]))))
+    ok &= check(worst_mag < 0.1, f"minimum-phase magnitude = natural within {worst_mag:.3f} dB (1/6 oct, 80 Hz-10 kHz)")
+    ok &= check(worst_ord >= 0.999, f"minimum-phase partial energy leads the natural IR's everywhere (worst ratio {worst_ord:.4f})")
+    mp96, _ = sf.read(X / "96k/xr_Close_96k_24_full_MP.wav")
+    k = int(np.argmax(np.abs(mp96)))
+    again = irc.minimum_phase(mp96)
+    c = float(np.dot(again, mp96) / np.sqrt(np.dot(again, again) * np.dot(mp96, mp96)))
+    ok &= check(k < 48 and mp96[k] > 0 and c > 0.9999,
+                f"MP peak at sample {k} (positive); minimum phase of it is itself (correlation {c:.6f})")
+    e = shape_error(mp96, H_CLOSE)
+    ok &= check(np.abs(e).max() < 0.5, f"MP close IR magnitude matches simulated truth within {np.abs(e).max():.2f} dB")
+
+    # mixes: the stated blend of the two mics, timing kept, all at the same loudness
+    def ener(x, rate):
+        return float(np.sum(x[:int(round(0.5 * rate))] ** 2))
+    for cap, D, A, B, ratios in [("xc", C, "Close", "Back", [(50, 50), (70, 30), (30, 70)]),
+                                 ("xr", X, "Close", "Room", [(80, 20), (60, 40)])]:
+        fa, _ = sf.read(work / "logic/set/48k/logic_Close_48k_24_full.wav")
+        fb, _ = sf.read(work / "logic/set/48k/logic_Room_48k_24_full.wav")
+        es = []
+        for wa, wb in ratios:
+            mx, _ = sf.read(D / f"48k/{cap}_{A}+{B}_{wa}-{wb}_48k_24_full.wav")
+            want = wa * fa / math.sqrt(ener(fa, 48000)) + wb * fb / math.sqrt(ener(fb, 48000))
+            c = float(np.dot(mx, want) / np.sqrt(np.dot(mx, mx) * np.dot(want, want)))
+            ok &= check(c > 0.9999, f"{A}+{B} {wa}/{wb}: = {wa}/{wb} blend of the level-matched singles (correlation {c:.6f})")
+            es.append(10 * np.log10(ener(mx, 48000)))
+        ok &= check(max(es) - min(es) < 0.01, f"{A}+{B}: every mix at the same loudness (spread {max(es) - min(es):.4f} dB)")
+    mm = list(C.rglob("*Close+Back*_MP.wav"))
+    ok &= check(len(mm) == 3 * 16, f"close+close mixes have minimum-phase versions ({len(mm)} files)")
+
+    # levels: no file over the target; a file's level doesn't depend on what else was chosen
+    pk = max(np.abs(sf.read(f)[0]).max() for f in list(X.rglob("*.wav")) + list(C.rglob("*.wav")))
+    ok &= check(pk <= 10 ** (-1 / 20) + 2e-3, f"loudest extra peaks at {20 * np.log10(pk):.2f} dBFS (target -1)")
+    irc.main(base + ["--names", "Close,Room", "--name", "xr1", "--extras", "mp,mixes", "--rates", "48000", "--lengths", "full"])
+    same = all(np.array_equal(sf.read(f)[0], sf.read(work / "xr/extras/48k" / f.name.replace("xr1_", "xr_"))[0])
+               for f in (work / "xr1/extras/48k").glob("*.wav"))
+    ok &= check(same, "choosing fewer rates and lengths leaves the extras' levels unchanged (identical files)")
+    return ok
 
 
 if __name__ == "__main__":

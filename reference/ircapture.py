@@ -470,6 +470,156 @@ def export(result: dict, capture_name: str, outdir: Path, opt: ExportOptions) ->
     return written
 
 
+# =========================================================================
+# Extras: minimum phase, room mics, automatic mixes (readiness plan P1.3a)
+# Export only. The app's targets layout and the page port these; keep them in step.
+# =========================================================================
+STANDARD_RATES = (44100, 48000, 88200, 96000)
+LEVEL_FULL_MS = 500.0          # the fixed "level set" every family's gain is computed over
+ROOM_SHORT_MS = 100.0          # room mics: files shorter than this cut off the room
+CLOSE_CLOSE_RATIOS = ((50, 50), (70, 30), (30, 70))
+CLOSE_ROOM_RATIOS = ((80, 20), (60, 40))
+
+
+def is_room_mic(name: str) -> bool:
+    """A room mic is one whose name has a word starting with "room" or "amb" (Room, Room L, Amb, Ambient)."""
+    words = "".join(c if ("a" <= c <= "z" or "0" <= c <= "9") else " " for c in name.lower()).split()
+    return any(w.startswith("room") or w.startswith("amb") for w in words)
+
+
+def minimum_phase(x: np.ndarray, fade_frac: float = 0.10) -> np.ndarray:
+    """Same magnitude response, phase rebuilt by the cepstral (homomorphic) method, energy at the start.
+    Same length as x; the main peak keeps x's main-peak sign; the end gets the export fade-out again."""
+    n = len(x)
+    N = 1
+    while N < max(8 * n, 16384):
+        N *= 2
+    mag = np.abs(np.fft.fft(x, N))
+    c = np.fft.ifft(np.log(np.maximum(mag, mag.max() * 1e-8))).real
+    c[1:N // 2] *= 2
+    c[N // 2 + 1:] = 0
+    y = np.fft.ifft(np.exp(np.fft.fft(c))).real[:n].copy()
+    if (y[int(np.argmax(np.abs(y)))] < 0) != (x[int(np.argmax(np.abs(x)))] < 0):
+        y = -y
+    nf = max(int(fade_frac * n), 2)
+    y[-nf:] *= _half_hann(nf, False)
+    return y
+
+
+def make_mixes(result: dict, preroll_ms: float = 0.25, full_ms: float = LEVEL_FULL_MS) -> list[dict]:
+    """Two-mic blends at the capture rate, from the (polarity-normalized) IRs with their timing kept.
+    Each mic is first scaled to the same energy over the exported window, then weighted; every mix is
+    scaled to the energy of the loudest single mic, so all mixes play at the same loudness.
+    Close+close: 50/50, 70/30, 30/70. Close+room (close first): 80/20, 60/40. Room+room: none."""
+    irs, onsets, fs = result["irs"], result["onsets"], result["fs"]
+    names = list(irs.keys())
+    s0 = int(math.floor(min(onsets.values()) - preroll_ms / 1000 * fs + 0.5))
+    n = int(math.floor(full_ms / 1000 * fs + 0.5))
+    a, b = max(s0, 0), max(s0 + n, 0)
+    energy = {m: float(np.sum(irs[m][a:b] ** 2)) for m in names}
+    e_ref = max(energy.values())
+    mixes = []
+    for i in range(len(names)):
+        for j in range(i + 1, len(names)):
+            A, B = names[i], names[j]
+            ra, rb = is_room_mic(A), is_room_mic(B)
+            if ra and rb:
+                continue
+            if ra:
+                A, B = B, A
+            ratios = CLOSE_ROOM_RATIOS if (ra or rb) else CLOSE_CLOSE_RATIOS
+            for wa, wb in ratios:
+                h = (wa / 100) * irs[A] / math.sqrt(energy[A]) + (wb / 100) * irs[B] / math.sqrt(energy[B])
+                h = h * math.sqrt(e_ref / float(np.sum(h[a:b] ** 2)))
+                mixes.append({"label": f"{A}+{B} {wa}/{wb}", "file": f"{A}+{B}_{wa}-{wb}",
+                              "mics": [A, B], "weights": [wa, wb], "room": ra or rb, "ir": h})
+    return mixes
+
+
+def extras_notes(names: list[str], lengths_ms: list[tuple[str, float]]) -> list[str]:
+    """Plain notes for room mics: lengths_ms is (label, ms) for every file length being written."""
+    notes = []
+    for m in names:
+        if is_room_mic(m):
+            short = [lab for lab, ms in lengths_ms if ms < ROOM_SHORT_MS]
+            notes.append(f"{m} is treated as a room mic: no minimum-phase version (it would smear the room).")
+            if short:
+                notes.append(f"{m}: the {', '.join(sorted(set(short)))} files are shorter than "
+                             f"{ROOM_SHORT_MS:.0f} ms and cut off most of the room. Use the 500 ms files.")
+    return notes
+
+
+def export_extras(result: dict, capture_name: str, outdir: Path, opt: ExportOptions,
+                  minimum_phase_on: bool = True, mixes_on: bool = True) -> list[Path]:
+    """Matrix-layout twin of the app's extras (set trim, opt.bits ignored: 24-bit):
+    <capture>/extras/<rate>k/<capture>_<label>_<rate>k_24_<len>[_MP].wav, for opt.rates x opt.lengths.
+    Gains (each family shared by all its files, computed over every standard rate at 500 ms, so they
+    don't depend on what's chosen; never louder than the singles):
+      singles   g  = target / peak of the natural singles
+      MP        g  min'd with target / peak of the close mics' MP versions
+      mixes     g  min'd with target / peak of the mixes
+      mix MP    the mixes' gain, min'd with target / peak of the close-only mixes' MP versions"""
+    fs, irs, onsets = result["fs"], result["irs"], result["onsets"]
+    names = list(irs.keys())
+    pre_fs = opt.preroll_ms / 1000 * fs
+    target = 10 ** (opt.peak_dbfs / 20)
+    mixes = make_mixes(result, opt.preroll_ms) if mixes_on else []
+    chans = {m: irs[m] for m in names}
+    chans.update({x["file"]: x["ir"] for x in mixes})
+    close = [m for m in names if not is_room_mic(m)]
+    mp_mix = [x["file"] for x in mixes if not x["room"]]
+
+    def variant(ch, rate, n):
+        hr = resample_to(chans[ch], fs, rate) * (fs / rate)
+        start = int(round((min(onsets.values()) - pre_fs) * rate / fs))
+        return cut(hr, start, n, int(round(opt.preroll_ms / 1000 * rate)), opt.fade_frac)
+
+    lvl = {}
+    for rate in STANDARD_RATES:
+        n = int(round(LEVEL_FULL_MS / 1000 * rate))
+        for ch in chans:
+            lvl[(ch, rate)] = variant(ch, rate, n)
+
+    def peak(chs, mp=False):
+        return max((np.abs(minimum_phase(lvl[(c, r)], opt.fade_frac) if mp else lvl[(c, r)]).max()
+                    for c in chs for r in STANDARD_RATES), default=0.0)
+
+    g_single = target / peak(names)
+    gains = {}
+    if minimum_phase_on and close:
+        gains["mp"] = min(g_single, target / peak(close, True))
+    if mixes:
+        gains["mix"] = min(g_single, target / peak([x["file"] for x in mixes]))
+        if minimum_phase_on and mp_mix:
+            gains["mix_mp"] = min(gains["mix"], target / peak(mp_mix, True))
+    result["extras"] = {
+        "minimum_phase": bool(minimum_phase_on), "room_mics": [m for m in names if is_room_mic(m)],
+        "mixes": [{"name": x["label"], "mics": x["mics"], "weights": x["weights"]} for x in mixes],
+        "gains_db": {k: 20 * math.log10(v) for k, v in gains.items()},
+    }
+    rng = np.random.default_rng(0)
+    written = []
+    for rate in opt.rates:
+        for ln in opt.lengths:
+            n = int(round(opt.full_ms / 1000 * rate)) if ln == "full" else int(ln)
+            jobs = []
+            if minimum_phase_on:
+                jobs += [(m, True, gains["mp"]) for m in close]
+            for x in mixes:
+                jobs.append((x["file"], False, gains["mix"]))
+                if minimum_phase_on and not x["room"]:
+                    jobs.append((x["file"], True, gains["mix_mp"]))
+            for ch, mp, g in jobs:
+                v = variant(ch, rate, n)
+                if mp:
+                    v = minimum_phase(v, opt.fade_frac)
+                p = (outdir / capture_name / "extras" / f"{rate / 1000:g}k"
+                     / f"{capture_name}_{ch}_{rate / 1000:g}k_24_{ln}{'_MP' if mp else ''}.wav")
+                _write(p, v * g, rate, "24", rng)
+                written.append(p)
+    return written
+
+
 def write_report(result: dict, spec: SweepSpec, capture_name: str, outdir: Path,
                  extra: dict | None = None) -> Path:
     rep = {k: v for k, v in result.items() if k not in ("irs", "onsets", "polarity_notes")}
@@ -561,7 +711,16 @@ def run_processing(rec, spec, names, ref_index, capture_name, outdir, a, extra=N
     print(summary_text(res))
     for n in res["polarity_notes"]:
         print("  * " + n)
-    files = export(res, capture_name, outdir, export_from_args(a))
+    eo = export_from_args(a)
+    files = export(res, capture_name, outdir, eo)
+    ex = _parse_list(getattr(a, "extras", ""))
+    if ex:
+        files += export_extras(res, capture_name, outdir, eo, minimum_phase_on="mp" in ex, mixes_on="mixes" in ex)
+        lens = [(f"{ln}-sample" if ln != "full" else f"{eo.full_ms:g} ms", (eo.full_ms if ln == "full" else int(ln) / r * 1000))
+                for r in eo.rates for ln in eo.lengths]
+        res["extras"]["notes"] = extras_notes(list(res["irs"].keys()), lens)
+        for n in res["extras"]["notes"]:
+            print("  * " + n)
     rep = write_report(res, spec, capture_name, outdir, extra)
     print(f"wrote {len(files)} IR files and {rep}")
     return res, files
@@ -680,6 +839,8 @@ def build_parser():
         q.add_argument("--ir-max", type=float, default=1.0, help="analysis window, s")
         q.add_argument("--reg-db", type=float, default=40.0)
         q.add_argument("--onset-db", type=float, default=20.0)
+        q.add_argument("--extras", default="",
+                       help="mp and/or mixes: minimum-phase versions and automatic two-mic mixes, in <name>/extras/")
         q.add_argument("--keep-polarity", action="store_true",
                        help="don't flip IRs whose main peak is negative")
 

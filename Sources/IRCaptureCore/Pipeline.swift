@@ -81,6 +81,8 @@ public struct ProcessedCapture {
     public var folder: URL
     public var curves: (fc: [Double], curves: [String: [Double]])
     public var polarityNotes: [String] = []
+    /// Room-mic and extras notes from the export.
+    public var exportNotes: [String] = []
     /// Paths of the files written, relative to the capture folder.
     public var files: [String] = []
 }
@@ -122,11 +124,11 @@ public func processAndWrite(rec: [[Double]], spec: SweepSpec, names: [String], r
     try reportJSON(res, spec: spec, capture: capture, extra: extra).write(to: folder.appendingPathComponent("report.json"), atomically: true, encoding: .utf8)
     if case .targets(let t, let c) = layout {
         try captureReadme(capture: capture, names: names, targets: t, custom: c != nil, referenced: res.referenced,
-                          polarityNotes: notes, warnings: res.warnings)
+                          polarityNotes: notes, warnings: res.warnings, notes: res.exportNotes)
             .write(to: folder.appendingPathComponent("README.txt"), atomically: true, encoding: .utf8)
     }
     let g = res.gains["set"]?[names[0]] ?? res.gains["individual"]?[names[0]] ?? 1
     let prefix = capture + "/"
     return ProcessedCapture(result: res, fileCount: files.count, folder: folder, curves: responseCurves(res, gain: g),
-                            polarityNotes: notes, files: files.map { $0.path.hasPrefix(prefix) ? String($0.path.dropFirst(prefix.count)) : $0.path })
+                            polarityNotes: notes, exportNotes: res.exportNotes, files: files.map { $0.path.hasPrefix(prefix) ? String($0.path.dropFirst(prefix.count)) : $0.path })
 }

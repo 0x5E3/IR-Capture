@@ -168,5 +168,50 @@ r = subprocess.run([cli, "process", "--signal", str(sim_out / "sweeps.json"), "-
 kp = json.loads((swift_out / "keep/report.json").read_text())["polarity"]
 check(kp["mode"] == "keep" and kp["mics"]["Room"] == {"main_peak": "negative", "flipped": False}, "--keep-polarity keeps it inverted")
 
+# 8. extras (P1.3a): minimum phase, room mics, mixes = Python's export_extras files (sim_test.py wrote xr/ and xc/)
+rec = [str(sim_out / "logic_close.wav"), str(sim_out / "logic_room.wav"), str(sim_out / "logic_ref.wav")]
+for cap, names in [("xr", "Close,Room"), ("xc", "Close,Back")]:
+    r = subprocess.run([cli, "process", "--signal", str(sim_out / "sweeps.json"), "--rec", *rec, "--ref", "3",
+                        "--names", names, "--name", cap, "--outdir", str(swift_out),
+                        "--targets", "universal,helix,iridium,minphase,mixes"], capture_output=True, text=True)
+    check(r.returncode == 0, f"Swift process with extras ({names}) ran" + (": " + r.stderr if r.returncode else ""))
+    S, E = swift_out / cap / "More formats", sim_out / cap / "extras"
+    pe = json.loads((sim_out / cap / "report.json").read_text())["extras"]
+    se = json.loads((swift_out / cap / "report.json").read_text()).get("extras", {})
+    check(se.get("room_mics") == pe["room_mics"] and se.get("mixes") == pe["mixes"],
+          f"{cap}: room mics and mixes in report.json match Python ({se.get('room_mics')}, {[m['name'] for m in se.get('mixes', [])]})")
+    gd = max(abs(se["gains_db"][k] - v) for k, v in pe["gains_db"].items())
+    check(set(se["gains_db"]) == set(pe["gains_db"]) and gd < 0.05, f"{cap}: extras gains match Python within {gd:.3f} dB")
+    pairs = []
+    for suffix, tag, ln in [("", "48k", "full"), ("_Helix", "48k", "2048"), ("_Iridium", "96k", "full")]:
+        pairs.append((S / f"Minimum phase/{cap}_Close{suffix}_MP.wav", E / f"{tag}/{cap}_Close_{tag}_24_{ln}_MP.wav"))
+        for m in pe["mixes"]:
+            f = f"{m['mics'][0]}+{m['mics'][1]}_{m['weights'][0]}-{m['weights'][1]}"
+            pairs.append((S / f"Mixes/{cap}_{f}{suffix}.wav", E / f"{tag}/{cap}_{f}_{tag}_24_{ln}.wav"))
+            if cap == "xc":
+                pairs.append((S / f"Mixes/{cap}_{f}{suffix}_MP.wav", E / f"{tag}/{cap}_{f}_{tag}_24_{ln}_MP.wav"))
+    if cap == "xc":
+        pairs.append((S / f"Minimum phase/{cap}_Back_MP.wav", E / f"48k/{cap}_Back_48k_24_full_MP.wav"))
+    miss = [str(a.relative_to(swift_out)) for a, _ in pairs if not a.exists()]
+    check(not miss, f"{cap}: {len(pairs)} extras files written ({miss[:3]} missing)" if miss else f"{cap}: {len(pairs)} extras files written")
+    worst = (1.0, 0.0)
+    for a, b in pairs:
+        if not a.exists():
+            continue
+        x, rx = sf.read(a)
+        y, ry = sf.read(b)
+        if rx != ry or len(x) != len(y):
+            check(False, f"{a.name}: rate/length {rx}/{len(x)} vs {ry}/{len(y)}")
+            continue
+        c = float(np.dot(x, y) / np.sqrt(np.dot(x, x) * np.dot(y, y)))
+        lv = float(10 * np.log10(np.dot(x, x) / np.dot(y, y)))
+        worst = (min(worst[0], c), max(worst[1], abs(lv)))
+    check(worst[0] > 0.99999 and worst[1] < 0.05, f"{cap}: every extras file = Python (correlation >= {worst[0]:.7f}, level within {worst[1]:.3f} dB)")
+    n_mp = len(list((S / "Minimum phase").glob("*.wav"))) if (S / "Minimum phase").exists() else 0
+    check(n_mp == (3 if cap == "xr" else 6), f"{cap}: {n_mp} minimum-phase singles (none for a room mic)")
+    if cap == "xr":
+        rd = (swift_out / cap / "README.txt").read_text()
+        check("Minimum phase:" in rd and "Mixes:" in rd and "cut off most of the room" in rd, "README.txt explains the extras and the room mic")
+
 print("\nALL PASS" if ok else "\nSOME CHECKS FAILED")
 sys.exit(0 if ok else 1)

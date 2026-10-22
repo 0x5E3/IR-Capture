@@ -84,7 +84,7 @@ python3 scripts/make_dmg.py "dist/IR Capture.app" "dist/Quick start.pdf" dist/IR
 
 - `VERSION` is the version string; keep `IRCaptureVersion` in `Spec.swift` the same (CI checks).
 - `Sources/IRCaptureCore`: the DSP, a line-for-line port of `reference/web/dsp.js`, itself a port of `reference/ircapture.py`. Keep all three in step. `Targets.swift` has polarity normalization (also in Python and the page), the export targets (each with its manufacturer source), README.txt and the raw take.
-- `Sources/ircapture-cli`: `make-signal`, `process` (`--targets`, `--keep-polarity`, `--raw-take`), `reexport` and `nam-prep`, used by the golden tests.
+- `Sources/ircapture-cli`: `make-signal`, `process` (`--targets`, including `minphase` and `mixes`, `--keep-polarity`, `--raw-take`), `reexport` and `nam-prep`, used by the golden tests.
 - `Sources/IRCaptureApp`: SwiftUI app. `DuplexIO.swift` plays and records through one AUHAL unit on one device, so input and output share a clock; it also reports input timestamp gaps and processor overloads (dropouts). `Support.swift` has the product name, support address, log and Contact Support.
 - Signing and notarization: `scripts/make_app.sh`, `scripts/notarize.sh`, `scripts/IRCapture.entitlements`, and the CI steps that run when the Apple secrets exist. Setup: `docs/SIGNING.md`.
 - CI (`.github/workflows/build.yml`) runs on macOS: simulated rig → page DSP vs Python → universal build → unit tests → Swift vs Python golden tests → app bundle → smoke tests and screenshots → diagrams and Quick start PDF → DMG → the `latest` release. A `v*` tag makes a signed, versioned release.

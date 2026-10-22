@@ -51,6 +51,10 @@ public struct AnalysisResult {
     /// Set by normalizePolarity(); nil until then.
     public var polarity: [String: PolarityInfo] = [:]
     public var polarityMode: String? = nil
+    /// Set by the extras export (minimum phase, room mics, mixes); nil when none were asked for.
+    public var extras: JSON? = nil
+    /// Plain-language notes from the export (room mics and the like), for the results and README.
+    public var exportNotes: [String] = []
 
     public var mode: String { referenced ? "reference" : "sweep" }
     public func diag(_ label: String) -> ChannelDiagnostics? { diagnostics.first { $0.label == label }?.diag }

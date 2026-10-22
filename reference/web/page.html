@@ -228,9 +228,12 @@ footer { color: var(--muted); font-size: 0.85rem; }
           <label><input type="checkbox" value="32f">32-bit float</label></div></div>
         <div><span class="group-label">Trimming</span><div class="checks" id="opt-trim">
           <label><input type="checkbox" value="set" checked>Keep mic timing</label><label><input type="checkbox" value="individual">Trim each mic</label></div></div>
+        <div><span class="group-label">Also make</span><div class="checks" id="opt-extras">
+          <label><input type="checkbox" value="mp" checked>Minimum-phase versions</label><label><input type="checkbox" value="mixes" checked>Mixes of two mics</label></div></div>
         <div><span class="group-label"><label for="full-ms">Full room length, ms</label></span><input type="number" id="full-ms" min="50" max="1000" step="50" value="500"></div>
       </div>
       <p class="note">“Keep mic timing” trims every mic by the same amount and gives them one shared gain, so they blend the way the real mics did. “Trim each mic” starts each file at its own first arrival and normalizes it on its own. Level is matched across sample rates.</p>
+      <p class="note">Minimum-phase versions keep the tone and remove the timing, for each close mic. Mixes blend two mics with their timing kept, all at the same loudness: two close mics 50/50, 70/30 and 30/70; a close mic with a room mic 80/20 and 60/40. A mic named Room or Amb counts as a room mic and gets no minimum-phase version. Both go in the zip's extras folder.</p>
     </details>
     <div class="actions">
       <button class="primary" id="go" type="button" disabled>Make IRs</button>
@@ -385,13 +388,15 @@ async function ircHandle(m, emit) {
       rec = null;
       var polarityNotes = IRC.normalizePolarity(res, !!m.keepPolarity);
       var files = IRC.exportFiles(res, m.capture, m.export, post);
+      var ex = m.extras || [];
+      if (ex.length) files = files.concat(IRC.exportExtras(res, m.capture, Object.assign({}, m.export, { minimum_phase: ex.indexOf("mp") >= 0, mixes: ex.indexOf("mixes") >= 0 }), post));
       var gain = res.gains.set ? res.gains.set[names[0]] : res.gains.individual[names[0]];
       var curves = IRC.responseCurves(res, gain);
       post("Packing the zip");
       files.push({ path: m.capture + "/report.json", data: new TextEncoder().encode(IRC.reportJSON(res, s, m.capture, { channels: m.channels.map(function (c) { return { file: c.fileName, channel: c.ch + 1, role: c.role, name: c.name }; }) })) });
       var zip = IRC.makeZip(files);
       emit({ type: "done", zip: zip, name: m.capture + "_IRs.zip", count: files.length - 1,
-        result: { polarity_notes: polarityNotes, diagnostics: res.diagnostics, warnings: res.warnings, mode: res.mode, sweeps_used: res.sweeps_used, names: res.names, curves: curves } });
+        result: { polarity_notes: polarityNotes.concat(res.extras ? res.extras.notes : []), diagnostics: res.diagnostics, warnings: res.warnings, mode: res.mode, sweeps_used: res.sweeps_used, names: res.names, curves: curves } });
     }
   } catch (err) { emit({ type: "error", text: err && err.message ? err.message : String(err) }); }
 }
@@ -585,7 +590,8 @@ async function ircHandle(m, emit) {
       files: fileIdx.map(function (i) { return { name: files[i].name, buf: files[i].buf.slice(0) }; }),
       channels: used.map(function (c) { return { file: fileIdx.indexOf(c.file), fileName: files[c.file].name, ch: c.ch, role: c.role, name: IRC.safeName(c.name) }; }),
       export: { rates: checked("opt-rates").map(Number), lengths: checked("opt-lengths").map(function (v) { return v === "full" ? "full" : +v; }),
-        bits: checked("opt-bits"), trim: checked("opt-trim"), full_ms: Math.max(50, Math.min(1000, +$("full-ms").value || 500)) }
+        bits: checked("opt-bits"), trim: checked("opt-trim"), full_ms: Math.max(50, Math.min(1000, +$("full-ms").value || 500)) },
+      extras: checked("opt-extras")
     };
     try {
       var d = await run(msg, msg.files.map(function (f) { return f.buf; }), function (t) { $("progress-text").textContent = t + "…"; });

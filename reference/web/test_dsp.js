@@ -57,6 +57,26 @@ for (const m of ["Close", "Room"]) for (const r of ["96k", "48k", "44.1k"]) for 
   files.splice(files.length - f2.length, f2.length);
 }
 
+// extras: minimum phase, room mics and mixes match Python's export_extras (sim_test.py wrote xr/ and xc/)
+for (const [cap, nm] of [["xr", ["Close", "Room"]], ["xc", ["Close", "Back"]]]) {
+  const r3 = IRC.analyse(rec, spec, nm, 2, {});
+  IRC.normalizePolarity(r3, false);
+  const t1 = Date.now();
+  const ex = IRC.exportExtras(r3, cap, {});
+  console.log(`${cap}: ${ex.length} extras files in ${((Date.now() - t1) / 1000).toFixed(1)} s`);
+  const pe = JSON.parse(fs.readFileSync(path.join(dir, cap, "report.json"))).extras;
+  check(JSON.stringify(r3.extras.room_mics) === JSON.stringify(pe.room_mics) && JSON.stringify(r3.extras.mixes) === JSON.stringify(pe.mixes)
+    && JSON.stringify(r3.extras.notes) === JSON.stringify(pe.notes), `${cap}: room mics, mixes and notes match Python`);
+  const gd = Math.max(...Object.keys(pe.gains_db).map((k) => Math.abs(r3.extras.gains_db[k] - pe.gains_db[k])));
+  check(Object.keys(r3.extras.gains_db).length === Object.keys(pe.gains_db).length && gd < 0.05, `${cap}: gains match Python within ${gd.toFixed(3)} dB`);
+  const pyN = require("child_process").execSync(`find ${path.join(dir, cap, "extras")} -name '*.wav' | wc -l`).toString().trim();
+  check(String(ex.length) === pyN, `${cap}: ${ex.length} files, Python wrote ${pyN}`);
+  files.push(...ex);
+  for (const f of ex.filter((f) => /\/(48k|96k)\//.test(f.path) && /_(full|2048)(_MP)?\.wav$/.test(f.path)))
+    compare(f.path, path.join(dir, f.path), f.path.split("/").pop() + " vs Python");
+  files.splice(files.length - ex.length, ex.length);
+}
+
 const zip = IRC.makeZip(files.slice(0, 3));
 zip.arrayBuffer().then((b) => {
   fs.writeFileSync("/tmp/claude_test.zip", Buffer.from(b));

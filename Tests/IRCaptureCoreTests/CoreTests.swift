@@ -172,4 +172,21 @@ final class CoreTests: XCTestCase {
         for i in r2.indices { r2[i].channel = i }
         XCTAssertNil(lc.referenceCandidate(r2))
     }
+
+    func testRoomMicNames() {
+        for n in ["Room", "room L", "Amb 2", "Ambient", "R121 Room"] { XCTAssertTrue(isRoomMic(n), n) }
+        for n in ["SM57", "Back", "Bedroom57", "Input 2"] { XCTAssertFalse(isRoomMic(n), n) }
+    }
+
+    func testMinimumPhaseOfDelayedEchoIsAtTheStart() {
+        // a delayed impulse with a later, smaller echo: minimum phase moves it to sample 0, same magnitude
+        var x = [Double](repeating: 0, count: 2048)
+        x[100] = 1; x[140] = 0.5
+        let y = minimumPhase(x)
+        XCTAssertEqual(y[0], 1, accuracy: 1e-6)
+        XCTAssertEqual(y[40], 0.5, accuracy: 1e-6)
+        XCTAssertEqual(absMax(y, 1, 40), 0, accuracy: 1e-6)
+        // an inverted input keeps its polarity
+        XCTAssertEqual(minimumPhase(x.map { -$0 })[0], -1, accuracy: 1e-6)
+    }
 }
