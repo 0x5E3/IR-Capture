@@ -752,7 +752,8 @@ final class AppModel: ObservableObject {
                 let rec: [[Float]]
                 if sim {
                     busy = .namRecording(0)
-                    rec = await Task.detached { AppModel.simulatedRecording(sig, inputs: rows.count, extraSeconds: 2.0) }.value
+                    let nIn = rows.count
+                    rec = await Task.detached { AppModel.simulatedRecording(sig, inputs: nIn, extraSeconds: 2.0) }.value
                 } else {
                     guard let dev else { return }
                     guard await microphoneAllowed() else { namError = micDenied; return }
@@ -772,7 +773,7 @@ final class AppModel: ObservableObject {
                     }
                 }.value
                 rawSaved = true
-                let report = { (t: String) in Task { @MainActor in self.busy = .processing(t) } }
+                let report: (String) -> Void = { t in Task { @MainActor in self.busy = .processing(t) } }
                 let extra: [(String, JSON)] = [
                     ("recorded_with", .string(sim ? "simulated" : "direct")),
                     ("channels", .object([
