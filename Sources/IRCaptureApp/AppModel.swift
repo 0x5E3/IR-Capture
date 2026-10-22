@@ -156,7 +156,7 @@ final class AppModel: ObservableObject {
     private let defaults = UserDefaults.standard
 
     // ---------------------------------------------------------------- window
-    @Published var job: Job { didSet { defaults.set(job.rawValue, forKey: "job") } }
+    @Published var job: Job { didSet { defaults.set(job.rawValue, forKey: "job"); if job != oldValue { stopLevelChecks() } } }
     @Published var cabImport = false              // Cab IR: showing Import DAW recordings instead of Record here
     @Published var showWelcome = false
     @Published var helpPage: HelpPage?
@@ -221,6 +221,14 @@ final class AppModel: ObservableObject {
     private var captureTask: Task<Void, Never>?
     /// The interface's own sample rate before the app changed it, restored when the app is idle again.
     private var savedRate: (id: AudioDeviceID, rate: Double)?
+    /// Finishes when the last job that drove the interface (or the rate restore after it) is done.
+    /// Every new audio job waits for it, so two jobs never drive the interface at once.
+    private var audioChain: Task<Void, Never>?
+    /// Each start of a level check gets a new number; a stopped run's cleanup only resets state if it's still current.
+    private var levelGen = 0, namGen = 0
+    private var autoSteppedDown = false
+    private var pendingRefresh = false
+    private var deviceSignature = ""
 
     // ---------------------------------------------------------------- Import DAW recordings (cab)
     @Published var logicChannels: [LogicChannel] = []
@@ -341,16 +349,23 @@ final class AppModel: ObservableObject {
             let removed = before.subtracting(devices.map(\.uid))
             Log.write("interfaces changed: added \(added), removed \(removed.count)")
         }
-        // Don't switch interfaces under a running job.
-        if busy != nil || levelRunning || namLevelRunning { return }
+        // Don't switch interfaces under a running job; catch up when it ends.
+        if audioActive { pendingRefresh = true; return }
+        pendingRefresh = false
         if device == nil, let first = duplexDevices.first(where: { $0.inputChannels > 2 }) ?? duplexDevices.first {
             deviceUID = first.uid
-        } else {
-            deviceChanged()
+        } else if signature(device) != deviceSignature {
+            deviceChanged()                 // only when the chosen interface itself appeared, went away or changed
         }
     }
 
+    /// True while anything is using the interface or processing.
+    var audioActive: Bool { busy != nil || levelRunning || namLevelRunning }
+
+    private func signature(_ d: AudioDevice?) -> String { d.map { "\($0.uid)|\($0.inputChannels)|\($0.outputChannels)" } ?? "" }
+
     private func deviceChanged() {
+        deviceSignature = signature(device)
         guard let dev = device else { inputs = []; namRows = []; return }
         Log.write("interface: \(dev.name), \(dev.inputChannels) in / \(dev.outputChannels) out, rates \(dev.sampleRates)")
         if outChannel >= dev.outputChannels { outChannel = 0 }
@@ -416,10 +431,21 @@ final class AppModel: ObservableObject {
     private func takeRate(_ dev: AudioDevice) {
         if savedRate == nil || savedRate!.id != dev.id { savedRate = (dev.id, CoreAudioHelper.nominalRate(dev.id)) }
     }
-    /// Puts the rate back once nothing is using the interface, so the user's DAW session isn't left changed.
-    private func releaseRateIfIdle() {
-        guard busy == nil, !levelRunning, !namLevelRunning else { return }
-        restoreRateNow()
+    /// Called when any job ends. Once nothing is using the interface, puts its rate back (waiting until the
+    /// interface has really switched, so the next job starts from a known rate) and catches up on hot-plug.
+    private func jobEnded() {
+        guard !audioActive else { return }
+        if pendingRefresh { refreshDevices() }
+        guard let s = savedRate else { return }
+        savedRate = nil
+        let before = audioChain
+        audioChain = Task.detached { await before?.value; CoreAudioHelper.restoreRate(s.id, s.rate) }
+    }
+
+    /// Stops both level checks. Their tasks finish in the background; the next audio job waits for them.
+    func stopLevelChecks() {
+        if levelRunning || levelTask != nil { levelTask?.cancel(); levelTask = nil; levelGen += 1; levelRunning = false; levelPhase = nil }
+        if namLevelRunning || namLevelTask != nil { namLevelTask?.cancel(); namLevelTask = nil; namGen += 1; namLevelRunning = false }
     }
     private func restoreRateNow() {
         guard let s = savedRate else { return }
@@ -553,16 +579,26 @@ final class AppModel: ObservableObject {
 
     // ---------------------------------------------------------------- level check (with auto sweep level and noise check)
     func toggleLevelCheck() {
-        if levelRunning { levelTask?.cancel(); levelTask = nil; levelRunning = false; levelPhase = nil; releaseRateIfIdle(); return }
+        if levelRunning { stopLevelChecks(); return }
         guard let dev = device else { levelError = "Choose an audio interface first."; return }
+        guard busy == nil else { return }
         guard inputs.contains(where: { $0.role != .off }) else { levelError = "Mark at least one input as a mic."; return }
         levelError = nil; levelReadings = []; idleSignals = []; refCandidate = nil; noise = [:]; levelRunning = true
         let fs = captureRate, out = outChannel, all = Array(0..<dev.inputChannels), auto = levelChoice == 0
-        if auto { autoLevel = -18; autoLevelSettled = false }
+        if auto { autoLevel = -18; autoLevelSettled = false; autoSteppedDown = false }
+        stopLevelChecks()                 // the NAM one, if it's running
+        levelRunning = true
+        levelGen += 1
+        let gen = levelGen, wait = audioChain
         Log.write("level check start: \(dev.name) at \(fs) Hz, output \(out + 1), sweep \(auto ? "auto" : "\(levelChoice) dBFS")")
-        takeRate(dev)
-        levelTask = Task {
-            defer { levelRunning = false; levelPhase = nil; releaseRateIfIdle() }
+        let t = Task {
+            defer {
+                if gen == levelGen { levelRunning = false; levelPhase = nil; levelTask = nil }
+                jobEnded()
+            }
+            await wait?.value
+            if Task.isCancelled { return }
+            takeRate(dev)
             guard await microphoneAllowed() else { levelError = micDenied; return }
             do {
                 try await Task.detached { try CoreAudioHelper.setNominalRate(dev.id, fs) }.value
@@ -607,20 +643,23 @@ final class AppModel: ObservableObject {
             } catch is CancellationError {
             } catch {
                 Log.write("level check error: \(error.localizedDescription)")
-                levelError = error.localizedDescription
+                if gen == levelGen { levelError = error.localizedDescription }
             }
         }
+        levelTask = t
+        audioChain = t
     }
 
     /// Auto sweep level: start at −18 dBFS, step up 6 dB while the mics' distortion stays below −40 dB,
-    /// back off 6 dB if it rises above −30 dB. Never above −6 dBFS or below −30 dBFS.
+    /// back off 6 dB if it rises above −30 dB, and never step up again after backing off (so it can't
+    /// oscillate). Never above −6 dBFS or below −30 dBFS.
     private func stepAutoLevel(_ mics: [LevelReading]) {
         guard !mics.isEmpty else { return }
         let worst = mics.map { max($0.h2, $0.h3) }.max()!
         let clipped = mics.contains(where: \.clipped)
         let before = autoLevel
-        if worst > -30 && autoLevel > -30 { autoLevel -= 6; autoLevelSettled = false }
-        else if worst < -40 && autoLevel < -6 && !clipped && mics.allSatisfy({ $0.peakDBFS < -9 }) { autoLevel += 6; autoLevelSettled = false }
+        if worst > -30 && autoLevel > -30 { autoLevel -= 6; autoLevelSettled = false; autoSteppedDown = true }
+        else if !autoSteppedDown && worst < -40 && autoLevel < -6 && !clipped && mics.allSatisfy({ $0.peakDBFS < -9 }) { autoLevel += 6; autoLevelSettled = false }
         else { autoLevelSettled = true }
         if before != autoLevel { Log.write("auto sweep level \(Int(before)) → \(Int(autoLevel)) dBFS (worst harmonic \(Int(worst.rounded())) dB)") }
     }
@@ -628,8 +667,8 @@ final class AppModel: ObservableObject {
     // ---------------------------------------------------------------- capture
     func startCapture() {
         if let p = captureProblem { errorText = p; return }
-        guard let dev = device else { return }
-        if levelRunning { levelTask?.cancel(); levelRunning = false; levelPhase = nil }
+        guard let dev = device, busy == nil else { return }
+        stopLevelChecks()
         errorText = nil
         let mics = inputs.filter { $0.role == .mic }
         let ref: InputRow? = refSource == .none ? nil : inputs.first(where: { $0.role == .ref })
@@ -640,10 +679,13 @@ final class AppModel: ObservableObject {
         let capture = uniqueCaptureName(safeName(captureName.isEmpty ? "Cab" : captureName))
         let refKind = refSource
         Log.write("capture \(capture): \(dev.name) at \(fs) Hz, output \(out + 1), sweep \(lv) dBFS, mics \(zip(names, mics.map { $0.id + 1 }).map { "\($0.0)=\($0.1)" }), reference \(ref.map { "\($0.id + 1)" } ?? "none")")
-        takeRate(dev)
         busy = .preparing("Getting ready")
-        captureTask = Task {
-            defer { busy = nil; captureTask = nil; releaseRateIfIdle() }
+        let wait = audioChain
+        let t = Task {
+            defer { busy = nil; captureTask = nil; jobEnded() }
+            await wait?.value
+            if Task.isCancelled { errorText = "Capture stopped. Nothing was saved."; return }
+            takeRate(dev)
             guard await microphoneAllowed() else { errorText = micDenied; return }
             let t0 = Date()
             do {
@@ -689,6 +731,8 @@ final class AppModel: ObservableObject {
                 errorText = error.localizedDescription
             }
         }
+        captureTask = t
+        audioChain = t
     }
 
     func cancelCapture() { captureTask?.cancel() }
@@ -724,7 +768,7 @@ final class AppModel: ObservableObject {
         reexportMessage = nil
         busy = .processing("Reading the raw take")
         captureTask = Task {
-            defer { busy = nil; captureTask = nil }
+            defer { busy = nil; captureTask = nil; jobEnded() }
             let report = { (t: String) in Task { @MainActor in self.busy = .processing(t) } }
             do {
                 let processed = try await Task.detached(priority: .userInitiated) { () -> ProcessedCapture in
@@ -857,7 +901,7 @@ final class AppModel: ObservableObject {
         Log.write("import \(capture): \(used.count) channels at \(fs) Hz")
         busy = .processing("Reading the recordings")
         captureTask = Task {
-            defer { busy = nil; captureTask = nil }
+            defer { busy = nil; captureTask = nil; jobEnded() }
             do {
                 let spec = try self.spec(fs: fs, level: lv)
                 let report = { (t: String) in Task { @MainActor in self.busy = .processing(t) } }
@@ -945,7 +989,7 @@ final class AppModel: ObservableObject {
         Log.write("NAM import \(capture): \(used.count) channels, \(kind.rawValue)")
         busy = .processing("Reading the recordings")
         captureTask = Task {
-            defer { busy = nil; captureTask = nil }
+            defer { busy = nil; captureTask = nil; jobEnded() }
             do {
                 let report = { (t: String) in Task { @MainActor in self.busy = .processing(t) } }
                 let (res, folder) = try await Task.detached(priority: .userInitiated) { () -> (NAMResult, URL) in
@@ -1066,17 +1110,25 @@ final class AppModel: ObservableObject {
     private func resetNAMMeters() { namMeterHistory = [:]; namClipped = []; namMeters = [] }
 
     func toggleNAMLevelCheck() {
-        if namLevelRunning { namLevelTask?.cancel(); namLevelTask = nil; namLevelRunning = false; releaseRateIfIdle(); return }
+        if namLevelRunning { stopLevelChecks(); return }
         if let p = namDirectProblem { namLevelError = p; return }
-        guard let sig = namSignal, let dev = device else { return }
+        guard let sig = namSignal, let dev = device, busy == nil else { return }
+        stopLevelChecks()                 // the cab one, if it's running
         namLevelError = nil; resetNAMMeters(); namLevelRunning = true
+        namGen += 1
+        let gen = namGen, wait = audioChain
         let (a, n) = NAMPrep.levelSection(sig)
         let section = Array(sig[a..<(a + n)])
         let out = namOutChannel
         Log.write("NAM level check start: \(dev.name), output \(out + 1)")
-        takeRate(dev)
-        namLevelTask = Task {
-            defer { namLevelRunning = false; releaseRateIfIdle() }
+        let t = Task {
+            defer {
+                if gen == namGen { namLevelRunning = false; namLevelTask = nil }
+                jobEnded()
+            }
+            await wait?.value
+            if Task.isCancelled { return }
+            takeRate(dev)
             guard await microphoneAllowed() else { namLevelError = micDenied; return }
             do {
                 try await Task.detached { try CoreAudioHelper.setNominalRate(dev.id, NAMPrep.fs) }.value
@@ -1090,9 +1142,11 @@ final class AppModel: ObservableObject {
             } catch is CancellationError {
             } catch {
                 Log.write("NAM level check error: \(error.localizedDescription)")
-                namLevelError = error.localizedDescription
+                if gen == namGen { namLevelError = error.localizedDescription }
             }
         }
+        namLevelTask = t
+        audioChain = t
     }
 
     /// Simulated interface for CI: input k hears the signal after 1234 + 150·k samples, at gain 0.5 or −0.3.
@@ -1109,8 +1163,8 @@ final class AppModel: ObservableObject {
     func startNAMCapture() {
         if let p = namDirectProblem { namError = p; return }
         guard let sig = namSignal else { return }
-        if namLevelRunning { namLevelTask?.cancel(); namLevelRunning = false }
-        if levelRunning { levelTask?.cancel(); levelRunning = false }
+        guard busy == nil else { return }
+        stopLevelChecks()
         namError = nil
         let rows = simulateIO ? namRows : namRows.filter(\.use)
         let names = rows.map { NAMPrep.safe($0.name) }
@@ -1118,11 +1172,14 @@ final class AppModel: ObservableObject {
         let capture = uniqueCaptureName(NAMPrep.safe(namName.isEmpty ? "Amp" : namName))
         let rawDir = outDir.appendingPathComponent(capture).appendingPathComponent("raw recording")
         resetNAMMeters()
-        if let dev, !sim { takeRate(dev) }
         Log.write("NAM record \(capture): \(sim ? "simulated" : dev?.name ?? "?"), output \(out + 1), inputs \(zip(names, rows.map { $0.id + 1 }).map { "\($0.0)=\($0.1)" })")
         busy = .preparing("Getting ready")
-        captureTask = Task {
-            defer { busy = nil; captureTask = nil; releaseRateIfIdle() }
+        let wait = audioChain
+        let t = Task {
+            defer { busy = nil; captureTask = nil; jobEnded() }
+            await wait?.value
+            if Task.isCancelled { namError = "Recording stopped. Nothing was saved."; return }
+            if let dev, !sim { takeRate(dev) }
             var rawSaved = false
             do {
                 let rec: [[Float]]
@@ -1172,6 +1229,8 @@ final class AppModel: ObservableObject {
                     + (rawSaved ? " The raw recording is saved in “\(capture)/raw recording”. You can drop those files into Import DAW recordings to try again." : "")
             }
         }
+        captureTask = t
+        audioChain = t
     }
 
     /// Lines up, checks and writes the prepared files (shared by both NAM routes).

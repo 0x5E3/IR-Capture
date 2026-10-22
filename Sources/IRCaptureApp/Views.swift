@@ -50,6 +50,7 @@ struct ContentView: View {
                 Text("Amp (NAM)").tag(Job.nam)
             }
             .pickerStyle(.segmented).labelsHidden().frame(maxWidth: 360).padding(.top, 12).padding(.bottom, 4)
+            .disabled(m.busy != nil)
             Text(m.job == .cab ? "Record the speaker cab's impulse response." : "Record the amp for a NAM model, trained at TONE3000.")
                 .font(.callout).foregroundStyle(.secondary).padding(.bottom, 10)
             Divider()

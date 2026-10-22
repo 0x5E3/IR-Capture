@@ -83,6 +83,8 @@ struct InterfaceRow: View {
                 }.frame(width: 260)
             }
         }
+        .disabled(m.audioActive)
+        .help(m.audioActive ? "Stop the level check or recording to change these" : "")
         if showRate, m.device != nil {
             Note("Records at \(rateTag(m.captureRate).dropLast()) kHz\(m.rateChoice == 0 ? " (the best this interface does; every other rate is made from this one capture)" : ""). The interface goes back to its own rate afterwards.")
         }

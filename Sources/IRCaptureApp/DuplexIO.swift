@@ -210,9 +210,11 @@ final class DuplexIO {
         var overloads: Int
         var bufferFrames: Int
         var dropoutWarning: String? {
-            guard !gaps.isEmpty || overloads > 0 else { return nil }
-            let at = gaps.first.map { g -> String in let s = max(0, Int(g.seconds)); return " at \(s / 60):\(String(format: "%02d", s % 60))" } ?? ""
-            return "Audio dropped out\(at) while recording (\(max(gaps.count, overloads)) time\(max(gaps.count, overloads) == 1 ? "" : "s")). Record again with other apps closed. If it keeps happening, raise the interface's buffer size in its control panel or in Audio MIDI Setup."
+            // Only a gap in the input timestamps counts: overload notices alone (which some interfaces post while
+            // starting up) are logged and kept in report.json, but don't raise the warning.
+            guard let g = gaps.first else { return nil }
+            let s = max(0, Int(g.seconds))
+            return "Audio dropped out at \(s / 60):\(String(format: "%02d", s % 60)) while recording (\(gaps.count) time\(gaps.count == 1 ? "" : "s")). Record again with other apps closed. If it keeps happening, raise the interface's buffer size in its control panel or in Audio MIDI Setup."
         }
         var json: JSON {
             .object([("buffer_frames", .int(bufferFrames)), ("overloads", .int(overloads)),

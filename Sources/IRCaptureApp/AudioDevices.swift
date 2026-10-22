@@ -93,14 +93,20 @@ enum CoreAudioHelper {
         throw AppError("The interface didn't switch to \(khz). Set it to \(khz) in Audio MIDI Setup, then try again.")
     }
 
-    /// Puts the interface back to the rate it had before (so the user's DAW session isn't disturbed).
-    /// Best effort: never throws.
+    /// Puts the interface back to the rate it had before (so the user's DAW session isn't disturbed), and
+    /// waits up to 4 s for the switch to take effect, so the next job starts from a known rate. Best effort:
+    /// never throws. Blocks, so call it off the main thread.
     static func restoreRate(_ id: AudioDeviceID, _ rate: Double) {
         guard rate > 0, abs(nominalRate(id) - rate) >= 0.5 else { return }
         var a = addr(kAudioDevicePropertyNominalSampleRate)
         var r = Float64(rate)
         let st = AudioObjectSetPropertyData(id, &a, 0, nil, UInt32(MemoryLayout<Float64>.size), &r)
-        Log.write("restored interface rate to \(Int(rate)) Hz" + (st == noErr ? "" : " (failed, CoreAudio error \(st))"))
+        guard st == noErr else { Log.write("restoring interface rate to \(Int(rate)) Hz failed, CoreAudio error \(st)"); return }
+        for _ in 0..<40 {
+            if abs(nominalRate(id) - rate) < 0.5 { Thread.sleep(forTimeInterval: 0.3); Log.write("restored interface rate to \(Int(rate)) Hz"); return }
+            Thread.sleep(forTimeInterval: 0.1)
+        }
+        Log.write("restoring interface rate to \(Int(rate)) Hz timed out; it reports \(nominalRate(id))")
     }
 
     /// The interface's current I/O buffer size in frames (0 if unknown).
