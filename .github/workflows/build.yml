@@ -196,9 +196,10 @@ jobs:
           MNT="$(mktemp -d)"
           hdiutil attach -nobrowse -readonly -mountpoint "$MNT" dist/IR-Capture.dmg >/dev/null
           ls -la "$MNT"
-          for f in "IR Capture.app" "Applications" "Quick start.pdf" ".background.png" ".DS_Store"; do
+          for f in "IR Capture.app" "Applications" "Quick start.pdf" ".DS_Store"; do
             [ -e "$MNT/$f" ] || { hdiutil detach "$MNT" >/dev/null; echo "::error title=DMG::$f is missing from the DMG"; exit 1; }
           done
+          ls "$MNT"/.background.* >/dev/null 2>&1 || { hdiutil detach "$MNT" >/dev/null; echo "::error title=DMG::The background image is missing from the DMG"; exit 1; }
           codesign --verify --strict "$MNT/IR Capture.app"
           hdiutil detach "$MNT" >/dev/null
           ls -la dist
