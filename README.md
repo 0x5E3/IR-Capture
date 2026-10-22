@@ -1,75 +1,76 @@
 # IR Capture
 
-A Mac app for capturing guitar-cab impulse responses with as little fuss as a ToneX capture: set up the mics, set the levels, press one button, and get trimmed IRs at every common sample rate and length.
+A Mac app for capturing guitar-cab impulse responses with as little fuss as a ToneX capture: wire the rig, check levels, press one button, and get finished IRs that load anywhere. It also records amps for NAM models trained at TONE3000.
 
 It uses the same processing as the **Cab IR Capture** web page and the Python reference in `reference/`. CI checks it against both on every build.
 
-> **Status:** the processing is verified against a simulated rig (fake amp, cab, two mics and a reference tap, with known answers). The app's audio recording has **not yet been tested on real hardware**. The first real capture is also the app's first real test.
+> **Status:** version 1.0.0, pre-release. The processing is verified against a simulated rig (fake amp, cab, two mics and a reference tap, with known answers). The app's audio recording has **not yet been tested on real hardware**. The first real capture is also the app's first real test. Builds aren't signed by Apple until the Developer ID is set up (see `docs/SIGNING.md`).
 
 ## Get the app
 
 1. Go to the **[Releases page](https://github.com/0x5E3/IR-Capture/releases/tag/latest)**.
-2. Under **Assets**, click **IR-Capture.zip**. It downloads to your Downloads folder.
-3. Double-click the zip. **IR Capture** appears next to it.
-4. Drag **IR Capture** into your **Applications** folder.
+2. Under **Assets**, click **IR-Capture.dmg**. It downloads to your Downloads folder.
+3. Double-click the DMG. A window opens: drag **IR Capture** onto **Applications**. The **Quick start.pdf** in that window has the wiring pictures.
+4. Open **IR Capture** from Applications.
 
-### First launch (the app isn't signed by Apple yet)
+### First launch (only while builds aren't signed)
 
 1. Double-click **IR Capture**. macOS says it can't check it for malicious software. Click **Done** (or **Cancel**).
 2. Open **System Settings › Privacy & Security**. Scroll down to the message about IR Capture and click **Open Anyway**. Enter your password if asked.
 3. Click **Open** in the next box.
-4. When the app first records, macOS asks if IR Capture may use the microphone. Click **Allow**. That covers every input on your interface.
 
-You only do this once per download. A newer build needs steps 1–3 again.
+A newer unsigned build needs steps 1–3 again. Once releases are signed and notarized, none of this is needed: it opens on the first double-click.
 
-If you clicked Don't Allow for the microphone: **System Settings › Privacy & Security › Microphone**, turn on IR Capture, then quit and reopen the app.
+The **Welcome** screen asks for permission to record from your interface, with a button. Click it, then **Allow**. If you clicked Don't Allow: **System Settings › Privacy & Security › Microphone**, turn on IR Capture, then quit and reopen the app.
 
-## Two ways to capture
+## Cab IR
 
-**Capture with the app** (one button, no Logic):
-1. Pick the interface, the sample rate, the output that feeds the power amp, and what's on each input (mic name, or the reference tap).
-2. Click **Start level check**. Short sweeps loop while you set each preamp until it says OK. Click **Stop level check**.
-3. Name the capture and click **Capture**. About 45 seconds later the results appear, with **Show in Finder**.
+**Record here** (the main way):
+1. **Connect.** Interface output → the amp's **FX return** (power amp in) or a clean power amp → the cab. Not the guitar input. Mics into the interface. The app shows the wiring picture, finds the interface when you plug it in, and picks the sample rate. Name each mic, and choose **Where's your reference?** (None is fine).
+2. **Set levels.** Click **Check levels**. The app listens to the room for 2 seconds, finds a clean sweep level by itself, then loops short sweeps while you turn each preamp until it says OK.
+3. **Capture.** Name it, check the **Before you capture** list, and click **Capture**. About 45 seconds later the results appear.
 
-**Use Logic recordings** (same as the web page):
-1. Save the test signal.
-2. Record it in Logic, following the steps on screen.
-3. Drag the exported WAVs in and click **Make IRs**.
+**Import DAW recordings** (secondary): save the test signal, record it in Logic, Reaper, Ableton, Pro Tools or GarageBand, and drag the exported WAVs in.
 
 Files land in **Music › IR Captures** unless you pick another folder:
 
 ```
-<capture>/report.json                       diagnostics (send this to Claude)
-<capture>/raw/                              the raw recording and sweep settings (app captures)
-<capture>/set/<rate>/<capture>_<mic>_<rate>_<bits>_<length>.wav
-<capture>/individual/...                    if "Trim each mic" is ticked
+412_V30_PosA/
+    412_V30_PosA_SM57.wav          ← Universal: 48 kHz, 24-bit, 500 ms. Load these.
+    412_V30_PosA_R121.wav
+    README.txt                     what everything is
+    report.json                    the measurements (send this to Claude)
+    More formats/                  only what you ticked under Files to make:
+        Everything/<rate>/…        44.1, 48, 88.2, 96 kHz × 500 ms, 1024, 2048, 4096 samples
+        Line 6 Helix/…             48 kHz, 2048 samples
+        Strymon Iridium/…          96 kHz, 500 ms
+        Custom/<trim>/<rate>/…     the Advanced matrix
+    Raw take/                      the untouched recording + settings
 ```
 
-## Amp capture (NAM)
+**Re-export** (in the results, or **Re-export a past capture…**) makes other formats from the raw take without recording again.
 
-The **Amp capture (NAM)** tab gets recordings ready for NAM training at [TONE3000](https://www.tone3000.com/capture). The app doesn't train models itself.
+Every IR comes out with its main peak positive, so mics blend without cancelling; a mic that recorded inverted is flipped and the results say so. **Advanced file options › Keep polarity as recorded** turns that off.
 
-Like IR capture, it works two ways. Both start with TONE3000's sweep file (`T3K-sweep-v3.wav`), downloaded from their Capture page.
+## Amp (NAM)
 
-**Record with the app** (no Logic):
-1. Choose the sweep file once. The app checks it's the untouched original and remembers it.
-2. Pick the interface, the output that feeds the reamp box, and the inputs to record (load box line out for **amp only**, mics for **full chain**).
-3. Run the level check. It loops the loudest 6 s of the signal and shows a live meter per input, aiming for peaks near −8 dBFS.
-4. Click **Record**. The app plays all 190 s and records every input on the same interface, so the clocks can't drift. It keeps the raw recording, then lines up and checks the files.
+The app gets recordings ready for NAM training at [TONE3000](https://www.tone3000.com/capture); it doesn't train models itself. Both routes start with TONE3000's sweep file, `T3K-sweep-v3.wav` (the app can find it in Downloads).
 
-**Use Logic recordings:**
-1. Play the sweep file from a 48 kHz Logic project through a reamp box into the amp, and record, following the steps on screen.
-2. Drag the exported WAVs in and click **Prepare files**.
+**Record here:** choose the capture type (amp only, or full chain), wire interface → reamp box → amp, check levels (live meters aiming for −8 dBFS), then **Record** (3 min 12 s). The app plays the file on the same interface it records with, so the clocks can't drift, and keeps the raw recording.
 
-Either way, each file is lined up to the sample on the signal's clicks and cut to the exact length. The app then checks clock drift, how much the amp changed during the take, level, clipping, noise and hum. Upload the WAVs at tone3000.com/capture.
+**Import DAW recordings:** record the sweep in a 48 kHz DAW project and drag the exported WAVs in.
 
-Output: `<capture>/<capture>_<input>.wav` (mono, 48 kHz, 24-bit), `report.json` and `UPLOAD-STEPS.txt`. Pair amp-only models with IRs captured with the reference tap, because the load box's line out already includes the speaker's impedance bump.
+Output: `<capture>/<capture>_<input>.wav` (mono, 48 kHz, 24-bit), `report.json` and `UPLOAD-STEPS.txt`. Pair amp-only models with IRs captured with a reference, because the load box's line out already includes the speaker's impedance bump.
 
-Status: checked on simulated recordings only. No real model has been trained from these files yet. Recording with the app has run only through a simulated interface in CI, not a real one.
+## Help and support
 
-## The reference tap (recommended)
+**Help** menu: Quick Start, Wiring, The Reference Tap (with a pad parts list), Troubleshooting, Contact Support (a mail draft with the app version, macOS version, interface and the latest report attached), Show Log File (`~/Library/Logs/IR Capture/`).
 
-Pad the speaker-terminal voltage by about 20 dB (for example 10 kΩ in series and 1.1 kΩ to ground) into a line input, and mark that input **Reference tap**. The IRs are then speaker, mic and room only, whatever power amp drives the cab. Without it, a tube amp bakes about 5 dB of impedance bump into the IR. For a bridged output, or if the tap hums, use an isolation transformer or a balanced input.
+## Status of what's tested
+
+- Simulated only: all processing, polarity, export targets and re-export (CI, every build).
+- In CI on a Mac: the app launches, processes simulated recordings through its own window, renders its diagrams, opens its help pages. NAM recording runs through a simulated interface.
+- Never on a real interface yet: the level check, the noise check, automatic sweep level, Capture, NAM Record, dropout detection, sample-rate switching and restoring.
 
 ## For developers
 
@@ -77,12 +78,13 @@ Pad the speaker-terminal voltage by about 20 dB (for example 10 kΩ in series an
 swift build -c release            # IRCaptureCore, ircapture-cli, IRCaptureApp
 swift test                        # unit tests
 cd reference && python3 sim_test.py && python3 compare_swift.py ../.build/release/ircapture-cli sim_out
-scripts/make_app.sh               # macOS: dist/IR-Capture.zip
+scripts/make_app.sh               # macOS: dist/IR-Capture.zip (signed if CODESIGN_IDENTITY is set)
+python3 scripts/make_dmg.py "dist/IR Capture.app" "dist/Quick start.pdf" dist/IR-Capture.dmg
 ```
 
-- `Sources/IRCaptureCore`: the DSP, a line-for-line port of `reference/web/dsp.js`, which is itself a port of `reference/ircapture.py`. Plain Swift, so it builds and tests on Linux too. Keep all three in step.
-- `Sources/ircapture-cli`: `make-signal`, `process` and `nam-prep`, used by the golden tests.
-- NAM prep: `reference/namprep.py` (reference), `reference/sim_nam_test.py` (simulated amp and mics), `reference/web/nam.js` (page), `Sources/IRCaptureCore/NAMPrep.swift` (app). `NAMLayout.swift` is generated from `reference/nam_v3_layout.json` by `scripts/gen_nam_layout.py`.
-- `Sources/IRCaptureApp`: SwiftUI app. `DuplexIO.swift` plays and records through one AUHAL unit on one device, so input and output share a clock.
-- `reference/`: the Python reference, the simulated rig (`sim_test.py`), the web page source, and `compare_swift.py`.
-- CI (`.github/workflows/build.yml`) runs on macOS: simulated rig → page DSP vs Python → universal build → unit tests → Swift vs Python golden test → app bundle → the `latest` release.
+- `VERSION` is the version string; keep `IRCaptureVersion` in `Spec.swift` the same (CI checks).
+- `Sources/IRCaptureCore`: the DSP, a line-for-line port of `reference/web/dsp.js`, itself a port of `reference/ircapture.py`. Keep all three in step. `Targets.swift` has polarity normalization (also in Python and the page), the export targets (each with its manufacturer source), README.txt and the raw take.
+- `Sources/ircapture-cli`: `make-signal`, `process` (`--targets`, `--keep-polarity`, `--raw-take`), `reexport` and `nam-prep`, used by the golden tests.
+- `Sources/IRCaptureApp`: SwiftUI app. `DuplexIO.swift` plays and records through one AUHAL unit on one device, so input and output share a clock; it also reports input timestamp gaps and processor overloads (dropouts). `Support.swift` has the product name, support address, log and Contact Support.
+- Signing and notarization: `scripts/make_app.sh`, `scripts/notarize.sh`, `scripts/IRCapture.entitlements`, and the CI steps that run when the Apple secrets exist. Setup: `docs/SIGNING.md`.
+- CI (`.github/workflows/build.yml`) runs on macOS: simulated rig → page DSP vs Python → universal build → unit tests → Swift vs Python golden tests → app bundle → smoke tests and screenshots → diagrams and Quick start PDF → DMG → the `latest` release. A `v*` tag makes a signed, versioned release.

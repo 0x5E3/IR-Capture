@@ -383,6 +383,7 @@ async function ircHandle(m, emit) {
       m.files = null; infos = null;
       var res = IRC.analyse(rec, s, names, refIndex, { ir_max: Math.max(1.0, m.export.full_ms / 1000 + 0.05) }, post);
       rec = null;
+      var polarityNotes = IRC.normalizePolarity(res, !!m.keepPolarity);
       var files = IRC.exportFiles(res, m.capture, m.export, post);
       var gain = res.gains.set ? res.gains.set[names[0]] : res.gains.individual[names[0]];
       var curves = IRC.responseCurves(res, gain);
@@ -390,7 +391,7 @@ async function ircHandle(m, emit) {
       files.push({ path: m.capture + "/report.json", data: new TextEncoder().encode(IRC.reportJSON(res, s, m.capture, { channels: m.channels.map(function (c) { return { file: c.fileName, channel: c.ch + 1, role: c.role, name: c.name }; }) })) });
       var zip = IRC.makeZip(files);
       emit({ type: "done", zip: zip, name: m.capture + "_IRs.zip", count: files.length - 1,
-        result: { diagnostics: res.diagnostics, warnings: res.warnings, mode: res.mode, sweeps_used: res.sweeps_used, names: res.names, curves: curves } });
+        result: { polarity_notes: polarityNotes, diagnostics: res.diagnostics, warnings: res.warnings, mode: res.mode, sweeps_used: res.sweeps_used, names: res.names, curves: curves } });
     }
   } catch (err) { emit({ type: "error", text: err && err.message ? err.message : String(err) }); }
 }
@@ -613,6 +614,8 @@ async function ircHandle(m, emit) {
     else { pill.className = "pill good"; pill.textContent = "Capture looks clean"; }
     $("result-note").hidden = !isExample && r.mode === "reference";
     if (!isExample) $("result-note").textContent = r.mode === "reference" ? "" : "No reference tap was used, so these IRs include the power amp's response.";
+    var pn = (r.polarity_notes || []).join(" ");
+    if (!isExample && pn) { $("result-note").hidden = false; $("result-note").textContent = ($("result-note").textContent + " " + pn).trim(); }
     var ul = $("warnings"); ul.textContent = "";
     warnings.forEach(function (w) { var li = document.createElement("li"); li.textContent = w; ul.appendChild(li); });
     ul.hidden = !warnings.length || isExample;

@@ -2,6 +2,7 @@
 import AudioToolbox
 import CoreAudio
 import Foundation
+import IRCaptureCore
 
 /// Plays a signal out of one output channel and records chosen inputs, on ONE interface
 /// (so input and output share a clock). Uses a single AUHAL unit with input and output enabled.
@@ -23,6 +24,13 @@ final class DuplexIO {
     private let scratch: UnsafeMutableAudioBufferListPointer
     private let scratchData: [UnsafeMutablePointer<Float>]
     private var renderError: OSStatus = noErr
+    // Dropout detection (P0.10): each input callback's sample time should follow the last one exactly.
+    private var lastSampleTime: Float64 = -1
+    private var lastFrames = 0
+    private static let maxGaps = 64
+    private let gapAt = UnsafeMutablePointer<Int>.allocate(capacity: DuplexIO.maxGaps)     // recorded frame where it happened
+    private let gapLen = UnsafeMutablePointer<Int>.allocate(capacity: DuplexIO.maxGaps)    // frames missing (negative: repeated)
+    private var gapCount = 0
 
     /// Frames recorded so far (read from the main thread for progress only).
     var recorded: Int { recPosStorage }
@@ -60,10 +68,20 @@ final class DuplexIO {
         rec.forEach { $0.deallocate() }
         scratchData.forEach { $0.deallocate() }
         free(scratch.unsafeMutablePointer)
+        gapAt.deallocate()
+        gapLen.deallocate()
+    }
+
+    /// Gaps in the input timestamps so far, as (seconds into the recording, frames missing).
+    var gaps: [(seconds: Double, frames: Int)] {
+        (0..<min(gapCount, DuplexIO.maxGaps)).map { (Double(gapAt[$0]) / Double(fs), gapLen[$0]) }
     }
 
     private func check(_ st: OSStatus, _ what: String) throws {
-        if st != noErr { throw AppError("Couldn't \(what) (CoreAudio error \(st)).") }
+        if st != noErr {
+            Log.write("CoreAudio error \(st) trying to \(what)")
+            throw AppError("Couldn't \(what). Check that the interface is connected and not in use by another app that holds it exclusively, then try again. (CoreAudio error \(st))")
+        }
     }
 
     func start(deviceID: AudioDeviceID) throws {
@@ -132,6 +150,18 @@ final class DuplexIO {
         let st = AudioUnitRender(unit, flags, ts, 1, frames, scratch.unsafeMutablePointer)
         if st != noErr { renderError = st; return st }
         let pos = recPosStorage
+        let t = ts.pointee
+        if t.mFlags.contains(.sampleTimeValid) && pos < recCapacity {
+            if lastSampleTime >= 0 {
+                let gap = Int((t.mSampleTime - (lastSampleTime + Float64(lastFrames))).rounded())
+                if gap != 0 {
+                    if gapCount < DuplexIO.maxGaps { gapAt[gapCount] = pos; gapLen[gapCount] = gap }
+                    gapCount += 1
+                }
+            }
+            lastSampleTime = t.mSampleTime
+            lastFrames = n
+        }
         let m = min(n, recCapacity - pos)
         if m > 0 {
             for (k, ch) in inputs.enumerated() where ch < scratchData.count {
@@ -174,12 +204,35 @@ final class DuplexIO {
         return rec.map { Array(UnsafeBufferPointer(start: $0, count: n)) }
     }
 
+    /// What happened during one pass, for report.json and the dropout warning.
+    struct Report {
+        var gaps: [(seconds: Double, frames: Int)]
+        var overloads: Int
+        var bufferFrames: Int
+        var dropoutWarning: String? {
+            guard !gaps.isEmpty || overloads > 0 else { return nil }
+            let at = gaps.first.map { g -> String in let s = max(0, Int(g.seconds)); return " at \(s / 60):\(String(format: "%02d", s % 60))" } ?? ""
+            return "Audio dropped out\(at) while recording (\(max(gaps.count, overloads)) time\(max(gaps.count, overloads) == 1 ? "" : "s")). Record again with other apps closed. If it keeps happening, raise the interface's buffer size in its control panel or in Audio MIDI Setup."
+        }
+        var json: JSON {
+            .object([("buffer_frames", .int(bufferFrames)), ("overloads", .int(overloads)),
+                     ("gaps", .array(gaps.map { .object([("at_s", .number((($0.seconds * 1000).rounded()) / 1000)), ("frames", .int($0.frames))]) }))])
+        }
+    }
+
     /// Plays and records until the signal plus the extra time has been captured.
     static func run(device: AudioDevice, fs: Int, outChannel: Int, inputs: [Int], signal: [Float],
                     extraSeconds: Double = 1.0, cancelled: @escaping () -> Bool = { false },
                     progress: @escaping (Double) -> Void = { _ in },
-                    meter: (([Float]) -> Void)? = nil) async throws -> [[Float]] {
+                    meter: (([Float]) -> Void)? = nil,
+                    report: ((Report) -> Void)? = nil) async throws -> [[Float]] {
         let io = DuplexIO(device: device, fs: fs, outChannel: outChannel, inputs: inputs, signal: signal, extraSeconds: extraSeconds)
+        // The HAL also reports processor overloads on the device; count them while this pass runs.
+        let overloads = OverloadCounter()
+        var oa = CoreAudioHelper.addr(kAudioDeviceProcessorOverload)
+        let listener: AudioObjectPropertyListenerBlock = { _, _ in overloads.bump() }
+        let listening = AudioObjectAddPropertyListenerBlock(device.id, &oa, overloads.queue, listener) == noErr
+        defer { if listening { AudioObjectRemovePropertyListenerBlock(device.id, &oa, overloads.queue, listener) } }
         try io.start(deviceID: device.id)
         defer { io.stop() }
         let started = Date()
@@ -188,12 +241,12 @@ final class DuplexIO {
         while !io.finished {
             try await Task.sleep(nanoseconds: 50_000_000)
             if cancelled() { throw CancellationError() }
-            if io.error != noErr { throw AppError("Recording failed (CoreAudio error \(io.error)). Check that the interface is connected.") }
+            if io.error != noErr { throw AppError("Recording stopped because the interface stopped answering. Check its cable and power, then try again. (CoreAudio error \(io.error))") }
             let elapsed = Date().timeIntervalSince(started)
             if elapsed > expected + 5 && io.recorded == 0 {
                 throw AppError("No audio is arriving from the interface. Check that it's connected and that IR Capture is allowed to use the microphone (System Settings › Privacy & Security › Microphone).")
             }
-            if elapsed > expected * 1.5 + 10 { throw AppError("The interface stopped delivering audio part way through.") }
+            if elapsed > expected * 1.5 + 10 { throw AppError("The interface stopped delivering audio part way through. Check its cable and power, close other audio apps, and try again.") }
             progress(Double(io.recorded) / Double(io.recCapacity))
             if let meter {
                 let pos = io.recorded
@@ -201,7 +254,18 @@ final class DuplexIO {
             }
         }
         io.stop()
+        let r = Report(gaps: io.gaps, overloads: overloads.value, bufferFrames: CoreAudioHelper.bufferFrames(device.id))
+        if !r.gaps.isEmpty || r.overloads > 0 { Log.write("dropouts: \(r.gaps.count) gaps \(r.gaps.prefix(5)), \(r.overloads) overloads, buffer \(r.bufferFrames)") }
+        report?(r)
         return io.recording()
     }
+}
+
+/// Counts kAudioDeviceProcessorOverload notifications on its own queue.
+final class OverloadCounter {
+    let queue = DispatchQueue(label: "ircapture.overloads")
+    private var n = 0
+    func bump() { n += 1 }                       // called on `queue`
+    var value: Int { queue.sync { n } }
 }
 #endif

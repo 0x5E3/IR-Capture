@@ -1,6 +1,7 @@
 import Foundation
 
-public let IRCaptureVersion = "0.1-swift"
+/// The app sets this to "1.0.0 (build N)" at launch. Keep the default in step with the VERSION file.
+public var IRCaptureVersion = "1.0.0"
 
 let H_MAX = 5            // highest harmonic measured / guarded against
 let LIN_PRE_S = 0.020    // seconds kept before the anchor impulse

@@ -19,6 +19,7 @@ on the amp. Checks:
   4. 44.1k export matches the 96k capture
   5. the hardware commands run end-to-end through a mocked sounddevice
 """
+import json
 import math
 import shutil
 import sys
@@ -250,6 +251,38 @@ def main():
     lc, _ = sf.read(work / "logic/set/96k/logic_Close_96k_24_full.wav")
     e = shape_error(lc, H_CLOSE)
     ok &= check(np.abs(e).max() < 0.5, f"offline (Logic) path matches truth within {np.abs(e).max():.2f} dB")
+
+    # -- 7. polarity: a back-of-cab mic records inverted; it gets flipped so mics sum
+    print("\n-- polarity (room mic recorded inverted)")
+    inv_room = y.copy()
+    inv_room[1] = -inv_room[1]
+    sf.write(work / "logic_room_inv.wav", inv_room[1].astype(np.float32), FS, subtype="FLOAT")
+    for refi, label in [(2, "reference"), (None, "sweep")]:
+        rows = inv_room if refi is not None else inv_room[:2]
+        base = irc.analyse(y if refi is not None else y[:2], spec, ["Close", "Room"], refi, irc.ProcessOptions())
+        r = irc.analyse(rows, spec, ["Close", "Room"], refi, irc.ProcessOptions())
+        notes = irc.normalize_polarity(r)
+        pol = r["polarity"]["mics"]
+        ok &= check(pol["Room"] == {"main_peak": "negative", "flipped": True}
+                    and pol["Close"] == {"main_peak": "positive", "flipped": False}
+                    and notes == ["Room was inverted relative to Close and has been flipped."],
+                    f"{label} mode: inverted Room mic detected and flipped ({notes})")
+        c = np.dot(r["irs"]["Room"], base["irs"]["Room"]) / (np.linalg.norm(r["irs"]["Room"]) * np.linalg.norm(base["irs"]["Room"]))
+        ok &= check(c > 0.9999, f"{label} mode: flipped Room IR equals the upright one (correlation {c:.6f})")
+        k = irc.analyse(rows, spec, ["Close", "Room"], refi, irc.ProcessOptions())
+        irc.normalize_polarity(k, keep=True)
+        ok &= check(k["polarity"]["mics"]["Room"]["flipped"] is False and k["irs"]["Room"][np.argmax(np.abs(k["irs"]["Room"]))] < 0,
+                    f"{label} mode: keep-polarity leaves it inverted")
+    irc.main(["process", "--signal", str(sig.with_suffix(".json")), "--rec",
+              str(work / "logic_close.wav"), str(work / "logic_room_inv.wav"), str(work / "logic_ref.wav"),
+              "--ref", "3", "--names", "Close,Room", "--name", "polarity", "--outdir", str(work),
+              "--rates", "48000", "--lengths", "full"])
+    rep = json.loads((work / "polarity/report.json").read_text())
+    ok &= check(rep["polarity"]["mics"]["Room"]["flipped"] is True, "report.json records the flip")
+    up, _ = sf.read(work / "logic/set/48k/logic_Room_48k_24_full.wav")
+    fl, _ = sf.read(work / "polarity/set/48k/polarity_Room_48k_24_full.wav")
+    c = float(np.dot(up, fl) / np.sqrt(np.dot(up, up) * np.dot(fl, fl)))
+    ok &= check(c > 0.9999, f"exported flipped Room file matches the upright capture (correlation {c:.6f})")
 
     print("\nALL PASS" if ok else "\nSOME CHECKS FAILED")
     return 0 if ok else 1

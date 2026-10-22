@@ -87,4 +87,89 @@ final class CoreTests: XCTestCase {
             XCTAssertTrue("\(e)".contains("couldn't find the training signal"))
         }
     }
+
+    /// A small fake capture: two mics (the second inverted), one reference, through the real analysis.
+    private func fakeCapture() throws -> (rec: [[Double]], spec: SweepSpec) {
+        let spec = try SweepSpec(fs: 48000, duration: 2, nSweeps: 3, discard: 1, gap: 1)
+        let x = makeTestSignal(spec).map(Double.init)
+        func rig(_ delay: Int, _ g: Double) -> [Double] {
+            var y = [Double](repeating: 0, count: x.count + 4800)
+            for i in 0..<x.count { y[i + delay] += g * x[i]; y[i + delay + 30] += 0.3 * g * x[i] }
+            return y
+        }
+        return ([rig(200, 0.5), rig(260, -0.4), rig(190, 0.3)], spec)
+    }
+
+    func testPolarityFlipsTheInvertedMic() throws {
+        let (rec, spec) = try fakeCapture()
+        var res = try analyse(rec, spec, names: ["Front", "Back"], refIndex: 2)
+        let backPeak = res.irs["Back"]!.map(abs).max()!
+        let notes = normalizePolarity(&res)
+        XCTAssertEqual(notes, ["Back was inverted relative to Front and has been flipped."])
+        XCTAssertEqual(res.polarity["Back"], PolarityInfo(mainPeakNegative: true, flipped: true))
+        XCTAssertEqual(res.polarity["Front"], PolarityInfo(mainPeakNegative: false, flipped: false))
+        XCTAssertEqual(res.irs["Back"]!.max()!, backPeak, accuracy: 1e-12)
+        var kept = try analyse(rec, spec, names: ["Front", "Back"], refIndex: 2)
+        let keptNotes = normalizePolarity(&kept, keep: true)
+        XCTAssertEqual(kept.polarity["Back"]?.flipped, false)
+        XCTAssertEqual(keptNotes.count, 1)
+        let report = reportJSON(res, spec: spec, capture: "t")
+        XCTAssertTrue(report.contains("\"flipped\": true"))
+    }
+
+    func testTargetsLayoutAndRawTake() throws {
+        let (rec, spec) = try fakeCapture()
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("ircapture-test-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let take = RawTake(capture: "cap", names: ["Front", "Back"], refIndex: 2, spec: spec, recordedWith: "test")
+        try take.save(rec.map { $0.map(Float.init) }, captureFolder: dir.appendingPathComponent("cap"))
+        let out = try processAndWrite(rec: rec, spec: spec, names: ["Front", "Back"], refIndex: 2, capture: "cap", outDir: dir,
+                                      layout: .targets([.universal, .helix, .iridium, .everything], custom: nil))
+        XCTAssertEqual(Set(out.files.filter { !$0.contains("/") }), ["cap_Front.wav", "cap_Back.wav"])
+        XCTAssertTrue(out.files.contains("More formats/Line 6 Helix/cap_Front_Helix.wav"))
+        XCTAssertTrue(out.files.contains("More formats/Strymon Iridium/cap_Back_Iridium.wav"))
+        XCTAssertEqual(out.files.filter { $0.hasPrefix("More formats/Everything/") }.count, 32)
+        let u = try WavInfo(Data(contentsOf: dir.appendingPathComponent("cap/cap_Front.wav")))
+        XCTAssertEqual(u.fs, 48000); XCTAssertEqual(u.bits, 24); XCTAssertEqual(u.frames, 24000)
+        let hx = try WavInfo(Data(contentsOf: dir.appendingPathComponent("cap/More formats/Line 6 Helix/cap_Front_Helix.wav")))
+        XCTAssertEqual(hx.fs, 48000); XCTAssertEqual(hx.frames, 2048)
+        let ir = try WavInfo(Data(contentsOf: dir.appendingPathComponent("cap/More formats/Strymon Iridium/cap_Front_Iridium.wav")))
+        XCTAssertEqual(ir.fs, 96000); XCTAssertEqual(ir.frames, 48000); XCTAssertEqual(ir.bits, 24)
+        // Universal and Everything's 48k 500 ms file are the same file, level included
+        let a = try u.channel(0)
+        let b = try WavInfo(Data(contentsOf: dir.appendingPathComponent("cap/More formats/Everything/48k/cap_Front_48k_24_full.wav"))).channel(0)
+        XCTAssertEqual(a, b)
+        // the level doesn't depend on which targets were chosen
+        let dir2 = dir.appendingPathComponent("only")
+        _ = try processAndWrite(rec: rec, spec: spec, names: ["Front", "Back"], refIndex: 2, capture: "cap", outDir: dir2,
+                                layout: .targets([.universal], custom: nil))
+        XCTAssertEqual(try WavInfo(Data(contentsOf: dir2.appendingPathComponent("cap/cap_Front.wav"))).channel(0), a)
+        XCTAssertTrue(try String(contentsOf: dir.appendingPathComponent("cap/README.txt")).contains("cap_Front.wav"))
+        // raw take round trip
+        let (t2, r2) = try RawTake.load(captureFolder: dir.appendingPathComponent("cap"))
+        XCTAssertEqual(t2.names, ["Front", "Back"]); XCTAssertEqual(t2.refIndex, 2); XCTAssertEqual(t2.spec, spec)
+        XCTAssertEqual(r2.count, 3); XCTAssertEqual(r2[0].count, rec[0].count)
+        XCTAssertThrowsError(try RawTake.load(captureFolder: dir2.appendingPathComponent("cap")))
+    }
+
+    func testReferenceCandidate() throws {
+        let lc = try LevelCheck(fs: 48000, levelDBFS: -12)
+        func rig(_ delay: Int, _ tail: Bool) -> [Double] {
+            var y = [Double](repeating: 0, count: lc.signal.count + 9600)
+            for i in 0..<lc.signal.count {
+                let u = Double(lc.signal[i]) * 2
+                y[i + delay] += u
+                if tail { for (k, g) in [(480, 0.5), (900, -0.4), (1500, 0.3)] { y[i + delay + k] += g * u } }
+            }
+            return y
+        }
+        var r = lc.read([rig(110, true), rig(100, false), rig(130, true)], labels: ["SM57", "Input 2", "Room"])
+        for i in r.indices { r[i].channel = i }
+        XCTAssertLessThan(r[1].tailDB, -30)
+        XCTAssertGreaterThan(r[0].tailDB, -20)
+        XCTAssertEqual(lc.referenceCandidate(r)?.channel, 1)
+        var r2 = lc.read([rig(110, true), rig(130, true)], labels: ["a", "b"])
+        for i in r2.indices { r2[i].channel = i }
+        XCTAssertNil(lc.referenceCandidate(r2))
+    }
 }

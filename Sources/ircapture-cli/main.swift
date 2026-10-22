@@ -9,6 +9,8 @@ import IRCaptureCore
 //                         --names Close,Room --name logic --outdir out
 //                         [--rates 44100,48000,88200,96000] [--lengths full,1024,2048,4096]
 //                         [--bits 24,32f] [--trim set,individual] [--full-ms 500]
+//                         [--targets universal,everything,helix,iridium[,custom]] [--keep-polarity] [--raw-take]
+//   ircapture-cli reexport --folder <capture folder> --targets helix,... [--keep-polarity]
 //   ircapture-cli nam-prep --rec Suhr.wav SM57.wav --names Suhr,SM57 --kind amp|full --name cap --outdir out
 
 func fail(_ m: String) -> Never { FileHandle.standardError.write((m + "\n").data(using: .utf8)!); exit(2) }
@@ -20,6 +22,16 @@ var opts: [String: [String]] = [:]
 var key: String? = nil
 for a in args {
     if a.hasPrefix("--") { key = String(a.dropFirst(2)); opts[key!] = [] } else if let k = key { opts[k]!.append(a) }
+}
+/// --targets a,b,c → the target layout; "custom" adds the --rates/--lengths/--bits/--trim matrix.
+func layoutFrom(_ ids: [String]?, custom: ExportOptions) throws -> OutputLayout {
+    guard let ids else { return .matrix }
+    var t: [ExportTarget] = []
+    for id in ids where id != "custom" {
+        guard let x = ExportTarget.named(id) else { throw IRCaptureError("unknown target \(id)") }
+        t.append(x)
+    }
+    return .targets(t, custom: ids.contains("custom") ? custom : nil)
 }
 func one(_ k: String) -> String? { opts[k]?.first }
 func list(_ k: String) -> [String]? { one(k).map { $0.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) } } }
@@ -57,12 +69,28 @@ do {
         if let t = list("trim") { eo.trim = t.compactMap { TrimMode(rawValue: $0) } }
         if let f = one("full-ms").flatMap(Double.init) { eo.fullMs = f }
         let t0 = Date()
+        let outDir = URL(fileURLWithPath: one("outdir") ?? "ir_out")
+        let layout = try layoutFrom(list("targets"), custom: eo)
+        if opts["raw-take"] != nil {
+            try RawTake(capture: name, names: names, refIndex: ref, spec: spec, recordedWith: "cli")
+                .save(rec.map { $0.map(Float.init) }, captureFolder: outDir.appendingPathComponent(name))
+        }
         let out = try processAndWrite(rec: rec, spec: spec, names: names, refIndex: ref, capture: name,
-                                      outDir: URL(fileURLWithPath: one("outdir") ?? "ir_out"), export: eo,
-                                      process: ProcessOptions(irMax: Double(one("ir-max") ?? "1.0")!),
+                                      outDir: outDir, export: eo, layout: layout, keepPolarity: opts["keep-polarity"] != nil,
+                                      process: one("ir-max").map { ProcessOptions(irMax: Double($0)!) },
                                       progress: { if opts["verbose"] != nil { print("  . " + $0) } })
         print(summaryText(out.result))
+        for n in out.polarityNotes { print("  * " + n) }
         print("wrote \(out.fileCount) IR files and \(out.folder.appendingPathComponent("report.json").path) in \(String(format: "%.1f", Date().timeIntervalSince(t0))) s")
+
+    case "reexport":
+        guard let f = one("folder") else { fail("reexport needs --folder") }
+        let folder = URL(fileURLWithPath: f)
+        let (take, rec) = try RawTake.load(captureFolder: folder)
+        let out = try processAndWrite(rec: rec, spec: take.spec, names: take.names, refIndex: take.refIndex, capture: take.capture,
+                                      outDir: folder.deletingLastPathComponent(), layout: try layoutFrom(list("targets") ?? ["universal"], custom: ExportOptions()),
+                                      keepPolarity: opts["keep-polarity"] != nil, extra: [("recorded_with", .string(take.recordedWith))])
+        print("re-exported \(out.fileCount) IR files into \(out.folder.path)")
 
     case "nam-prep":
         guard let recs = opts["rec"], !recs.isEmpty, let name = one("name") else { fail("nam-prep needs --rec and --name") }

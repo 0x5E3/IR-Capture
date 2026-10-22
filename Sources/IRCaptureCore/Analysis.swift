@@ -48,6 +48,9 @@ public struct AnalysisResult {
     public var diagnostics: [(label: String, diag: ChannelDiagnostics)]
     public var warnings: [String]
     public var gains: [String: [String: Double]] = [:]
+    /// Set by normalizePolarity(); nil until then.
+    public var polarity: [String: PolarityInfo] = [:]
+    public var polarityMode: String? = nil
 
     public var mode: String { referenced ? "reference" : "sweep" }
     public func diag(_ label: String) -> ChannelDiagnostics? { diagnostics.first { $0.label == label }?.diag }

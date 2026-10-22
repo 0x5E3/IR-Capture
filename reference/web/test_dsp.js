@@ -43,6 +43,20 @@ function compare(jsPath, pyPath, label) {
 for (const m of ["Close", "Room"]) for (const r of ["96k", "48k", "44.1k"]) for (const L of ["full", "2048"])
   compare(`logic/set/${r}/logic_${m}_${r}_24_${L}.wav`, path.join(dir, `logic/set/${r}/logic_${m}_${r}_24_${L}.wav`), `${m} ${r} ${L} vs Python`);
 
+// polarity: the room mic recorded inverted gets flipped, matching Python
+{
+  const recInv = ["close", "room_inv", "ref"].map((n) => wav(path.join(dir, `logic_${n}.wav`)).x);
+  const r2 = IRC.analyse(recInv, spec, ["Close", "Room"], 2, {});
+  const notes = IRC.normalizePolarity(r2, false);
+  const pyPol = JSON.parse(fs.readFileSync(path.join(dir, "polarity/report.json"))).polarity;
+  check(JSON.stringify(r2.polarity) === JSON.stringify(pyPol), `polarity decision matches Python: ${JSON.stringify(r2.polarity.mics)}`);
+  check(notes.length === 1 && notes[0] === "Room was inverted relative to Close and has been flipped.", `polarity note: ${notes}`);
+  const f2 = IRC.exportFiles(r2, "polarity", { rates: [48000], lengths: ["full"] });
+  files.push(...f2);
+  compare("polarity/set/48k/polarity_Room_48k_24_full.wav", path.join(dir, "polarity/set/48k/polarity_Room_48k_24_full.wav"), "flipped Room vs Python");
+  files.splice(files.length - f2.length, f2.length);
+}
+
 const zip = IRC.makeZip(files.slice(0, 3));
 zip.arrayBuffer().then((b) => {
   fs.writeFileSync("/tmp/claude_test.zip", Buffer.from(b));

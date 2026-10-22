@@ -15,85 +15,113 @@ let micColors: [Color] = [Color(red: 0.92, green: 0.6, blue: 0.24), Color(red: 0
 struct IRCaptureApp: App {
     @StateObject private var model = AppModel()
     var body: some Scene {
-        WindowGroup("IR Capture") {
+        WindowGroup(Product.name) {
             ContentView().environmentObject(model)
-                .frame(minWidth: 760, minHeight: 640)
+                .frame(minWidth: 780, minHeight: 640)
         }
-        .defaultSize(width: 900, height: 940)
-        .commands { CommandGroup(replacing: .newItem) {} }
+        .defaultSize(width: 920, height: 960)
+        .commands {
+            CommandGroup(replacing: .newItem) {}
+            CommandGroup(replacing: .appInfo) {
+                Button("About \(Product.name)") { Support.showAbout() }
+            }
+            CommandGroup(replacing: .help) {
+                Button("Quick Start") { model.helpPage = .quickStart }
+                Button("Wiring") { model.helpPage = .wiring }
+                Button("The Reference Tap") { model.helpPage = .reference }
+                Button("Troubleshooting") { model.helpPage = .troubleshooting }
+                Divider()
+                Button("Welcome Screen") { model.showWelcome = true }
+                Divider()
+                Button("Contact Support…") { model.contactSupport() }
+                Button("Show Log File") { Log.reveal() }
+                Button("Check for Updates…") { NSWorkspace.shared.open(Product.updatesPage) }
+            }
+        }
     }
 }
 
 struct ContentView: View {
     @EnvironmentObject var m: AppModel
-    @State private var tab = 0
     var body: some View {
         VStack(spacing: 0) {
-            Picker("", selection: $tab) {
-                Text("Capture with the app").tag(0)
-                Text("Use Logic recordings").tag(1)
-                Text("Amp capture (NAM)").tag(2)
+            Picker("", selection: $m.job) {
+                Text("Cab IR").tag(Job.cab)
+                Text("Amp (NAM)").tag(Job.nam)
             }
-            .pickerStyle(.segmented).labelsHidden().frame(maxWidth: 600).padding(.vertical, 12)
+            .pickerStyle(.segmented).labelsHidden().frame(maxWidth: 360).padding(.top, 12).padding(.bottom, 4)
+            Text(m.job == .cab ? "Record the speaker cab's impulse response." : "Record the amp for a NAM model, trained at TONE3000.")
+                .font(.callout).foregroundStyle(.secondary).padding(.bottom, 10)
             Divider()
             ScrollViewReader { proxy in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    if tab == 2 {
-                        NAMTab()
-                        if let r = m.namResult { NAMResultsView(r: r).id("namresults") }
-                    } else {
-                        if tab == 0 { CaptureTab() } else { LogicTab() }
-                        if let r = m.result { ResultsView(r: r).id("results") }
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 18) {
+                        if m.job == .nam {
+                            NAMJob()
+                            if let r = m.namResult { NAMResultsView(r: r).id("namresults") }
+                        } else {
+                            CabJob()
+                            if let r = m.result { ResultsView(r: r).id("results") }
+                        }
                     }
-                    if tab != 2 { Text("Method: exponential sine sweeps (Farina), averaged, with harmonic distortion windowed out. With a reference tap each IR is the speaker-terminal voltage to microphone response. IR Capture \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev").")
-                        .font(.footnote).foregroundStyle(.secondary) }
+                    .padding(22).frame(maxWidth: 900, alignment: .leading).frame(maxWidth: .infinity)
                 }
-                .padding(22).frame(maxWidth: 880, alignment: .leading).frame(maxWidth: .infinity)
-            }
-            .onChange(of: m.result?.folder) { _ in
-                withAnimation { proxy.scrollTo("results", anchor: .top) }
-            }
-            .onChange(of: m.namResult?.folder) { _ in
-                withAnimation { proxy.scrollTo("namresults", anchor: .top) }
-            }
+                .onChange(of: m.result?.folder) { _ in withAnimation { proxy.scrollTo("results", anchor: .top) } }
+                .onChange(of: m.namResult?.folder) { _ in withAnimation { proxy.scrollTo("namresults", anchor: .top) } }
             }
         }
-        .onAppear {
-            // CI smoke test: `IR Capture --demo <sim_out>` processes the simulated Logic recordings.
-            let args = ProcessInfo.processInfo.arguments
-            if let i = args.firstIndex(of: "--demo"), i + 1 < args.count {
-                tab = 1
-                let dir = URL(fileURLWithPath: args[i + 1])
-                m.outputFolder = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("IRCaptureDemo")
-                m.captureName = "demo"
-                m.addLogicFiles(["logic_close", "logic_room", "logic_ref"].map { dir.appendingPathComponent($0 + ".wav") })
-                for c in m.logicChannels where c.role == .mic {
-                    if let k = m.logicChannels.firstIndex(where: { $0.id == c.id }) {
-                        m.logicChannels[k].name = c.name.contains("close") ? "Close" : "Room"
-                    }
+        .sheet(isPresented: $m.showWelcome) { WelcomeSheet().environmentObject(m) }
+        .sheet(item: $m.helpPage) { p in HelpSheet(page: p).environmentObject(m) }
+        .sheet(isPresented: Binding(get: { m.reexportFolder != nil }, set: { if !$0 { m.reexportFolder = nil } })) {
+            ReexportSheet().environmentObject(m)
+        }
+        .onAppear { runAutomation() }
+    }
+
+    /// CI hooks: process the simulated recordings, render the diagrams, or open a given view.
+    private func runAutomation() {
+        let args = ProcessInfo.processInfo.arguments
+        if let i = args.firstIndex(of: "--demo"), i + 1 < args.count {
+            // `IR Capture --demo <sim_out>` processes the simulated Logic recordings through Import DAW recordings.
+            m.job = .cab; m.cabImport = true
+            let dir = URL(fileURLWithPath: args[i + 1])
+            m.outputFolder = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("IRCaptureDemo")
+            m.captureName = "demo"
+            m.targets = ["universal", "everything", "helix", "iridium"]
+            m.customOn = false
+            m.keepPolarity = false
+            m.addLogicFiles(["logic_close", "logic_room", "logic_ref"].map { dir.appendingPathComponent($0 + ".wav") })
+            for c in m.logicChannels where c.role == .mic {
+                if let k = m.logicChannels.firstIndex(where: { $0.id == c.id }) {
+                    m.logicChannels[k].name = c.name.contains("close") ? "Close" : "Room"
                 }
-                m.processLogic()
-            } else if let i = args.firstIndex(of: "--nam-demo"), i + 1 < args.count {
-                // CI smoke test: process the simulated NAM recordings (sim_nam_out/gold).
-                tab = 2
-                m.namMode = "logic"
-                let dir = URL(fileURLWithPath: args[i + 1])
-                m.outputFolder = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("IRCaptureDemo")
-                m.namName = "namdemo"
-                m.namKind = .full
-                m.addNAMFiles(["Suhr", "SM57", "Room96"].map { dir.appendingPathComponent($0 + ".wav") })
-                for k in m.namInputs.indices where m.namInputs[k].name == "Room96" { m.namInputs[k].name = "Room" }
-                m.prepareNAM()
-            } else if let i = args.firstIndex(of: "--nam-direct-demo"), i + 1 < args.count {
-                // CI smoke test: record through a simulated interface with the stand-in sweep file.
-                tab = 2
-                m.runNAMDirectDemo(URL(fileURLWithPath: args[i + 1]))
-            } else if args.contains("--nam-tab") {
-                tab = 2
-            } else if args.contains("--logic-tab") {
-                tab = 1
             }
+            m.processLogic()
+        } else if let i = args.firstIndex(of: "--nam-demo"), i + 1 < args.count {
+            m.job = .nam
+            m.namMode = "logic"
+            let dir = URL(fileURLWithPath: args[i + 1])
+            m.outputFolder = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("IRCaptureDemo")
+            m.namName = "namdemo"
+            m.namKind = .full
+            m.addNAMFiles(["Suhr", "SM57", "Room96"].map { dir.appendingPathComponent($0 + ".wav") })
+            for k in m.namInputs.indices where m.namInputs[k].name == "Room96" { m.namInputs[k].name = "Room" }
+            m.prepareNAM()
+        } else if let i = args.firstIndex(of: "--nam-direct-demo"), i + 1 < args.count {
+            m.runNAMDirectDemo(URL(fileURLWithPath: args[i + 1]))
+        } else if let i = args.firstIndex(of: "--render-diagrams"), i + 1 < args.count {
+            DiagramExport.render(to: URL(fileURLWithPath: args[i + 1]))
+            NSApp.terminate(nil)
+        } else if let i = args.firstIndex(of: "--help-page"), i + 1 < args.count {
+            m.helpPage = HelpPage(rawValue: args[i + 1])
+        } else if args.contains("--welcome") {
+            m.showWelcome = true
+        } else if args.contains("--nam-tab") {
+            m.job = .nam
+        } else if args.contains("--logic-tab") {
+            m.job = .cab; m.cabImport = true
+        } else if args.contains("--cab-tab") {
+            m.job = .cab; m.cabImport = false
         }
     }
 }
@@ -103,13 +131,17 @@ struct Step<Content: View>: View {
     let n: Int
     let title: String
     var subtitle: String? = nil
+    var done = false
     @ViewBuilder let content: Content
     var body: some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    Text("\(n)").font(.system(size: 14, weight: .bold)).foregroundStyle(.black)
-                        .frame(width: 24, height: 24).background(Circle().fill(lamp))
+                    ZStack {
+                        Circle().fill(done ? goodColor : lamp).frame(width: 24, height: 24)
+                        if done { Image(systemName: "checkmark").font(.system(size: 12, weight: .bold)).foregroundStyle(.white) }
+                        else { Text("\(n)").font(.system(size: 14, weight: .bold)).foregroundStyle(.black) }
+                    }
                     VStack(alignment: .leading, spacing: 2) {
                         Text(title.uppercased()).font(.system(size: 15, weight: .semibold)).kerning(0.8)
                         if let s = subtitle { Text(s).foregroundStyle(.secondary) }
@@ -122,11 +154,46 @@ struct Step<Content: View>: View {
     }
 }
 
+/// The Connect → Set levels → Capture → Results strip at the top of each job.
+struct JobStepper: View {
+    let steps: [(String, Bool)]
+    var body: some View {
+        HStack(spacing: 8) {
+            ForEach(Array(steps.enumerated()), id: \.offset) { i, s in
+                if i > 0 { Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary) }
+                HStack(spacing: 5) {
+                    Image(systemName: s.1 ? "checkmark.circle.fill" : "\(i + 1).circle")
+                        .foregroundStyle(s.1 ? goodColor : Color.secondary)
+                    Text(s.0).foregroundStyle(s.1 ? Color.primary : Color.secondary)
+                }
+            }
+        }
+        .font(.callout.weight(.medium))
+        .padding(.horizontal, 12).padding(.vertical, 8)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.08)))
+    }
+}
+
 struct Note: View {
     let text: String
     var color: Color = .secondary
     init(_ t: String, color: Color = .secondary) { text = t; self.color = color }
     var body: some View { Text(text).font(.callout).foregroundStyle(color).fixedSize(horizontal: false, vertical: true) }
+}
+
+/// An error line. If the fix is in Audio MIDI Setup, it carries a button that opens it.
+struct ErrorNote: View {
+    let text: String
+    init(_ t: String) { text = t }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Note(text, color: badColor)
+            HStack {
+                if text.contains("Audio MIDI Setup") { Button("Open Audio MIDI Setup") { CoreAudioHelper.openAudioMIDISetup() } }
+                if text.contains("Privacy & Security") { Button("Open Privacy & Security") { NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")!) } }
+            }
+        }
+    }
 }
 
 struct Checklist: View {
@@ -152,6 +219,19 @@ struct Pill: View {
     }
 }
 
+struct Aside<Content: View>: View {
+    let title: String
+    @ViewBuilder let content: Content
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title.uppercased()).font(.caption.weight(.semibold)).kerning(0.8).foregroundStyle(.secondary)
+            content
+        }
+        .padding(12).frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 6).fill(Color.secondary.opacity(0.1)))
+    }
+}
+
 struct BusyLine: View {
     @EnvironmentObject var m: AppModel
     var body: some View {
@@ -165,7 +245,7 @@ struct BusyLine: View {
                 }
             }
         }
-        if let e = m.errorText { Note(e, color: badColor) }
+        if let e = m.errorText { ErrorNote(e) }
     }
 }
 
@@ -186,6 +266,7 @@ struct SweepSettings: View {
     }
 }
 
+/// The DAW route's fixed sweep level (the app route sets its own automatically).
 struct LevelPicker: View {
     @EnvironmentObject var m: AppModel
     var body: some View {
@@ -195,48 +276,74 @@ struct LevelPicker: View {
     }
 }
 
-struct OutputOptions: View {
+/// Which files to make (P0.8): Universal by default, plus named targets. Custom lives under Advanced.
+struct TargetsPicker: View {
+    @EnvironmentObject var m: AppModel
+    func on(_ id: String) -> Binding<Bool> {
+        Binding(get: { m.targets.contains(id) }, set: { v in if v { m.targets.insert(id) } else { m.targets.remove(id) } })
+    }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("FILES TO MAKE").font(.caption.weight(.semibold)).kerning(0.8).foregroundStyle(.secondary)
+            ForEach(ExportTarget.all) { t in
+                VStack(alignment: .leading, spacing: 1) {
+                    Toggle(t.title, isOn: on(t.id)).toggleStyle(.checkbox).fontWeight(t.id == "universal" ? .semibold : .regular)
+                    Text(t.detail).font(.caption).foregroundStyle(.secondary).padding(.leading, 20).fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Note("Not listed (Quad Cortex, ToneX, Fractal, Kemper Cab Maker…)? Use Universal; those makers don't publish a fixed format, and their own software converts on import.")
+        }
+    }
+}
+
+/// Advanced output: polarity and the Custom matrix.
+struct AdvancedOutput: View {
     @EnvironmentObject var m: AppModel
     func toggle<T: Hashable>(_ set: Binding<Set<T>>, _ v: T) -> Binding<Bool> {
         Binding(get: { set.wrappedValue.contains(v) }, set: { on in if on { set.wrappedValue.insert(v) } else { set.wrappedValue.remove(v) } })
     }
     var body: some View {
-        DisclosureGroup("Output files") {
+        DisclosureGroup("Advanced file options") {
             VStack(alignment: .leading, spacing: 12) {
-                Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 10) {
-                    GridRow {
-                        Text("Sample rates").foregroundStyle(.secondary)
-                        HStack { ForEach(CoreAudioHelper.captureRates, id: \.self) { r in Toggle(rateTag(r), isOn: toggle($m.exportRates, r)) } }
-                    }
-                    GridRow {
-                        Text("Lengths").foregroundStyle(.secondary)
-                        HStack {
-                            Toggle("Full room", isOn: toggle($m.lengths, "full"))
-                            ForEach(["1024", "2048", "4096"], id: \.self) { l in Toggle(l, isOn: toggle($m.lengths, l)) }
+                Toggle("Keep polarity as recorded", isOn: $m.keepPolarity).toggleStyle(.checkbox)
+                Note("Normally every IR is made with its main peak positive, as commercial IR packs are, so mics blend without cancelling. A mic that came out inverted (a back-of-cab mic, say) is flipped and the results say so.")
+                Toggle("Custom files (pick rates, lengths, bit depth and trimming)", isOn: $m.customOn).toggleStyle(.checkbox)
+                if m.customOn {
+                    Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 10) {
+                        GridRow {
+                            Text("Sample rates").foregroundStyle(.secondary)
+                            HStack { ForEach(CoreAudioHelper.captureRates, id: \.self) { r in Toggle(rateTag(r), isOn: toggle($m.exportRates, r)) } }
+                        }
+                        GridRow {
+                            Text("Lengths").foregroundStyle(.secondary)
+                            HStack {
+                                Toggle("Full room", isOn: toggle($m.lengths, "full"))
+                                ForEach(["1024", "2048", "4096"], id: \.self) { l in Toggle(l, isOn: toggle($m.lengths, l)) }
+                            }
+                        }
+                        GridRow {
+                            Text("Bit depth").foregroundStyle(.secondary)
+                            HStack {
+                                Toggle("16-bit", isOn: toggle($m.bits, "16"))
+                                Toggle("24-bit", isOn: toggle($m.bits, "24"))
+                                Toggle("32-bit float", isOn: toggle($m.bits, "32f"))
+                            }
+                        }
+                        GridRow {
+                            Text("Trimming").foregroundStyle(.secondary)
+                            HStack {
+                                Toggle("Keep mic timing", isOn: toggle($m.trims, "set"))
+                                Toggle("Trim each mic", isOn: toggle($m.trims, "individual"))
+                            }
+                        }
+                        GridRow {
+                            Text("Full room length").foregroundStyle(.secondary)
+                            Stepper("\(Int(m.fullMs)) ms", value: $m.fullMs, in: 50...1000, step: 50)
                         }
                     }
-                    GridRow {
-                        Text("Bit depth").foregroundStyle(.secondary)
-                        HStack {
-                            Toggle("16-bit", isOn: toggle($m.bits, "16"))
-                            Toggle("24-bit", isOn: toggle($m.bits, "24"))
-                            Toggle("32-bit float", isOn: toggle($m.bits, "32f"))
-                        }
-                    }
-                    GridRow {
-                        Text("Trimming").foregroundStyle(.secondary)
-                        HStack {
-                            Toggle("Keep mic timing", isOn: toggle($m.trims, "set"))
-                            Toggle("Trim each mic", isOn: toggle($m.trims, "individual"))
-                        }
-                    }
-                    GridRow {
-                        Text("Full room length").foregroundStyle(.secondary)
-                        Stepper("\(Int(m.fullMs)) ms", value: $m.fullMs, in: 50...1000, step: 50)
-                    }
+                    .toggleStyle(.checkbox)
+                    Note("Custom files go in More formats › Custom. “Keep mic timing” trims every mic by the same amount and gives them one shared gain, so they blend the way the real mics did. “Trim each mic” starts each file at its own first arrival and normalizes it on its own.")
                 }
-                .toggleStyle(.checkbox)
-                Note("“Keep mic timing” trims every mic by the same amount and gives them one shared gain, so they blend the way the real mics did. “Trim each mic” starts each file at its own first arrival and normalizes it on its own. Level is matched across sample rates.")
             }.padding(.top, 8)
         }
     }
@@ -276,558 +383,18 @@ struct CaptureNameFields: View {
     }
 }
 
-struct ReferenceAside: View {
+/// A text field with a menu of common mic names next to it (names become file names).
+struct MicNameField: View {
+    @Binding var name: String
+    var disabled = false
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("REFERENCE TAP (RECOMMENDED)").font(.caption.weight(.semibold)).kerning(0.8).foregroundStyle(.secondary)
-            Note("Pad the voltage across the speaker terminals by about 20 dB (for example 10 kΩ in series, 1.1 kΩ to ground) and record it on its own line input. The IRs then come out as speaker, mic and room only, whatever power amp you use.", color: .primary)
-            Note("If the amp's speaker output is bridged (neither terminal is ground), or the tap brings in hum, use an isolation transformer or a balanced input. Without a reference the IRs still work, but they include the power amp's own response.", color: .primary)
-        }
-        .padding(12).frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 6).fill(Color.secondary.opacity(0.1)))
-    }
-}
-
-// ------------------------------------------------------------------ Capture tab
-struct CaptureTab: View {
-    @EnvironmentObject var m: AppModel
-    var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Step(n: 1, title: "Interface and inputs", subtitle: "Pick the interface, the output that feeds the power amp, and what's plugged into each input.") {
-                if m.duplexDevices.isEmpty {
-                    Note("No audio interface with both inputs and outputs was found. Connect it, then click Refresh.", color: badColor)
-                }
-                HStack(spacing: 16) {
-                    Picker("Interface", selection: $m.deviceUID) {
-                        ForEach(m.duplexDevices) { d in Text("\(d.name)  (\(d.inputChannels) in / \(d.outputChannels) out)").tag(d.uid) }
-                    }.frame(maxWidth: 420)
-                    Button("Refresh") { m.refreshDevices() }
-                }
-                if let dev = m.device {
-                    HStack(spacing: 16) {
-                        Picker("Sample rate", selection: $m.rate) {
-                            ForEach(m.deviceRates, id: \.self) { Text("\(rateTag($0).dropLast()) kHz").tag($0) }
-                        }.frame(width: 200)
-                        Picker("Output to the amp", selection: $m.outChannel) {
-                            ForEach(0..<dev.outputChannels, id: \.self) { Text("Output \($0 + 1)").tag($0) }
-                        }.frame(width: 230)
-                        LevelPicker()
-                    }
-                    Note("Use the highest sample rate your interface does well; every other rate is made from this one capture. IR Capture switches the interface to this rate when it runs.")
-                    InputsGrid()
-                }
-                SweepSettings()
-            }
-
-            Step(n: 2, title: "Set the levels", subtitle: "Short sweeps play on a loop so you can set each preamp.") {
-                Checklist(items: [
-                    "Mute the studio monitors so the room mic only hears the cab. Wear ear protection: the sweeps play at full amp volume.",
-                    "Set the amp to the loudness you want, then click Start level check.",
-                    "Turn each preamp until its line says OK (the sweep peaks near −6 dBFS). Nothing should say CLIP.",
-                    "If distortion shows orange or red, lower the sweep level in step 1 or the amp volume. An IR is linear, so pushing the speaker gains nothing.",
-                ])
-                HStack {
-                    Button(m.levelRunning ? "Stop level check" : "Start level check") { m.toggleLevelCheck() }
-                        .buttonStyle(.borderedProminent).tint(m.levelRunning ? .secondary : lamp)
-                        .disabled(m.busy != nil || m.device == nil)
-                    if m.levelRunning { ProgressView().controlSize(.small); Text("Playing short sweeps…").foregroundStyle(.secondary) }
-                }
-                if let e = m.levelError { Note(e, color: badColor) }
-                if !m.levelReadings.isEmpty { LevelTable(readings: m.levelReadings) }
-            }
-
-            Step(n: 3, title: "Capture", subtitle: String(format: "One button. It plays %d sweeps (about %.0f s), records every input, and saves finished IRs.", m.nSweeps, m.signalSeconds)) {
-                CaptureNameFields()
-                OutputOptions()
-                HStack {
-                    Button("Capture") { m.startCapture() }
-                        .buttonStyle(.borderedProminent).tint(lamp).controlSize(.large)
-                        .disabled(m.busy != nil || m.captureProblem != nil)
-                    if let p = m.captureProblem, m.busy == nil { Note(p, color: warnColor) }
-                }
-                BusyLine()
-            }
-        }
-    }
-}
-
-struct InputsGrid: View {
-    @EnvironmentObject var m: AppModel
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 6) {
-                GridRow {
-                    Text("INPUT").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                    Text("USE").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                    Text("MIC NAME").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                }
-                ForEach($m.inputs) { $row in
-                    GridRow {
-                        Text("Input \(row.id + 1)").monospacedDigit()
-                        Picker("", selection: Binding(get: { row.role }, set: { m.setRole($0, for: row.id) })) {
-                            ForEach(Role.allCases) { Text($0.label).tag($0) }
-                        }.labelsHidden().frame(width: 150)
-                        TextField("SM57, R121, Room…", text: $row.name).frame(width: 220).disabled(row.role != .mic)
-                    }
-                    .foregroundStyle(row.role == .off ? .secondary : .primary)
-                }
-            }
-            Note("Name each mic (the name goes into the IR file names). Mark the input with the speaker-terminal tap as Reference tap.")
-            ReferenceAside()
-        }
-    }
-}
-
-struct LevelTable: View {
-    let readings: [LevelReading]
-    func meterColor(_ r: LevelReading) -> Color { r.clipped ? badColor : abs(r.changeDB) <= 3 ? goodColor : warnColor }
-    func advice(_ r: LevelReading) -> (String, Color) {
-        if r.clipped { return ("CLIP — turn down", badColor) }
-        let d = r.changeDB
-        if abs(d) <= 3 { return ("OK", goodColor) }
-        return (d > 0 ? "Turn up \(Int(d.rounded())) dB" : "Turn down \(Int((-d).rounded())) dB", warnColor)
-    }
-    func distColor(_ v: Double) -> Color { v > -30 ? badColor : v > -40 ? warnColor : goodColor }
-    var body: some View {
-        Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 8) {
-            ForEach(readings) { r in
-                GridRow {
-                    Text(r.label).bold()
-                    GeometryReader { g in
-                        let frac = max(0, min(1, (r.peakDBFS + 60) / 60))
-                        ZStack(alignment: .leading) {
-                            RoundedRectangle(cornerRadius: 3).fill(Color.secondary.opacity(0.15))
-                            RoundedRectangle(cornerRadius: 3).fill(meterColor(r)).frame(width: g.size.width * frac)
-                            Rectangle().fill(Color.primary.opacity(0.6)).frame(width: 2).offset(x: g.size.width * 0.9 - 1)
-                        }
-                    }.frame(width: 220, height: 12)
-                    Text(String(format: "%.1f dBFS", r.peakDBFS)).monospacedDigit()
-                    let a = advice(r)
-                    Pill(text: a.0, color: a.1)
-                    if r.label == "Reference tap" {
-                        Text("")
-                    } else {
-                        HStack(spacing: 6) {
-                            Pill(text: String(format: "H2 %.0f", r.h2), color: distColor(r.h2))
-                            Pill(text: String(format: "H3 %.0f", r.h3), color: distColor(r.h3))
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-// ------------------------------------------------------------------ Logic tab
-struct LogicTab: View {
-    @EnvironmentObject var m: AppModel
-    @State private var dropping = false
-    var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Step(n: 1, title: "Test signal", subtitle: "Save the sweeps to play from Logic. Pick the sample rate your Logic project will run at.") {
-                HStack(spacing: 16) {
-                    Picker("Capture rate", selection: $m.logicRate) {
-                        ForEach(CoreAudioHelper.captureRates, id: \.self) { Text("\(rateTag($0).dropLast()) kHz").tag($0) }
-                    }.frame(width: 200)
-                    LevelPicker()
-                }
-                SweepSettings()
-                HStack {
-                    Button("Save test signal…") { m.saveTestSignal() }.buttonStyle(.borderedProminent).tint(lamp)
-                    Button("Load settings from a test signal…") { m.loadSignalSettings() }
-                }
-                Note(m.signalMessage ?? "Keep these settings when you process the recording in step 3. The app remembers them.")
-            }
-
-            Step(n: 2, title: "Record in Logic") {
-                Checklist(items: [
-                    "Set the Logic project to the capture rate above. Drag the sweep WAV onto a new audio track at bar 1.",
-                    "Send that track only to the interface output that feeds the power amp. Mute the studio monitors so the room mic doesn't hear them.",
-                    "Make one audio track per mic and one for the reference tap if you have it. Name each track after its mic (SM57, R121, Room…) and name the reference track “Ref”; the exported files take these names. Record-enable them all, with input monitoring off and no plug-ins.",
-                    "Play the sweep track and watch the meters. Set each mic preamp so the loudest point of the sweep peaks around −6 dBFS. Nothing should clip.",
-                    "Record one full pass. Keep the room quiet and don't touch the mics.",
-                    "Choose File › Export › All Tracks as Audio Files. Pick WAV, 24-bit or 32-bit float, at the project sample rate, with Normalize off. Leave the faders at 0 dB.",
-                ])
-                ReferenceAside()
-            }
-
-            Step(n: 3, title: "Make the IRs", subtitle: "Add the exported WAV files, check the names, and click Make IRs.") {
-                VStack(spacing: 6) {
-                    Text("Drag the exported WAV files here").bold()
-                    Button("or choose them…") { m.chooseLogicFiles() }.buttonStyle(.link)
-                    Text("If the sweep track's file comes along too, that's fine; it's skipped automatically.").font(.callout).foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity).padding(.vertical, 18)
-                .background(RoundedRectangle(cornerRadius: 6).strokeBorder(dropping ? lamp : Color.secondary.opacity(0.4), style: StrokeStyle(lineWidth: 2, dash: [6])))
-                .onDrop(of: [.fileURL], isTargeted: $dropping) { providers in
-                    for p in providers {
-                        _ = p.loadObject(ofClass: URL.self) { url, _ in
-                            if let url { DispatchQueue.main.async { m.addLogicFiles([url]) } }
-                        }
-                    }
-                    return true
-                }
-                if let msg = m.logicMessage { Note(msg, color: badColor) }
-                if !m.logicChannels.isEmpty { LogicGrid() }
-                CaptureNameFields()
-                OutputOptions()
-                HStack {
-                    Button("Make IRs") { m.processLogic() }
-                        .buttonStyle(.borderedProminent).tint(lamp).controlSize(.large)
-                        .disabled(m.busy != nil || m.logicProblem != nil)
-                    if let p = m.logicProblem, m.busy == nil, !m.logicChannels.isEmpty { Note(p, color: warnColor) }
-                }
-                BusyLine()
-            }
-        }
-    }
-}
-
-struct LogicGrid: View {
-    @EnvironmentObject var m: AppModel
-    var body: some View {
-        Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 8) {
-            GridRow {
-                Text("FILE").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                Text("MIC NAME").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                Text("ROLE").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                Text("")
-            }
-            ForEach($m.logicChannels) { $c in
-                GridRow {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(c.label).font(.system(.callout, design: .monospaced)).lineLimit(1).truncationMode(.middle)
-                        Text(c.meta).font(.caption).foregroundStyle(.secondary)
-                    }.frame(maxWidth: 280, alignment: .leading)
-                    TextField("", text: $c.name).frame(width: 180).disabled(c.role != .mic)
-                    Picker("", selection: Binding(get: { c.role }, set: { m.setLogicRole($0, for: c.id) })) {
-                        Text("Mic").tag(Role.mic); Text("Reference tap").tag(Role.ref); Text("Skip").tag(Role.off)
-                    }.labelsHidden().frame(width: 150)
-                    if c.channel == 0 {
-                        Button { m.removeLogicFile(c.url) } label: { Image(systemName: "xmark.circle") }.buttonStyle(.borderless).help("Remove this file")
-                    } else { Text("") }
-                }
-            }
-        }
-    }
-}
-
-// ------------------------------------------------------------------ NAM tab
-struct NAMTab: View {
-    @EnvironmentObject var m: AppModel
-    var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Picker("", selection: $m.namMode) {
-                Text("Record with the app").tag("app")
-                Text("Use Logic recordings").tag("logic")
-            }
-            .pickerStyle(.segmented).labelsHidden().frame(maxWidth: 420)
-            if m.namMode == "logic" { NAMLogicSteps() } else { NAMDirectSteps() }
-        }
-    }
-}
-
-struct NAMModelChoice: View {
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("WHICH MODEL TO MAKE").font(.caption.weight(.semibold)).kerning(0.8).foregroundStyle(.secondary)
-            Note("Amp only is the flexible one: pair the model with this app's cab IRs. Use IRs captured with the speaker-terminal reference tap. The load box's line out already carries the speaker's impedance bump, so a sweep-referenced IR would add it twice.", color: .primary)
-            Note("Full chain captures amp, cab and mic together. Each mic becomes its own model. Close mics work best: NAM only models a short stretch of time, so room sound won't carry over well.", color: .primary)
-        }
-        .padding(12).frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 6).fill(Color.secondary.opacity(0.1)))
-    }
-}
-
-struct NAMNameRow: View {
-    @EnvironmentObject var m: AppModel
-    var body: some View {
-        Picker("Capture type", selection: $m.namKind) {
-            Text("Amp only (load box line out)").tag(NAMKind.amp)
-            Text("Full chain (mics on the cab)").tag(NAMKind.full)
-        }.pickerStyle(.radioGroup)
-        HStack {
-            Text("Capture name").foregroundStyle(.secondary)
-            TextField("e.g. JCM800_Gain6_Bass5", text: $m.namName).frame(maxWidth: 320)
-        }
-        Note("The amp and its settings, e.g. JCM800_Gain6_Bass5. Every file name starts with this.")
-        SaveFolderRow()
-    }
-}
-
-// Record with the app: it plays TONE3000's sweep file itself and records every input on the same interface.
-struct NAMDirectSteps: View {
-    @EnvironmentObject var m: AppModel
-    var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Step(n: 1, title: "Training signal", subtitle: "TONE3000's sweep file. You only choose it once; the app remembers it.") {
-                Checklist(items: [
-                    "Log in at tone3000.com. Choose Create Tone, then Capture, and download the sweep file, T3K-sweep-v3.wav. Don't open it in an editor or convert it.",
-                    "Click Choose sweep file and pick T3K-sweep-v3.wav. The app checks that it's the right file.",
-                ])
-                HStack(spacing: 12) {
-                    Button("Open tone3000.com/capture") { m.openTONE3000() }
-                    Button(m.namSignal == nil ? "Choose sweep file…" : "Choose a different file…") { m.chooseNAMSignal() }
-                }
-                if m.namSignal != nil {
-                    Note("✓ \(m.namSignalName) is ready (190 s, 48 kHz). The app plays it exactly as it is.", color: goodColor)
-                } else if let s = m.namSignalStatus {
-                    Note(s, color: s.hasPrefix("Checking") ? .secondary : badColor)
-                }
-            }
-
-            Step(n: 2, title: "Interface and inputs", subtitle: "One interface does both: its output feeds the reamp box, its inputs record the amp.") {
-                if m.duplexDevices.isEmpty {
-                    Note("No audio interface with both inputs and outputs was found. Connect it, then click Refresh.", color: badColor)
-                }
-                HStack(spacing: 16) {
-                    Picker("Interface", selection: $m.deviceUID) {
-                        ForEach(m.duplexDevices) { d in Text("\(d.name)  (\(d.inputChannels) in / \(d.outputChannels) out)").tag(d.uid) }
-                    }.frame(maxWidth: 420)
-                    Button("Refresh") { m.refreshDevices() }
-                }
-                if let dev = m.device {
-                    Picker("Output to the reamp box", selection: $m.namOutChannel) {
-                        ForEach(0..<dev.outputChannels, id: \.self) { Text("Output \($0 + 1)").tag($0) }
-                    }.frame(width: 300)
-                    Note("The app switches the interface to 48 kHz when it runs, because the training signal is 48 kHz.")
-                    NAMInputsGrid()
-                    Note("Mark each input you're recording as Use and give it a name (Suhr, SM57, R121…). Each one becomes its own file and its own model.")
-                }
-                Checklist(items: [
-                    "Interface output → reamp box → the amp's input. Turn off noise gates, reverb, delay and anything in the effects loop.",
-                    "Amp only: speaker output into the load box (the Suhr Reactive Load), and its line out into an interface input. Leave any cab sim or EQ on the load box off.",
-                    "Full chain: amp into the cab as usual, with mics on the cab. Mute the studio monitors.",
-                    "Turn off any mixer or monitoring software effects on the interface's inputs (its own DSP, compressors, gates).",
-                ])
-                NAMModelChoice()
-            }
-
-            Step(n: 3, title: "Set the levels", subtitle: "The app loops the loudest 6 seconds of the training signal so you can set each input.") {
-                Checklist(items: [
-                    "Warm the amp up for about 20 minutes. Wear ear protection for full chain captures.",
-                    "Click Start level check. Set the reamp level so the amp is hit about as hard as by a guitar.",
-                    "Turn each input's gain until its line says OK (peaks around −8 dBFS). Nothing should say CLIP.",
-                    "Click Stop level check. From here on, don't touch any knobs.",
-                ])
-                HStack {
-                    Button(m.namLevelRunning ? "Stop level check" : "Start level check") { m.toggleNAMLevelCheck() }
-                        .controlSize(.large).disabled(m.busy != nil)
-                    if m.namLevelRunning { ProgressView().controlSize(.small); Text("Looping…").foregroundStyle(.secondary) }
-                }
-                if let e = m.namLevelError { Note(e, color: badColor) }
-                if !m.namMeters.isEmpty { NAMMeterTable(meters: m.namMeters) }
-            }
-
-            Step(n: 4, title: "Record", subtitle: "Plays all 3 minutes 10 seconds of the training signal and records every input at once.") {
-                NAMNameRow()
-                HStack {
-                    Button("Record (3 min 12 s)") { m.startNAMCapture() }
-                        .buttonStyle(.borderedProminent).tint(lamp).controlSize(.large)
-                        .disabled(m.busy != nil || m.namDirectProblem != nil)
-                    if let p = m.namDirectProblem, m.busy == nil { Note(p, color: warnColor) }
-                }
-                if let e = m.namError { Note(e, color: badColor) }
-                BusyLine()
-                if m.busy?.progress != nil && !m.namMeters.isEmpty { NAMMeterTable(meters: m.namMeters) }
-                Note("When it finishes, the app lines the files up, checks them and saves them in a folder ready to upload to TONE3000. The untouched recording is also kept in a “raw recording” folder inside it.")
-            }
-        }
-    }
-}
-
-struct NAMInputsGrid: View {
-    @EnvironmentObject var m: AppModel
-    var body: some View {
-        Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 8) {
-            GridRow {
-                Text("INPUT").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                Text("USE").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                Text("NAME").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-            }
-            ForEach($m.namRows) { $r in
-                GridRow {
-                    Text("Input \(r.id + 1)")
-                    Picker("", selection: $r.use) { Text("Use").tag(true); Text("Not used").tag(false) }.labelsHidden().frame(width: 130)
-                    TextField("", text: $r.name).frame(width: 220).disabled(!r.use)
-                }
-            }
-        }
-    }
-}
-
-struct NAMMeterTable: View {
-    let meters: [NAMMeter]
-    static let target = -8.0
-    func advice(_ x: NAMMeter) -> (String, Color) {
-        if x.clipped { return ("CLIP — lower the input gain about 6 dB", badColor) }
-        if x.peakDB < -60 { return ("No signal — check the cable and the input", badColor) }
-        let change = NAMMeterTable.target - x.peakDB
-        if abs(change) <= 3 { return ("OK", goodColor) }
-        return (change > 0 ? "Raise about \(Int(change.rounded())) dB" : "Lower about \(Int((-change).rounded())) dB", warnColor)
-    }
-    var body: some View {
-        Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 8) {
-            ForEach(meters) { x in
-                let adv = advice(x)
-                let color = adv.1
-                GridRow {
-                    Text(x.label).frame(width: 130, alignment: .leading).lineLimit(1)
-                    GeometryReader { g in
-                        let frac = max(0, min(1, (x.peakDB + 48) / 48))
-                        ZStack(alignment: .leading) {
-                            RoundedRectangle(cornerRadius: 3).fill(Color.secondary.opacity(0.15))
-                            RoundedRectangle(cornerRadius: 3).fill(color).frame(width: g.size.width * frac)
-                            Rectangle().fill(Color.primary.opacity(0.5)).frame(width: 2)
-                                .offset(x: g.size.width * (NAMMeterTable.target + 48) / 48 - 1)
-                        }
-                    }.frame(width: 220, height: 12)
-                    Text(x.peakDB < -100 ? "—" : String(format: "%.1f dBFS", x.peakDB)).font(.system(.body, design: .monospaced)).frame(width: 100, alignment: .trailing)
-                    Text(adv.0).foregroundStyle(color)
-                }
-            }
-        }
-    }
-}
-
-// Use Logic recordings: the original route, kept as is.
-struct NAMLogicSteps: View {
-    @EnvironmentObject var m: AppModel
-    @State private var dropping = false
-    var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Step(n: 1, title: "Training signal") {
-                Checklist(items: [
-                    "Log in at tone3000.com. Choose Create Tone, then Capture, and download the sweep file. It's called T3K-sweep-v3.wav (190 seconds, 48 kHz).",
-                    "Use that file exactly as it is. Don't trim, normalize or convert it. The app knows its layout, so you don't need to give it the file.",
-                ])
-                Button("Open tone3000.com/capture") { m.openTONE3000() }
-            }
-
-            Step(n: 2, title: "Record in Logic") {
-                Checklist(items: [
-                    "Make a new Logic project at 48 kHz. Drag T3K-sweep-v3.wav onto an audio track at bar 1.",
-                    "Send that track to the interface output that goes to the reamp box, and the reamp box into the amp's input. Turn off noise gates, reverb, delay and anything in the effects loop.",
-                    "Amp only: speaker output into the load box (the Suhr Reactive Load), and its line out into an interface input. Leave any cab sim or EQ on the load box off. Full chain: amp into the cab as usual, with mics on the cab. Mute the studio monitors.",
-                    "Make one audio track per input and name it (Suhr, SM57, R121…); the exported files take these names. Input monitoring off, no plug-ins.",
-                    "Set the reamp level so the amp is hit about as hard as by a guitar. Play the first 20 seconds and set each input so the loudest part peaks around −8 dBFS, with nothing clipping.",
-                    "Warm the amp up for about 20 minutes first. Then record one full pass, all 3 minutes 10 seconds, and a second or two past the end. Don't touch any knobs while it runs.",
-                    "Choose File › Export › All Tracks as Audio Files: WAV, 24-bit, 48 kHz, Normalize off.",
-                ])
-                NAMModelChoice()
-            }
-
-            Step(n: 3, title: "Prepare the files", subtitle: "Add the exported WAV files, check the names, and click Prepare files.") {
-                VStack(spacing: 6) {
-                    Text("Drag the exported WAV files here").bold()
-                    Button("or choose them…") { m.chooseNAMFiles() }.buttonStyle(.link)
-                    Text("The sweep track's own file is skipped automatically.").font(.callout).foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity).padding(.vertical, 18)
-                .background(RoundedRectangle(cornerRadius: 6).strokeBorder(dropping ? lamp : Color.secondary.opacity(0.4), style: StrokeStyle(lineWidth: 2, dash: [6])))
-                .onDrop(of: [.fileURL], isTargeted: $dropping) { providers in
-                    for p in providers {
-                        _ = p.loadObject(ofClass: URL.self) { url, _ in
-                            if let url { DispatchQueue.main.async { m.addNAMFiles([url]) } }
-                        }
-                    }
-                    return true
-                }
-                if let msg = m.namMessage { Note(msg, color: badColor) }
-                if !m.namInputs.isEmpty { NAMGrid() }
-                NAMNameRow()
-                HStack {
-                    Button("Prepare files") { m.prepareNAM() }
-                        .buttonStyle(.borderedProminent).tint(lamp).controlSize(.large)
-                        .disabled(m.busy != nil || m.namProblem != nil)
-                    if let p = m.namProblem, m.busy == nil, !m.namInputs.isEmpty { Note(p, color: warnColor) }
-                }
-                if let e = m.namError { Note(e, color: badColor) }
-                BusyLine()
-            }
-        }
-    }
-}
-
-struct NAMGrid: View {
-    @EnvironmentObject var m: AppModel
-    var body: some View {
-        Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 8) {
-            GridRow {
-                Text("FILE").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                Text("NAME").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                Text("USE").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                Text("")
-            }
-            ForEach($m.namInputs) { $c in
-                GridRow {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(c.label).font(.system(.callout, design: .monospaced)).lineLimit(1).truncationMode(.middle)
-                        Text(c.meta).font(.caption).foregroundStyle(.secondary)
-                    }.frame(maxWidth: 280, alignment: .leading)
-                    TextField("", text: $c.name).frame(width: 180).disabled(!c.use)
-                    Picker("", selection: $c.use) { Text("Use").tag(true); Text("Skip").tag(false) }.labelsHidden().frame(width: 110)
-                    if c.channel == 0 {
-                        Button { m.removeNAMFile(c.url) } label: { Image(systemName: "xmark.circle") }.buttonStyle(.borderless).help("Remove this file")
-                    } else { Text("") }
-                }
-            }
-        }
-    }
-}
-
-struct NAMResultsView: View {
-    @EnvironmentObject var m: AppModel
-    let r: NAMSummary
-    var body: some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack {
-                    Text("UPLOAD FOR TRAINING — \(r.title)").font(.system(size: 15, weight: .semibold)).kerning(0.8)
-                    Spacer()
-                    if r.warnings.isEmpty { Pill(text: "Ready to upload", color: goodColor) }
-                    else { Pill(text: r.warnings.count == 1 ? "1 thing to check" : "\(r.warnings.count) things to check", color: warnColor) }
-                }
-                ForEach(r.warnings, id: \.self) { w in
-                    Text(w).padding(.horizontal, 10).padding(.vertical, 7).frame(maxWidth: .infinity, alignment: .leading)
-                        .background(warnColor.opacity(0.15)).overlay(Rectangle().fill(warnColor).frame(width: 3), alignment: .leading)
-                }
-                Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 8) {
-                    GridRow {
-                        ForEach(["CHANNEL", "PEAK", "NOISE", "START VS END", "LINED UP"], id: \.self) {
-                            Text($0).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                        }
-                    }
-                    Divider().gridCellUnsizedAxes(.horizontal)
-                    ForEach(r.names, id: \.self) { n in
-                        let d = r.diagnostics[n]!
-                        GridRow {
-                            Text(n)
-                            Pill(text: String(format: "%.1f dBFS", d.peakDBFS),
-                                 color: d.clippedSamples > 0 || d.peakDBFS > -3 ? badColor : d.peakDBFS < -24 ? warnColor : goodColor)
-                            Pill(text: String(format: "%.0f dBFS", d.noiseDBFS) + (d.humHz.map { " · \($0) Hz hum" } ?? ""),
-                                 color: (d.noiseBelowPeakDB ?? 99) < 40 ? badColor : d.humHz != nil ? warnColor : goodColor)
-                            Pill(text: d.replicateESR < 0.0001 ? "< 0.0001" : String(format: "%.4f", d.replicateESR),
-                                 color: d.replicateESR > 0.005 ? badColor : d.replicateESR > 0.001 ? warnColor : goodColor)
-                            Text(String(format: "%.1f ms", d.offsetMs) + (d.polarityInverted ? " · inverted" : "")
-                                 + (abs(d.driftSamples) > 1 ? " · drift \(d.driftSamples)" : "")
-                                 + (r.names.count > 1 ? String(format: " · +%.2f ms", d.delayVsFirstMs) : "")).monospacedDigit()
-                        }
-                    }
-                }
-                Checklist(items: [
-                    "Click Show in Finder. The folder holds one WAV per channel (48 kHz, 24-bit, mono), plus report.json and UPLOAD-STEPS.txt.",
-                    "At tone3000.com/capture, upload the WAV files, one model per file.",
-                    "Settings: Model Standard, Best Fit on, 400 max epochs (TONE3000's suggestion). Name each model with the amp, its knob settings and, for mics, the mic and its position. Keep it private unless you mean to share it.",
-                    "Training takes about 5–20 minutes. Check the ESR when it's done: under 0.01 is great; 0.3 or more means something went wrong. Download the .nam file to use in any NAM player.",
-                ])
-                Note("“Start vs end” compares the opening 9 seconds of the take with the closing 9, which are the same signal. It shows how much the amp drifted while you recorded, and a model can't be much more accurate than that. Under 0.001 is excellent.")
-                HStack {
-                    Button("Show in Finder") { m.revealNAM() }.buttonStyle(.borderedProminent).tint(lamp)
-                    Button("Open tone3000.com/capture") { m.openTONE3000() }
-                    Text(r.folder.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")).font(.callout).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
-                }
-            }.padding(8)
+        HStack(spacing: 4) {
+            TextField("SM57, R121, Room…", text: $name).frame(width: 180).disabled(disabled)
+            Menu {
+                ForEach(commonMicNames, id: \.self) { n in Button(n) { name = n } }
+            } label: { Image(systemName: "chevron.down") }
+            .menuStyle(.borderlessButton).menuIndicator(.hidden).frame(width: 26).disabled(disabled)
+            .help("Common mic names")
         }
     }
 }
@@ -836,19 +403,38 @@ struct NAMResultsView: View {
 struct ResultsView: View {
     @EnvironmentObject var m: AppModel
     let r: ResultSummary
+    var quality: (String, Color) {
+        if r.droppedOut { return ("Record again", badColor) }
+        if r.warnings.isEmpty { return ("Excellent", goodColor) }
+        return (r.warnings.count == 1 ? "Good — 1 thing to check" : "Check these \(r.warnings.count) things", warnColor)
+    }
     var body: some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 14) {
                 HStack {
                     Text("RESULTS — \(r.title)").font(.system(size: 15, weight: .semibold)).kerning(0.8)
                     Spacer()
-                    if r.warnings.isEmpty { Pill(text: "Capture looks clean", color: goodColor) }
-                    else { Pill(text: r.warnings.count == 1 ? "1 thing to check" : "\(r.warnings.count) things to check", color: warnColor) }
+                    Pill(text: quality.0, color: quality.1)
                 }
-                if !r.referenced { Note("No reference tap was used, so these IRs include the power amp's response.") }
                 ForEach(r.warnings, id: \.self) { w in
                     Text(w).padding(.horizontal, 10).padding(.vertical, 7).frame(maxWidth: .infinity, alignment: .leading)
-                        .background(warnColor.opacity(0.15)).overlay(Rectangle().fill(warnColor).frame(width: 3), alignment: .leading)
+                        .background((r.droppedOut && w == r.warnings.first ? badColor : warnColor).opacity(0.15))
+                        .overlay(Rectangle().fill(r.droppedOut && w == r.warnings.first ? badColor : warnColor).frame(width: 3), alignment: .leading)
+                }
+                if r.droppedOut {
+                    HStack {
+                        Button("Record again") { m.startCapture() }.buttonStyle(.borderedProminent).tint(lamp)
+                            .disabled(m.busy != nil || m.captureProblem != nil)
+                        Note("Quit other apps first (browsers, video calls, other audio software).")
+                    }
+                }
+                if !r.referenced { Note("No reference tap was used, so these IRs include the power amp's response.") }
+                ForEach(r.polarityNotes, id: \.self) { n in Note("Polarity: " + n, color: .primary) }
+                if !r.topFiles.isEmpty {
+                    Aside(title: "Load these") {
+                        ForEach(r.topFiles, id: \.self) { f in Text(f).font(.system(.callout, design: .monospaced)) }
+                        Note("48 kHz, 24-bit, 500 ms. They load in any IR loader, DAW plug-in or modeler. Other formats are in More formats.")
+                    }
                 }
                 DiagnosticsTable(r: r)
                 Text("FREQUENCY RESPONSE, 1/6 OCTAVE").font(.caption.weight(.semibold)).kerning(0.8).foregroundStyle(.secondary)
@@ -860,11 +446,36 @@ struct ResultsView: View {
                 ResponsePlot(fc: r.curves.fc, curves: r.names.map { r.curves.curves[$0] ?? [] }).frame(height: 300)
                 HStack {
                     Button("Show in Finder") { m.revealResult() }.buttonStyle(.borderedProminent).tint(lamp)
-                    Text("\(r.fileCount) IR files plus report.json in \(r.folder.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))")
+                    Button("Re-export…") { m.reexportMessage = nil; m.reexportFolder = r.folder }
+                        .help("Make other formats from this capture's raw take, without recording again")
+                    Text("\(r.fileCount) IR files, README.txt and report.json in \(r.folder.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))")
                         .font(.callout).foregroundStyle(.secondary).lineLimit(2)
                 }
             }.padding(8)
         }
+    }
+}
+
+struct ReexportSheet: View {
+    @EnvironmentObject var m: AppModel
+    var processing: String? { if case .processing(let t) = m.busy { return t } else { return nil } }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Re-export \(m.reexportFolder?.lastPathComponent ?? "")").font(.title2.weight(.semibold))
+            Note("Makes the files again from this capture's raw take, with the choices below. Nothing is recorded. The old generated files go to the Trash; the raw take and report history stay.")
+            TargetsPicker()
+            AdvancedOutput()
+            if let msg = m.reexportMessage { ErrorNote(msg) }
+            if let t = processing { HStack { ProgressView().controlSize(.small); Text(t + "…").foregroundStyle(.secondary) } }
+            HStack {
+                Spacer()
+                Button("Cancel") { m.reexportFolder = nil }.keyboardShortcut(.cancelAction)
+                Button("Re-export") { if let f = m.reexportFolder { m.reexport(f) } }
+                    .keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent).tint(lamp)
+                    .disabled(m.busy != nil || m.outputProblem != nil)
+            }
+        }
+        .padding(24).frame(width: 600)
     }
 }
 
@@ -883,7 +494,7 @@ struct DiagnosticsTable: View {
                 GridRow {
                     HStack(spacing: 6) {
                         if !isRef { RoundedRectangle(cornerRadius: 2).fill(micColors[(r.names.firstIndex(of: item.label) ?? i) % micColors.count]).frame(width: 10, height: 10) }
-                        Text(isRef ? "Reference tap" : item.label)
+                        Text(isRef ? "Reference" : item.label)
                     }
                     Pill(text: String(format: "%.1f dBFS", d.recordingPeakDBFS),
                          color: d.recordingPeakDBFS > -0.3 ? badColor : d.recordingPeakDBFS < -30 ? warnColor : goodColor)

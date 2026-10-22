@@ -192,6 +192,11 @@ public func reportJSON(_ res: AnalysisResult, spec: SweepSpec, capture: String, 
         ("diagnostics", .object(res.diagnostics.map { ($0.label, $0.diag.json) })),
         ("warnings", .array(res.warnings.map { .string($0) })),
     ]
+    if let mode = res.polarityMode {
+        o.append(("polarity", .object([("mode", .string(mode)), ("mics", .object(res.names.compactMap { m in
+            res.polarity[m].map { p in (m, JSON.object([("main_peak", .string(p.mainPeakNegative ? "negative" : "positive")), ("flipped", .bool(p.flipped))])) }
+        }))])))
+    }
     o += extra
     return JSON.object(o).serialized()
 }

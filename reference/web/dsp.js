@@ -553,9 +553,30 @@ var IRC = (function () {
     return out;
   }
 
+  // Make each IR's main peak positive, so mics sum without cancelling (as commercial packs do).
+  // Port of normalize_polarity() in ircapture.py. Returns notes; records res.polarity.
+  function normalizePolarity(res, keep) {
+    var names = res.names, pol = {}, notes = [];
+    names.forEach(function (m) {
+      var h = res.irs[m], k = 0, best = -1;
+      for (var i = 0; i < h.length; i++) { var a = Math.abs(h[i]); if (a > best) { best = a; k = i; } }
+      var neg = h[k] < 0, flip = neg && !keep;
+      if (flip) for (var j = 0; j < h.length; j++) h[j] = -h[j];
+      pol[m] = { main_peak: neg ? "negative" : "positive", flipped: flip };
+    });
+    res.polarity = { mode: keep ? "keep" : "positive", mics: pol };
+    var flipped = names.filter(function (m) { return pol[m].flipped; }), kept = names.filter(function (m) { return !pol[m].flipped; });
+    flipped.forEach(function (m) {
+      notes.push(kept.length ? m + " was inverted relative to " + kept[0] + " and has been flipped." : m + " came out inverted (main peak negative) and has been flipped.");
+    });
+    if (keep) names.forEach(function (m) { if (pol[m].main_peak === "negative") notes.push(m + " is inverted (main peak negative). It was kept as recorded."); });
+    return notes;
+  }
+
   function reportJSON(res, s, capture, extra) {
     var r = { capture: capture, created: new Date().toISOString(), ircapture_version: VERSION, sweep: specJSON(s) };
     ["mode", "sweeps_used", "timing_jitter_samples", "analysis_window_s", "diagnostics", "warnings"].forEach(function (k) { r[k] = res[k]; });
+    if (res.polarity) r.polarity = res.polarity;
     if (extra) for (var k in extra) r[k] = extra[k];
     return JSON.stringify(r, null, 2);
   }
@@ -563,7 +584,7 @@ var IRC = (function () {
   return {
     VERSION: VERSION, makeSpec: makeSpec, specJSON: specJSON, makeSweep: makeSweep, makeTestSignal: makeTestSignal,
     inverseFilter: inverseFilter, analyse: analyse, onsetIndex: onsetIndex, resampleTo: resampleTo,
-    exportFiles: exportFiles, responseCurves: responseCurves, reportJSON: reportJSON,
+    exportFiles: exportFiles, responseCurves: responseCurves, reportJSON: reportJSON, normalizePolarity: normalizePolarity,
     writeWav: writeWav, readWav: readWav, wavChannel: wavChannel, makeZip: makeZip, safeName: safeName, rateTag: rateTag,
     fft: fft, nextPow2: nextPow2
   };

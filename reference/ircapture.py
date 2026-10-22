@@ -372,6 +372,34 @@ class ExportOptions:
     peak_dbfs: float = -1.0
 
 
+def normalize_polarity(result: dict, keep: bool = False) -> list[str]:
+    """Make each IR's main peak positive (commercial IR packs do this, so mics sum
+    without cancelling). Records the decision in result["polarity"]; returns notes.
+    With keep=True nothing is flipped but the detection is still recorded."""
+    irs, names = result["irs"], list(result["irs"].keys())
+    pol, notes = {}, []
+    for m in names:
+        h = irs[m]
+        neg = bool(h[int(np.argmax(np.abs(h)))] < 0)
+        flip = neg and not keep
+        if flip:
+            irs[m] = -h
+        pol[m] = {"main_peak": "negative" if neg else "positive", "flipped": flip}
+    result["polarity"] = {"mode": "keep" if keep else "positive", "mics": pol}
+    flipped = [m for m in names if pol[m]["flipped"]]
+    kept = [m for m in names if not pol[m]["flipped"]]
+    for m in flipped:
+        if kept:
+            notes.append(f"{m} was inverted relative to {kept[0]} and has been flipped.")
+        else:
+            notes.append(f"{m} came out inverted (main peak negative) and has been flipped.")
+    if keep:
+        for m in names:
+            if pol[m]["main_peak"] == "negative":
+                notes.append(f"{m} is inverted (main peak negative). It was kept as recorded.")
+    return notes
+
+
 def resample_to(x: np.ndarray, fs: int, rate: int) -> np.ndarray:
     if rate == fs:
         return x.copy()
@@ -444,7 +472,7 @@ def export(result: dict, capture_name: str, outdir: Path, opt: ExportOptions) ->
 
 def write_report(result: dict, spec: SweepSpec, capture_name: str, outdir: Path,
                  extra: dict | None = None) -> Path:
-    rep = {k: v for k, v in result.items() if k not in ("irs", "onsets")}
+    rep = {k: v for k, v in result.items() if k not in ("irs", "onsets", "polarity_notes")}
     rep.update({"capture": capture_name, "created": datetime.now().isoformat(timespec="seconds"),
                 "sweep": asdict(spec), "ircapture_version": VERSION})
     if extra:
@@ -529,7 +557,10 @@ def export_from_args(a) -> ExportOptions:
 def run_processing(rec, spec, names, ref_index, capture_name, outdir, a, extra=None):
     res = analyse(rec, spec, names, ref_index,
                   ProcessOptions(ir_max=a.ir_max, reg_db=a.reg_db, onset_db=a.onset_db))
+    res["polarity_notes"] = normalize_polarity(res, keep=getattr(a, "keep_polarity", False))
     print(summary_text(res))
+    for n in res["polarity_notes"]:
+        print("  * " + n)
     files = export(res, capture_name, outdir, export_from_args(a))
     rep = write_report(res, spec, capture_name, outdir, extra)
     print(f"wrote {len(files)} IR files and {rep}")
@@ -649,6 +680,8 @@ def build_parser():
         q.add_argument("--ir-max", type=float, default=1.0, help="analysis window, s")
         q.add_argument("--reg-db", type=float, default=40.0)
         q.add_argument("--onset-db", type=float, default=20.0)
+        q.add_argument("--keep-polarity", action="store_true",
+                       help="don't flip IRs whose main peak is negative")
 
     def io_args(q):
         q.add_argument("--device", help="audio device index or name")

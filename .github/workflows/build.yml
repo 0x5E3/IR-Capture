@@ -3,6 +3,7 @@ name: Build and test
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   pull_request:
   workflow_dispatch:
 
@@ -25,7 +26,13 @@ jobs:
           python-version: "3.12"
 
       - name: Install Python reference dependencies
-        run: pip install numpy scipy soundfile
+        run: pip install numpy scipy soundfile pillow reportlab dmgbuild
+
+      - name: Version file matches the Swift default
+        run: |
+          V="$(tr -d '[:space:]' < VERSION)"
+          grep -q "public var IRCaptureVersion = \"$V\"" Sources/IRCaptureCore/Spec.swift \
+            || { echo "::error title=Version::VERSION ($V) and IRCaptureVersion in Spec.swift differ"; exit 1; }
 
       - name: Simulated rig — Python reference (known answers)
         working-directory: reference
@@ -69,7 +76,31 @@ jobs:
           python reference/compare_swift.py "$BIN/ircapture-cli" reference/sim_out
           python reference/compare_swift_nam.py "$BIN/ircapture-cli" reference/sim_nam_out/gold
 
+      # P0.1: signing and notarization run only when the Apple secrets exist (docs/SIGNING.md).
+      # Without them the build is signed ad hoc, as before, and everything else still runs.
+      - name: Import the Developer ID certificate
+        env:
+          MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+        run: |
+          if [ -z "$MACOS_CERT_P12" ]; then echo "No signing certificate in the secrets: ad hoc build."; exit 0; fi
+          KC="$RUNNER_TEMP/signing.keychain-db"; KCPW="$(uuidgen)"
+          echo "$MACOS_CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$KCPW" "$KC"
+          security set-keychain-settings -lut 21600 "$KC"
+          security unlock-keychain -p "$KCPW" "$KC"
+          security import "$RUNNER_TEMP/cert.p12" -P "$MACOS_CERT_PASSWORD" -A -t cert -f pkcs12 -k "$KC"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KCPW" "$KC" >/dev/null
+          security list-keychains -d user -s "$KC" $(security list-keychains -d user | tr -d '"')
+          rm "$RUNNER_TEMP/cert.p12"
+          ID="$(security find-identity -v -p codesigning "$KC" | grep -o '"Developer ID Application: [^"]*"' | head -1 | tr -d '"')"
+          [ -n "$ID" ] || { echo "::error title=Signing::No Developer ID Application identity in the certificate"; exit 1; }
+          echo "CODESIGN_IDENTITY=$ID" >> "$GITHUB_ENV"
+          echo "Signing as $ID"
+
       - name: Make the app
+        env:
+          IRCAPTURE_CHANNEL: ${{ startsWith(github.ref, 'refs/tags/v') && 'release' || 'pre-release' }}
         run: scripts/make_app.sh "${{ github.run_number }}"
 
       - name: Smoke test — launch the app, process the simulated Logic recordings in it
@@ -106,22 +137,94 @@ jobs:
           "$EXE" & PID=$!
           sleep 6
           kill -0 $PID || { echo "::error title=Smoke test::The app quit or crashed on a plain launch"; exit 1; }
+          screencapture -x dist/screenshot-welcome.png || echo "screenshot failed"
+          kill $PID; sleep 1
+          "$EXE" --cab-tab & PID=$!
+          sleep 6
+          kill -0 $PID || { echo "::error title=Smoke test::The app quit or crashed opening the Cab IR job"; exit 1; }
           screencapture -x dist/screenshot-capture.png || echo "screenshot failed"
-          kill $PID
+          kill $PID; sleep 1
+          "$EXE" --nam-tab & PID=$!
+          sleep 5
+          kill -0 $PID || { echo "::error title=Smoke test::The app quit or crashed opening the Amp (NAM) job"; exit 1; }
+          screencapture -x dist/screenshot-nam-tab.png || echo "screenshot failed"
+          kill $PID; sleep 1
+          for page in reference troubleshooting; do
+            "$EXE" --help-page $page & PID=$!
+            sleep 4
+            kill -0 $PID || { echo "::error title=Smoke test::The app crashed showing Help › $page"; exit 1; }
+            screencapture -x dist/screenshot-help-$page.png || echo "screenshot failed"
+            kill $PID; sleep 1
+          done
+          LOG="$HOME/Library/Logs/IR Capture/IR Capture.log"
+          [ -s "$LOG" ] || { echo "::error title=Smoke test::The app didn't write its log file"; exit 1; }
+          tail -5 "$LOG"
+
+      - name: Wiring diagrams and Quick start PDF
+        run: |
+          "dist/IR Capture.app/Contents/MacOS/IR Capture" --render-diagrams "$PWD/dist/diagrams"
+          ls dist/diagrams
+          [ "$(ls dist/diagrams/*.png | wc -l)" -eq 4 ] || { echo "::error title=Diagrams::The app didn't render the 4 wiring diagrams"; exit 1; }
+          python scripts/make_quickstart.py dist/diagrams "dist/Quick start.pdf" "$(tr -d '[:space:]' < VERSION) (build ${{ github.run_number }})"
+
+      - name: Notarize the app
+        env:
+          NOTARY_KEY_P8: ${{ secrets.NOTARY_KEY_P8 }}
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+        run: |
+          if [ -z "$CODESIGN_IDENTITY" ] || [ -z "$NOTARY_KEY_P8" ]; then echo "Not signed for distribution: notarization skipped."; exit 0; fi
+          export NOTARY_KEY_PATH="$RUNNER_TEMP/notary.p8"; printf '%s' "$NOTARY_KEY_P8" > "$NOTARY_KEY_PATH"
+          scripts/notarize.sh dist/IR-Capture.zip "dist/IR Capture.app"
+          rm dist/IR-Capture.zip && ditto -c -k --keepParent "dist/IR Capture.app" dist/IR-Capture.zip
+
+      - name: Make the DMG
+        env:
+          NOTARY_KEY_P8: ${{ secrets.NOTARY_KEY_P8 }}
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+        run: |
+          python scripts/make_dmg.py "dist/IR Capture.app" "dist/Quick start.pdf" dist/IR-Capture.dmg
+          if [ -n "$CODESIGN_IDENTITY" ]; then
+            codesign --force --timestamp --sign "$CODESIGN_IDENTITY" dist/IR-Capture.dmg
+            if [ -n "$NOTARY_KEY_P8" ]; then
+              export NOTARY_KEY_PATH="$RUNNER_TEMP/notary.p8"; printf '%s' "$NOTARY_KEY_P8" > "$NOTARY_KEY_PATH"
+              scripts/notarize.sh dist/IR-Capture.dmg
+            fi
+          fi
+          hdiutil verify dist/IR-Capture.dmg
+          ls -la dist
 
       - name: Upload app
         uses: actions/upload-artifact@v4
         with:
           name: IR-Capture-app
-          path: dist/IR-Capture.zip
+          path: |
+            dist/IR-Capture.zip
+            dist/IR-Capture.dmg
+            dist/Quick start.pdf
 
       - name: Publish as the "latest" release
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          SIGNED="$([ -n "$CODESIGN_IDENTITY" ] && echo "Signed with Developer ID." || echo "Not signed yet: the first launch needs System Settings › Privacy & Security › Open Anyway (see the README).")"
+          cp "dist/Quick start.pdf" dist/Quick-start.pdf
           gh release delete latest --yes --cleanup-tag || true
-          gh release create latest dist/IR-Capture.zip $(ls dist/screenshot-*.png 2>/dev/null) \
+          gh release create latest dist/IR-Capture.dmg dist/IR-Capture.zip dist/Quick-start.pdf $(ls dist/screenshot-*.png 2>/dev/null) \
             --title "IR Capture — latest build (#${{ github.run_number }})" \
-            --notes "Built from ${GITHUB_SHA::7}. Download IR-Capture.zip below, double-click to unzip, and move IR Capture to Applications. First launch: see the README." \
+            --notes "Version $(tr -d '[:space:]' < VERSION), build ${{ github.run_number }}, from ${GITHUB_SHA::7}. Download IR-Capture.dmg below, open it, and drag IR Capture to Applications. $SIGNED" \
             --prerelease --target "$GITHUB_SHA"
+
+      - name: Publish a versioned release (tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          [ "$TAG" = "v$(tr -d '[:space:]' < VERSION)" ] || { echo "::error title=Release::Tag $TAG doesn't match VERSION $(cat VERSION)"; exit 1; }
+          [ -n "$CODESIGN_IDENTITY" ] || { echo "::error title=Release::A release must be signed and notarized. Add the Apple secrets first (docs/SIGNING.md)."; exit 1; }
+          cp "dist/Quick start.pdf" dist/Quick-start.pdf
+          gh release view "$TAG" >/dev/null 2>&1 && gh release upload "$TAG" dist/IR-Capture.dmg dist/Quick-start.pdf --clobber \
+            || gh release create "$TAG" dist/IR-Capture.dmg dist/Quick-start.pdf --title "IR Capture $TAG" --notes "Signed and notarized. Open the DMG and drag IR Capture to Applications." --verify-tag

@@ -107,5 +107,66 @@ check(np.abs(m96 - m44).max() < 0.2, f"44.1k matches 96k within {np.abs(m96 - m4
 peaks = [np.abs(sf.read(f)[0]).max() for f in (swift_out / "logic/set").rglob("*.wav")]
 check(abs(max(peaks) - 10 ** (-1 / 20)) < 2e-3, f"loudest file peaks at {20 * np.log10(max(peaks)):.2f} dBFS (target -1)")
 
+
+# 5. export targets (the app's consumer layout): every file must equal Python's matrix file, level included
+def same(a_path, b_path, label):
+    a, ra = sf.read(a_path)
+    b, rb = sf.read(b_path)
+    if ra != rb or len(a) != len(b):
+        check(False, f"{label}: rate/length {ra}/{len(a)} vs {rb}/{len(b)}")
+        return
+    corr = float(np.dot(a, b) / np.sqrt(np.dot(a, a) * np.dot(b, b)))
+    lvl = float(10 * np.log10(np.dot(a, a) / np.dot(b, b)))
+    check(corr > 0.99999 and abs(lvl) < 0.05, f"{label}: correlation {corr:.7f}, level {lvl:+.3f} dB")
+
+
+r = subprocess.run([cli, "process", "--signal", str(sim_out / "sweeps.json"), "--rec",
+                    str(sim_out / "logic_close.wav"), str(sim_out / "logic_room.wav"), str(sim_out / "logic_ref.wav"),
+                    "--ref", "3", "--names", "Close,Room", "--name", "tgt", "--outdir", str(swift_out),
+                    "--targets", "universal,everything,helix,iridium", "--raw-take"], capture_output=True, text=True)
+check(r.returncode == 0, "Swift process with targets ran" + (": " + r.stderr if r.returncode else ""))
+T = swift_out / "tgt"
+P = sim_out / "logic/set"
+for m in ["Close", "Room"]:
+    same(T / f"tgt_{m}.wav", P / f"48k/logic_{m}_48k_24_full.wav", f"Universal {m} = Python 48k 500 ms")
+    same(T / f"More formats/Line 6 Helix/tgt_{m}_Helix.wav", P / f"48k/logic_{m}_48k_24_2048.wav", f"Helix {m} = Python 48k 2048")
+    same(T / f"More formats/Strymon Iridium/tgt_{m}_Iridium.wav", P / f"96k/logic_{m}_96k_24_full.wav", f"Iridium {m} = Python 96k 500 ms")
+ev = sorted((T / "More formats/Everything").rglob("*.wav"))
+check(len(ev) == 32, f"Everything: {len(ev)} files (expected 32)")
+worst = 1.0
+for f in ev:
+    a, _ = sf.read(f)
+    b, _ = sf.read(P / f.parent.name / f.name.replace("tgt_", "logic_"))
+    worst = min(worst, float(np.dot(a, b) / np.sqrt(np.dot(a, a) * np.dot(b, b))) if len(a) == len(b) else 0.0)
+check(worst > 0.99999, f"Everything files match Python's set files (worst correlation {worst:.7f})")
+top = sorted(p.name for p in T.iterdir())
+check(top == ["More formats", "README.txt", "Raw take", "report.json", "tgt_Close.wav", "tgt_Room.wav"], f"capture folder top level: {top}")
+check("tgt_Close.wav" in (T / "README.txt").read_text(), "README.txt names the Universal files")
+
+# 6. re-export from the raw take gives the same files, bit for bit
+before = sf.read(T / "More formats/Line 6 Helix/tgt_Close_Helix.wav")[0]
+r = subprocess.run([cli, "reexport", "--folder", str(T), "--targets", "universal,helix"], capture_output=True, text=True)
+check(r.returncode == 0, "re-export from the raw take ran" + (": " + r.stderr if r.returncode else ""))
+after = sf.read(T / "More formats/Line 6 Helix/tgt_Close_Helix.wav")[0]
+check(np.array_equal(before, after), "re-exported Helix file is identical to the original")
+
+# 7. polarity: the inverted room mic is flipped exactly as Python flips it
+r = subprocess.run([cli, "process", "--signal", str(sim_out / "sweeps.json"), "--rec",
+                    str(sim_out / "logic_close.wav"), str(sim_out / "logic_room_inv.wav"), str(sim_out / "logic_ref.wav"),
+                    "--ref", "3", "--names", "Close,Room", "--name", "polarity", "--outdir", str(swift_out),
+                    "--rates", "48000", "--lengths", "full"], capture_output=True, text=True)
+print(r.stdout)
+check(r.returncode == 0 and "Room was inverted relative to Close and has been flipped." in r.stdout, "Swift flips the inverted Room mic")
+spol = json.loads((swift_out / "polarity/report.json").read_text())["polarity"]
+ppol = json.loads((sim_out / "polarity/report.json").read_text())["polarity"]
+check(spol == ppol, f"polarity in report.json matches Python: {spol}")
+same(swift_out / "polarity/set/48k/polarity_Room_48k_24_full.wav", sim_out / "polarity/set/48k/polarity_Room_48k_24_full.wav", "flipped Room = Python")
+r = subprocess.run([cli, "process", "--signal", str(sim_out / "sweeps.json"), "--rec",
+                    str(sim_out / "logic_close.wav"), str(sim_out / "logic_room_inv.wav"), str(sim_out / "logic_ref.wav"),
+                    "--ref", "3", "--names", "Close,Room", "--name", "keep", "--outdir", str(swift_out),
+                    "--rates", "48000", "--lengths", "full", "--keep-polarity"], capture_output=True, text=True)
+kp = json.loads((swift_out / "keep/report.json").read_text())["polarity"]
+check(kp["mode"] == "keep" and kp["mics"]["Room"] == {"main_peak": "negative", "flipped": False}, "--keep-polarity keeps it inverted")
+
 print("\nALL PASS" if ok else "\nSOME CHECKS FAILED")
 sys.exit(0 if ok else 1)

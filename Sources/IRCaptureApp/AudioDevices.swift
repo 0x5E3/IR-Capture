@@ -2,6 +2,7 @@
 import CoreAudio
 import AudioToolbox
 import Foundation
+import IRCaptureCore
 
 /// An audio interface as CoreAudio sees it.
 struct AudioDevice: Identifiable, Hashable {
@@ -79,12 +80,53 @@ enum CoreAudioHelper {
         var a = addr(kAudioDevicePropertyNominalSampleRate)
         var r = Float64(rate)
         let st = AudioObjectSetPropertyData(id, &a, 0, nil, UInt32(MemoryLayout<Float64>.size), &r)
-        if st != noErr { throw AppError("The interface wouldn't switch to \(rate) Hz (CoreAudio error \(st)).") }
+        let khz = "\(rateTag(rate).dropLast()) kHz"
+        if st != noErr {
+            Log.write("rate switch to \(rate) failed, CoreAudio error \(st)")
+            throw AppError("The interface wouldn't switch to \(khz). Set it to \(khz) in Audio MIDI Setup, then try again. (CoreAudio error \(st))")
+        }
         for _ in 0..<40 {
-            if abs(nominalRate(id) - Double(rate)) < 0.5 { Thread.sleep(forTimeInterval: 0.3); return }
+            if abs(nominalRate(id) - Double(rate)) < 0.5 { Thread.sleep(forTimeInterval: 0.3); Log.write("interface now at \(rate) Hz"); return }
             Thread.sleep(forTimeInterval: 0.1)
         }
-        throw AppError("The interface didn't switch to \(rate) Hz. Set it in Audio MIDI Setup and try again.")
+        Log.write("rate switch to \(rate) timed out; still \(nominalRate(id))")
+        throw AppError("The interface didn't switch to \(khz). Set it to \(khz) in Audio MIDI Setup, then try again.")
+    }
+
+    /// Puts the interface back to the rate it had before (so the user's DAW session isn't disturbed).
+    /// Best effort: never throws.
+    static func restoreRate(_ id: AudioDeviceID, _ rate: Double) {
+        guard rate > 0, abs(nominalRate(id) - rate) >= 0.5 else { return }
+        var a = addr(kAudioDevicePropertyNominalSampleRate)
+        var r = Float64(rate)
+        let st = AudioObjectSetPropertyData(id, &a, 0, nil, UInt32(MemoryLayout<Float64>.size), &r)
+        Log.write("restored interface rate to \(Int(rate)) Hz" + (st == noErr ? "" : " (failed, CoreAudio error \(st))"))
+    }
+
+    /// The interface's current I/O buffer size in frames (0 if unknown).
+    static func bufferFrames(_ id: AudioDeviceID) -> Int {
+        var a = addr(kAudioDevicePropertyBufferFrameSize)
+        var v: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        return AudioObjectGetPropertyData(id, &a, 0, nil, &size, &v) == noErr ? Int(v) : 0
+    }
+
+    /// The best capture rate: the highest the interface supports, up to 96 kHz.
+    static func bestRate(_ d: AudioDevice) -> Int { d.sampleRates.filter { $0 <= 96000 }.max() ?? 48000 }
+
+    /// Calls `changed` on the main queue whenever an interface is plugged in or removed.
+    static func watchDevices(_ changed: @escaping () -> Void) {
+        var a = addr(kAudioHardwarePropertyDevices)
+        let st = AudioObjectAddPropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &a, DispatchQueue.main) { _, _ in changed() }
+        if st != noErr { Log.write("couldn't watch for interface changes, CoreAudio error \(st)") }
+    }
+
+    /// Opens Audio MIDI Setup, where interface sample rates and aggregate devices are set.
+    static func openAudioMIDISetup() {
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+        p.arguments = ["-b", "com.apple.audio.AudioMIDISetup"]
+        try? p.run()
     }
 }
 
