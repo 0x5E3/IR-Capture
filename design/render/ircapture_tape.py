@@ -13,11 +13,16 @@
 #            smoked window on the cassette well, the cassette's label carrying the training signal's map (sweeps,
 #            noise, guitar), soft-touch keys, a three-digit counter.
 #
+# Round 3b (Lowell, 11-03: "r2r looks good, broadcast cart would be better", "warm brushed"):
+#   reel     the deck plate is warm brushed aluminium (PLATE=satin for round 3's plate); the deck is 27 cm tall, head
+#            block between the reels and the keys along the bottom, so it and a seven-input meter bridge fit the window.
+#   cart     AMP NAM: a broadcast cart machine replaces the cassette deck (piece_cart, below).
+#
 # Same studio, camera and light as every other IR Capture piece (toolkit.scene(): orthographic, 10 degrees above, key
 # light up left). Concept proofs: one whole picture each. Split into layers (deck, reels at frames, tape packs) only once
 # Lowell picks a direction.
 #
-#   FONTS_DIR=Resources/SwellKit/fonts ~/bvenv/bin/python design/render/ircapture_tape.py <out dir> reel|cassette [px/cm] [samples] [progress 0..1]
+#   FONTS_DIR=Resources/SwellKit/fonts ~/bvenv/bin/python design/render/ircapture_tape.py <out dir> reel|cart|cassette [px/cm] [samples] [progress 0..1]
 import sys, os, math, json, time
 HERE = os.path.dirname(os.path.abspath(__file__))
 _argv = sys.argv[:]
@@ -132,6 +137,28 @@ def satin_alu(name='deckalu', base='#b2a993'):
     return grimy(m, dirt='#3b3428', amount=0.45, dist=0.1)
 
 
+def brushed_alu(name='deckbrush', base='#bdae90'):
+    """The deck plate (Lowell, 11-03: "warm brushed"): aluminium brushed along x, the grain long and visible, an
+    anisotropic sheen that runs across the plate, gone warm with age; rubbed edges, handling marks round the keys."""
+    m = mat(name, srgb(base), rough=0.3, metal=0.92, spec=0.5, aniso=0.55)
+    nt = m.node_tree; b = nt.nodes['Principled BSDF']; co = obj_coords(nt)
+    tg = node(nt, 'ShaderNodeTangent'); tg.direction_type = 'RADIAL'; tg.axis = 'Y'   # radial round y: the tangent runs along x
+    nt.links.new(tg.outputs['Tangent'], b.inputs['Tangent'])
+    # the grain: noise stretched 200:1 along x, two scales (the brush's long strokes and the fine hairlines)
+    st = node(nt, 'ShaderNodeMapping'); st.inputs['Scale'].default_value = (0.005, 1.0, 1.0); nt.links.new(co, st.inputs[0])
+    hair = noise(nt, st.outputs[0], 90.0, 4.0, 0.65, lo=0.25, hi=0.75)
+    st2 = node(nt, 'ShaderNodeMapping'); st2.inputs['Scale'].default_value = (0.02, 1.0, 1.0); nt.links.new(co, st2.inputs[0])
+    stroke = noise(nt, st2.outputs[0], 6.0, 3.0, 0.55, lo=0.3, hi=0.7)
+    add_bump(m, hair, 0.12, 0.0015)
+    mix_into(m, 'Roughness', mul(nt, hair, 0.6), 0.44, 'FLOAT')
+    mix_into(m, 'Base Color', mul(nt, stroke, 0.35), (*srgb('#a89a7e'), 1))
+    mix_into(m, 'Base Color', mul(nt, hair, 0.25), (*srgb('#cbbfa6'), 1))
+    # age: a soft warm cloud, darker toward the edges
+    mix_into(m, 'Base Color', mul(nt, noise(nt, co, 0.3, 3.0, 0.55, lo=0.35, hi=0.75), 0.45), (*srgb('#968a72'), 1))
+    surface_wear(m, dust=0.3, smudge=0.5, scuff=0.35)
+    return grimy(m, dirt='#3b3428', amount=0.45, dist=0.1)
+
+
 def reel_alu(name='reelalu'):
     m = mat(name, srgb('#b9b6ae'), rough=0.3, metal=1.0, spec=0.5)
     nt = m.node_tree; co = obj_coords(nt)
@@ -147,14 +174,9 @@ def reel_alu(name='reelalu'):
 
 
 def oxide(name='oxide'):
-    """Brown oxide tape: the pack's face a dull chocolate brown with the faint rings of the winding."""
-    m = mat(name, srgb('#74503a'), rough=0.5, spec=0.35, coat=0.15, coat_rough=0.35)
-    nt = m.node_tree; co = obj_coords(nt)
-    wv = node(nt, 'ShaderNodeTexWave', Scale=55.0); wv.wave_type = 'RINGS'; wv.rings_direction = 'Z'
-    nt.links.new(co, wv.inputs['Vector'])
-    mix_into(m, 'Base Color', mul(nt, wv.outputs['Fac'], 0.25), (*srgb('#7a5236'), 1))
-    mix_into(m, 'Roughness', mul(nt, wv.outputs['Fac'], 0.3), 0.4, 'FLOAT')
-    return m
+    """Brown oxide tape: the pack's face a dull chocolate brown with a soft sheen. (The earlier node set, with ring
+    colour and roughness mixes, shaded the pack nearly black; a plain material reads as tape.)"""
+    return mat(name, srgb('#86603f'), rough=0.42, spec=0.45)
 
 
 def mu_metal(name='mu'):
@@ -174,8 +196,10 @@ def black_rubber(name='pinch'):
 # ---------------------------------------------------------------------------------------------------------------------
 # the open-reel recorder (CAB IR)
 
-REEL = dict(w=72.0, h=36.0, case_d=3.0, plate_inset=1.6, rx=22.5, ry=4.0, R=8.9, hub=3.0, tape=0.635, z_reel=1.2,
-            pack_full=8.3, ty=-9.8)
+# Round 3b (11-03): 27 cm tall instead of 36, so the deck and a six-mic meter bridge fit the 920 x 960 pt window: the
+# head block sits between the reels, the keys run along the bottom edge under it.
+REEL = dict(w=72.0, h=27.0, case_d=3.0, plate_inset=1.6, rx=22.5, ry=1.5, R=8.9, hub=3.0, tape=0.635, z_reel=1.2,
+            pack_full=8.3, ty=-7.0)
 
 
 def reel(x, y, rp, ang, alu, tape_m, chrome, black):
@@ -204,9 +228,9 @@ def reel(x, y, rp, ang, alu, tape_m, chrome, black):
         lip.location = (x, y, 0); lip.data.materials.append(alu)
     hb = cyl('hub', hub, zf0, zg1 + 0.02, x, y, 128, alu)
     if rp > hub + 0.05:
-        pk = lathe('pack', [(hub, zt0), (rp, zt0), (rp, zt1), (hub, zt1)], 256)
+        pk = lathe('pack', [(hub, zt0), (rp, zt0), (rp, zt1), (hub, zt1)], 256, smooth=False)   # flat: smooth normals across the pack's square corners shaded its face black
         pk.location = (x, y, 0); pk.data.materials.append(tape_m)
-        top = lathe('packtop', [(rp, zt1), (hub, zt1)], 256, fan=False); top.location = (x, y, 0); top.data.materials.append(tape_m)
+        # (no separate top disc: one coplanar with the pack's own face shadowed it black)
     # the hold-down: a chrome boss and three prongs
     bo = lathe('boss', [(1.1, zg1), (1.1, zg1 + 0.35), (0.9, zg1 + 0.55), (0.35, zg1 + 0.62), (0.0, zg1 + 0.64)], 96)
     bo.location = (x, y, 0); bo.data.materials.append(chrome)
@@ -227,7 +251,7 @@ def piece_reel(prog):
     TK.flat_faces(case); case.data.materials.append(K.hammertone_fine(name='casehammer'))
     pw, ph = W_ - 2 * REEL['plate_inset'], H_ - 2 * REEL['plate_inset']
     plate = rbox('plate', pw, ph, 0.25, 0.0, 0.6, roll=0.08)
-    TK.flat_faces(plate); plate.data.materials.append(satin_alu())
+    TK.flat_faces(plate); plate.data.materials.append(brushed_alu() if os.environ.get('PLATE', 'brushed') == 'brushed' else satin_alu())
     ni = TK.nickel(); ch = SG.chrome('chr', seed=3); blk = SG.black_cast('bc'); alu = reel_alu(); tp = oxide()
     for sx in (-1, 1):
         for sy in (-1, 1):
@@ -241,7 +265,7 @@ def piece_reel(prog):
     reel(rx, ry, rt, 1.4, alu, tp, ch, blk)
     # the head block: a cast base, three heads, a hood behind, guides, the capstan and the pinch roller
     ty = REEL['ty']
-    base = rbox('hbase', 30.0, 5.6, 0.6, 0.25, 0.4, roll=0.12); base.location = (0, ty + 3.4, 0)
+    base = rbox('hbase', 28.0, 5.6, 0.6, 0.25, 0.4, roll=0.12); base.location = (0, ty + 3.4, 0)
     chamfer(base, 0.02, 2); base.data.materials.append(K.hammertone_fine(base='#191612', hi='#2e271e', name='hbase'))
     hood = rbox('hood', 17.5, 2.4, 1.6, 0.85, 0.6, roll=0.35); hood.location = (-1.5, ty + 4.9, 0)
     chamfer(hood, 0.02, 2); hood.data.materials.append(blk)
@@ -262,31 +286,34 @@ def piece_reel(prog):
     cyl('pinchcap', 0.4, zt1 + 0.25, zt1 + 0.4, cx_, ty - 1.07, 64, ch)
     # the tension arms with their rollers, beside each reel
     for sx in (-1, 1):
-        ax, ay = sx * 13.6, ty + 5.6
-        a = rbox('tarm', 0.7, 3.4, 0.3, 0.55, 0.3, roll=0.1); a.location = (ax, ay + 0.8, 0); a.rotation_euler = (0, 0, sx * -0.35)
+        ax, ay = sx * 13.0, ty + 5.0                 # the roller; its arm pivots below it, on the head base
+        a = rbox('tarm', 0.7, 3.0, 0.3, 0.55, 0.3, roll=0.1); a.location = (ax + sx * 0.5, ay - 1.3, 0); a.rotation_euler = (0, 0, sx * -0.35)
         a.data.materials.append(blk)
-        cyl('troll', 0.7, 0.85, zt1 + 0.15, ax + sx * 0.0, ay + 2.0, 64, ch)
+        cyl('troll', 0.7, 0.85, zt1 + 0.15, ax, ay, 64, ch)
     # the tape's path
-    circles = [((-rx, ry), rs, -1), ((-13.6, ty + 7.6), 0.7, +1), ((-10.5, ty + 0.55), 0.55, +1),
+    circles = [((-rx, ry), rs, -1), ((-13.0, ty + 5.0), 0.7, +1), ((-10.5, ty + 0.55), 0.55, +1),
                ((-6.0, ty + 0.9), 0.9, +1), ((-1.5, ty + 0.9), 0.9, +1), ((3.0, ty + 0.9), 0.9, +1),
-               ((cx_, ty + 0.22), 0.22, +1), ((7.8, ty + 0.55), 0.55, +1), ((13.6, ty + 7.6), 0.7, +1), ((rx, ry), rt, -1)]
+               ((cx_, ty + 0.22), 0.22, +1), ((7.8, ty + 0.55), 0.55, +1), ((13.0, ty + 5.0), 0.7, +1), ((rx, ry), rt, -1)]
     ribbon('tape', tape_path(circles), zt0, zt1, tp)
     # the counter, between the reels
     cw, chh = 6.2, 2.0
-    bz = rbox('cbez', cw + 0.6, chh + 0.6, 0.3, 0.25, 0.3, roll=0.1); bz.location = (0, 8.5, 0)
-    cut(bz, prism('chole', [(x, y + 8.5, z) for x, y, z in _rring(cw / 2, chh / 2, 0.15, 0.0, 0, n_arc=8)], -2, 2))
+    CY = 6.4
+    bz = rbox('cbez', cw + 0.6, chh + 0.6, 0.3, 0.25, 0.3, roll=0.1); bz.location = (0, CY, 0)
+    cut(bz, prism('chole', [(x, y + CY, z) for x, y, z in _rring(cw / 2, chh / 2, 0.15, 0.0, 0, n_arc=8)], -2, 2))
     chamfer(bz, 0.02, 2); bz.data.materials.append(blk)
     for i, d in enumerate('0045'):
         dx = -2.25 + i * 1.5
-        wh = rbox('wheel', 1.25, 1.9, 0.3, -0.05, 0.05, roll=0.06); wh.location = (dx, 8.5, 0.0)
+        wh = rbox('wheel', 1.25, 1.9, 0.3, -0.05, 0.05, roll=0.06); wh.location = (dx, CY, 0.0)
         wh.data.materials.append(mat('wheel', srgb('#141211'), rough=0.5, coat=0.2))
-        ink(d, dx, 8.5, 0.26, 0.95, color='#ece6d6', kind='BarlowSemiCondensed-600-normal.ttf', track=0.0, w=1.2)
+        ink(d, dx, CY, 0.26, 0.95, color='#ece6d6', kind='BarlowSemiCondensed-600-normal.ttf', track=0.0, w=1.2)
     D = '#221e19'
-    ink('SECONDS LEFT', 0, 6.85, 0.25, 0.34, color=D)
-    ink('SUPPLY', -rx, ry - 10.4, 0.25, 0.34, color=D); ink('TAKE-UP', rx, ry - 10.4, 0.25, 0.34, color=D)
+    ink('SECONDS LEFT', 0, CY - 1.65, 0.25, 0.34, color=D)
+    ink('SUPPLY', -rx, -10.4, 0.25, 0.34, color=D); ink('TAKE-UP', rx, -10.4, 0.25, 0.34, color=D)
+    ink('CAB IR RECORDER', 0, 10.0, 0.25, 0.5, track=0.3, color=D)
+    ink('FULL TRACK  .  ONE CAPTURE, EVERY RATE', 0, 9.0, 0.25, 0.24, track=0.2, color=D, w=12.0)
     # the keys: the shelf's illuminated pushbuttons, only for real actions; a red jewel for record
-    keys = [('CHECK LEVELS', -18.0, False, 6.2), ('CAPTURE', -9.0, True, 5.4), ('STOP', -1.6, False, 3.8)]
-    ky = -14.3
+    keys = [('CHECK LEVELS', -15.0, False, 6.2), ('CAPTURE', -6.6, True, 5.4), ('STOP', 1.6, False, 3.8)]
+    ky = -10.4
     for txt, kx, lit, kw in keys:
         kh = 1.9
         bez = rbox('kbez', kw + 0.44, kh + 0.44, 0.25, 0.25, 0.25, roll=0.06); bez.location = (kx, ky, 0)
@@ -299,15 +326,13 @@ def piece_reel(prog):
             g = bpy.data.objects.new('kg', L); s.collection.objects.link(g); g.location = (kx, ky, 1.4)
     jw = SG.chrome('jch', seed=7)
     from gear_kit import tek_jewel
-    j = 4.3
+    j = -2.6 + 0.0
     bzl = lathe('jb', [(0.92, 0.0), (0.92, 0.2), (0.88, 0.26), (0.76, 0.28), (0.7, 0.36), (0.66, 0.42), (0.6, 0.43), (0.56, 0.38), (0.55, 0.2)], 160)
     bzl.location = (j, ky, 0.25); bzl.data.materials.append(jw)
     lens = mat('reclens', srgb('#5a0a06'), rough=0.3, coat=0.5, coat_rough=0.03, spec=0.4, emit=srgb('#ff3a22'), emit_strength=3.0)
     o = lathe('jl', [(0.56, 0.2), (0.56, 0.34), (0.45, 0.4), (0.25, 0.45), (0.0, 0.47)], 96); o.location = (j, ky, 0.25); o.data.materials.append(lens)
-    ink('REC', j + 1.6, ky, 0.25, 0.3, color=D)
+    ink('REC', j, ky + 1.3, 0.25, 0.26, color=D)
     # the meter bridge's place on the right (the app's own VU modules sit here; shown as a blank engraved label)
-    ink('CAB IR RECORDER', 18.0, -14.6, 0.25, 0.55, track=0.3, color=D)
-    ink('FULL TRACK  .  ONE CAPTURE, EVERY RATE', 18.0, -15.8, 0.25, 0.28, track=0.2, color=D, w=14.0)
     name = 'tape-reel-%02d' % int(round(prog * 100))
     if os.environ.get('DETAIL'):
         from gear_kit import render_crop
@@ -419,8 +444,185 @@ def piece_cassette(prog):
     TK.shoot(s, cam, name, W_, H_)
 
 
+# ---------------------------------------------------------------------------------------------------------------------
+# the broadcast cart machine (AMP NAM; Lowell, 11-03: "broadcast cart would be better")
+#
+# A late-1970s/80s rack cart machine, 3U: graphite anodised face with rack ears, a C-size cartridge in the slot with
+# its end label facing out, square lens pushbuttons (CHECK amber, RECORD red, STOP white), READY and two CUE lamps,
+# a four-digit LED timer behind a red filter. Every part is a function of the app:
+#   the cart's end label   the training signal's map, with a playhead the app moves
+#   READY                  T3K-sweep-v3.wav found and checked (was SIGNAL LOADED)
+#   CUE 1, CUE 2           the two one-sample clicks at 10.5 s and 11.5 s, found in the recording (the alignment)
+#   the timer              time left in the 190 s take
+#   CHECK / RECORD / STOP  the level check, the take, stop
+
+CART = dict(w=48.3, h=13.3, d=3.0, ear=1.9)
+
+
+def cart_label_tex(w, h, ppcm, prog=None):
+    """The cart's end label: cream stock, a title line, and the training signal's map (the real envelope of
+    T3K-sweep-v3.wav, reference/nam_v3_map.json), the CHECK sections and the two cue clicks marked."""
+    from PIL import ImageDraw
+    W_, H_ = int(w * ppcm), int(h * ppcm)
+    im = Image.new('RGB', (W_, H_), (233, 224, 199)); d = ImageDraw.Draw(im)
+    f = SG.font('cap', int(0.30 * ppcm)); f2 = SG.font('BarlowSemiCondensed-600-normal.ttf', int(0.24 * ppcm))
+    ink_c = (44, 34, 26)
+    d.text((0.25 * ppcm, 0.08 * ppcm), 'TRAINING SIGNAL v3', font=f, fill=ink_c)
+    t2 = '190 s  .  48 kHz  .  MONO'; d.text((W_ - 0.25 * ppcm - f2.getlength(t2), 0.12 * ppcm), t2, font=f2, fill=(70, 56, 44))
+    d.line([(0.25 * ppcm, 0.5 * ppcm), (W_ - 0.25 * ppcm, 0.5 * ppcm)], fill=(170, 60, 50), width=max(1, int(0.03 * ppcm)))
+    y0, y1 = int(0.62 * ppcm), int(1.42 * ppcm)
+    x0, x1 = int(0.25 * ppcm), W_ - int(0.25 * ppcm)
+    mp = json.load(open(os.path.join(HERE, '..', '..', 'reference', 'nam_v3_map.json')))
+    pk = np.array(mp['peak_db']); rm = np.array(mp['rms_db']); n = len(pk); T = n * mp['block_s']
+    ym = (y0 + y1) / 2
+    X = lambda t: x0 + (x1 - x0) * t / T
+    for a, b in ((0, 9), (181, 190)): d.rectangle([X(a), y0, X(b), y1], fill=(216, 160, 112))
+    for px in range(x0, x1):
+        i0 = int((px - x0) / (x1 - x0) * n); i1 = max(i0 + 1, int((px + 1 - x0) / (x1 - x0) * n))
+        for arr, col in ((pk, (126, 102, 80)), (rm, (52, 40, 32))):
+            e = arr[i0:i1].max(); hh = max(0.0, (e + 48) / 48) * (y1 - y0) / 2
+            if hh > 0.3: d.line([(px, ym - hh), (px, ym + hh)], fill=col)
+    for tc in (10.5, 11.5):                                   # the cue clicks
+        d.line([(X(tc), y0 - 0.06 * ppcm), (X(tc), y1 + 0.06 * ppcm)], fill=(170, 60, 50), width=max(1, int(0.025 * ppcm)))
+    yl = y1 + 0.04 * ppcm
+    d.text((X(0), yl), 'CHECK', font=f2, fill=(70, 56, 44))
+    d.text((X(12.5), yl), 'CUE 1, 2', font=f2, fill=(150, 56, 46))
+    d.text(((x0 + x1) / 2 - f2.getlength('TRAINING') / 2, yl), 'TRAINING', font=f2, fill=(70, 56, 44))
+    d.text((x1 - f2.getlength('CHECK'), yl), 'CHECK', font=f2, fill=(70, 56, 44))
+    return np.asarray(im, np.float32) / 255.0
+
+
+def img_plane(name, arr, w, h, x, y, z, rough=0.7):
+    bpy.ops.mesh.primitive_plane_add(size=1, location=(x, y, z)); o = bpy.context.active_object; o.name = name
+    o.scale = (w, h, 1)
+    m = mat(name, srgb('#e8dec4'), rough=rough); nt = m.node_tree
+    t = SG.img_tex(nt, name + 'tx', arr, True, 'CLIP')
+    uv = nt.nodes.new('ShaderNodeTexCoord'); nt.links.new(uv.outputs['UV'], t.inputs['Vector'])
+    nt.links.new(t.outputs['Color'], nt.nodes['Principled BSDF'].inputs['Base Color'])
+    co = obj_coords(nt); add_bump(m, noise(nt, co, 40.0, 3.0, 0.6), 0.08, 0.002)
+    o.data.materials.append(m)
+    return o
+
+
+def lens_mat(name, base, glow, lit):
+    """A square pushbutton's lens: tinted translucent resin, frosted; lit, the lamp behind it glows evenly."""
+    m = mat(name, srgb(base), rough=0.35, coat=0.4, coat_rough=0.12, spec=0.4,
+            emit=srgb(glow) if lit else None, emit_strength=0.8 if lit else 0.0)
+    nt = m.node_tree; co = obj_coords(nt)
+    add_bump(m, noise(nt, co, 160.0, 2.0, 0.5), 0.12, 0.0012)
+    surface_wear(m, smudge=0.5, scuff=0.2)
+    return m
+
+
+def led_mat(name, col, on, k=5.0):
+    return mat(name, srgb(col if on else '#2a0e08'), rough=0.25, coat=0.5, coat_rough=0.05,
+               emit=srgb(col) if on else None, emit_strength=k if on else 0.0)
+
+
+SEG = {'0': 'abcdef', '1': 'bc', '2': 'abdeg', '3': 'abcdg', '4': 'bcfg', '5': 'acdfg', '6': 'acdefg', '7': 'abc',
+       '8': 'abcdefg', '9': 'abcdfg'}
+
+
+def seven_seg(ch, x, y, z, hgt, on_m, off_m):
+    """One seven-segment digit hgt cm tall, slanted 8 degrees, every segment present (unlit ones dark red)."""
+    w = hgt * 0.52; t = hgt * 0.11; sl = math.tan(math.radians(8))
+    segs = {'a': (0, hgt / 2, True), 'g': (0, 0, True), 'd': (0, -hgt / 2, True),
+            'f': (-w / 2, hgt / 4, False), 'b': (w / 2, hgt / 4, False), 'e': (-w / 2, -hgt / 4, False), 'c': (w / 2, -hgt / 4, False)}
+    for k, (sx, sy, horiz) in segs.items():
+        sw, sh = (w - t, t) if horiz else (t, hgt / 2 - t)
+        o = rbox('seg', sw, sh, 0.02, z, t * 0.45, roll=0.0)
+        o.location = (x + sx + sy * sl, y + sy, 0); o.rotation_euler = (0, 0, 0 if horiz else math.radians(-8) * 0)
+        o.data.materials.append(on_m if k in SEG.get(ch, '') else off_m)
+
+
+def piece_cart(prog):
+    W_, H_, D, E = CART['w'], CART['h'], CART['d'], CART['ear']
+    s, cam = TK.scene(W_, H_, 1.0)
+    TK.catcher(-D)
+    blk = SG.black_cast('bc'); ni = TK.nickel()
+    # the face, the slot cut through it
+    sx0, sy0, sw, sh = -10.4, 1.9, 16.2, 3.1
+    face = rbox('face', W_, H_, 0.5, -0.5, 0.25, roll=0.2)
+    cut(face, prism('slot', [(x + sx0, y + sy0, z) for x, y, z in _rring(sw / 2, sh / 2, 0.25, 0.0, 0, n_arc=8)], -2, 2))
+    for ex in (-1, 1):                                        # rack ears: two slotted holes each
+        for ey in (-1, 1):
+            cut(face, prism('rk', [(x + ex * (W_ / 2 - E / 2), y + ey * 4.75, z) for x, y, z in _rring(0.55, 0.33, 0.32, 0.0, 0, n_arc=8)], -2, 2))
+    TK.flat_faces(face); face.data.materials.append(K.anodised('face'))
+    body = rbox('body', W_ - 2 * E - 0.4, H_ - 0.6, D - 0.5, -D, 0.3); body.data.materials.append(mat('body', srgb('#141414'), rough=0.6))
+    for ex in (-1, 1):
+        for ey in (-1, 1): screw_at(ex * (W_ / 2 - E / 2), ey * 4.75, 0.0, ni)
+    # the ears' seams: a fine engraved line where the ear meets the panel's working face
+    for ex in (-1, 1):
+        g = rbox('seam', 0.035, H_ - 0.9, 0.02, -0.005, 0.0); g.location = (ex * (W_ / 2 - E), 0, 0)
+        g.data.materials.append(mat('seam', srgb('#0e0e0f'), rough=0.6))
+    # the slot's throat: dark, lit faintly from inside; the cart in it, its end standing 1.4 cm proud
+    throat = rbox('throat', sw - 0.1, sh - 0.1, 0.1, -2.6, 0.2); throat.location = (sx0, sy0, 0)
+    throat.data.materials.append(mat('throat', srgb('#0d0c0b'), rough=0.85))
+    Lt = bpy.data.lights.new('throat', 'AREA'); Lt.energy = 0.6; Lt.size = 12.0; Lt.color = srgb('#ffdcb0')
+    gt = bpy.data.objects.new('throat', Lt); s.collection.objects.link(gt); gt.location = (sx0, sy0 + 1.0, -1.2); gt.rotation_euler = (math.radians(80), 0, 0)
+    cw_, ch_ = 15.2, 2.45
+    shell = rbox('cart', cw_, ch_, 4.0, -2.6, 0.18, roll=0.04); shell.location = (sx0, sy0 - 0.15, 0)
+    shm = mat('cartshell', srgb('#2b2927'), rough=0.42, coat=0.25, coat_rough=0.25)
+    add_bump(shm, noise(shm.node_tree, obj_coords(shm.node_tree), 90.0, 2.0, 0.5), 0.08, 0.001); surface_wear(shm, dust=0.4, smudge=0.5, scuff=0.5)
+    shell.data.materials.append(grimy(shm, dirt='#3a3228', amount=0.35, dist=0.05))
+    # two finger grips moulded into the end, either side of the label
+    for gx in (-1, 1):
+        for i in range(4):
+            gr = rbox('grip', 0.06, ch_ - 0.7, 0.05, 1.4, 0.02); gr.location = (sx0 + gx * (cw_ / 2 - 0.45 - i * 0.16), sy0 - 0.15, 0)
+            gr.data.materials.append(shm)
+    lw, lh = 12.6, 1.9
+    img_plane('cartlabel', cart_label_tex(lw, lh, 110), lw, lh, sx0, sy0 - 0.15, 1.402)
+    # the playhead on the label's map (the app moves it)
+    ph = rbox('phead', 0.06, 0.95, 0.01, 1.404, 0.0)
+    ph.location = (sx0 - lw / 2 + 0.25 + (lw - 0.5) * prog, sy0 - 0.15 - lh / 2 + 1.02 / 1.9 * lh, 0)
+    ph.data.materials.append(mat('phm', srgb('#d01a10'), rough=0.5, emit=srgb('#ff2010'), emit_strength=0.6))
+    D_ = '#cfc9bd'
+    ink('PLAY / RECORD', sx0 - sw / 2 + 1.6, sy0 + sh / 2 + 0.55, 0.0, 0.26, color=D_)
+    # the keys: square lens pushbuttons in chrome-edged bezels, under the slot
+    ky = -3.3; ks = 2.5
+    for txt, kx, base, glow, lit in (('CHECK', -16.0, '#c88a30', '#ffa030', False), ('RECORD', -10.4, '#5e0a05', '#ff1a08', True),
+                                     ('STOP', -4.8, '#cfc8b8', '#fff0d0', False)):
+        bz = rbox('kbz', ks + 0.5, ks + 0.5, 0.22, 0.0, 0.2, roll=0.06); bz.location = (kx, ky, 0)
+        cut(bz, prism('kh', [(x + kx, y + ky, z) for x, y, z in _rring(ks / 2 + 0.03, ks / 2 + 0.03, 0.15, 0.0, 0, n_arc=8)], -2, 2))
+        chamfer(bz, 0.02, 2); bz.data.materials.append(SG.chrome('kch', seed=5))
+        cap = rbox('lens', ks, ks, 0.55, -0.1, 0.12, roll=0.08); TK.flat_faces(cap); cap.location = (kx, ky, 0)
+        cap.data.materials.append(lens_mat('lens' + txt, base, glow, lit))
+        if lit:
+            L = bpy.data.lights.new('kg', 'POINT'); L.energy = 0.35; L.color = srgb(glow); L.shadow_soft_size = 0.8
+            g = bpy.data.objects.new('kg', L); s.collection.objects.link(g); g.location = (kx, ky, 1.3)
+        ink(txt, kx, ky - ks / 2 - 0.62, 0.0, 0.3, color=D_)
+    # the lamps: READY and the two cues, flush LEDs in a row right of the slot
+    for i, (txt, col, on) in enumerate((('READY', '#40e070', True), ('CUE 1', '#ffb030', True), ('CUE 2', '#ffb030', True))):
+        lx, ly = 1.2 + i * 2.5, 2.4
+        cyl('ledbz', 0.36, 0.0, 0.12, lx, ly, 48, blk)
+        cyl('led', 0.24, 0.0, 0.2, lx, ly, 48, led_mat('led' + txt, col, on))
+        ink(txt, lx, ly - 0.85, 0.0, 0.24, color=D_)
+    # the timer: four digits (M:SS) behind a red filter, time left in the take
+    left = int(round(190 * (1 - prog))); digits = '%d%02d' % (left // 60, left % 60)
+    tx, tyy, tw, th = 3.7, -2.6, 7.4, 2.6
+    win = rbox('twin', tw, th, 0.3, 0.0, 0.1, roll=0.04); win.location = (tx, tyy, 0)
+    cut(win, prism('twh', [(x + tx, y + tyy, z) for x, y, z in _rring(tw / 2 - 0.3, th / 2 - 0.3, 0.1, 0.0, 0, n_arc=8)], -2, 2))
+    win.data.materials.append(blk)
+    back = rbox('tback', tw - 0.6, th - 0.6, 0.05, 0.0, 0.0); back.location = (tx, tyy, 0)
+    back.data.materials.append(mat('tback', srgb('#120605'), rough=0.6))
+    on_m, off_m = led_mat('segon', '#ff3a18', True, 14.0), led_mat('segoff', '#ff3a18', False)
+    hgt = 1.45
+    xs = (tx - 2.0, tx - 0.15, tx + 1.15, tx + 2.45)          # M : S S (one digit, colon, two)
+    seven_seg(digits[0], xs[0], tyy, 0.05, hgt, on_m, off_m)
+    for k, c in enumerate(digits[1:]): seven_seg(c, xs[2 + k] - 0.4, tyy, 0.05, hgt, on_m, off_m)
+    for dy in (0.32, -0.32): cyl('colon', 0.08, 0.05, 0.07, xs[1] - 0.25, tyy + dy, 16, on_m)
+    filt = rbox('tfilt', tw - 0.5, th - 0.5, 0.04, 0.16, 0.0); filt.location = (tx, tyy, 0)
+    filt.data.materials.append(mat('tfilt', srgb('#e0a090'), rough=0.04, transm=1.0, ior=1.1, spec=0.35))
+    ink('TIME LEFT', tx, tyy - th / 2 - 0.5, 0.0, 0.24, color=D_)
+    # the title, engraved and filled
+    ink('AMP CAPTURE CART', 15.6, 0.9, 0.0, 0.48, track=0.3, color=D_)
+    ink('NAM  .  TRAINING SIGNAL v3', 15.6, -0.2, 0.0, 0.24, track=0.2, color='#a8a298')
+    name = 'tape-cart-%02d' % int(round(prog * 100))
+    TK.shoot(s, cam, name, W_, H_)
+
+
 if __name__ == '__main__':
     t = time.time()
-    (piece_reel if WHAT == 'reel' else piece_cassette)(PROG)
+    {'reel': piece_reel, 'cassette': piece_cassette, 'cart': piece_cart}[WHAT](PROG)
     print('done %.1fs' % (time.time() - t))
     json.dump(TK.LAY, open(os.path.join(OUT, 'tape-%s.json' % WHAT), 'w'), indent=1)
