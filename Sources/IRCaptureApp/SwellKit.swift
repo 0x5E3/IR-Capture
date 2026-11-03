@@ -147,11 +147,14 @@ enum SwellNine {
     }
     static let window = Piece(name: "rkit-win", pxPerPoint: 2.4, insets: EdgeInsets(top: 5, leading: 5, bottom: 5, trailing: 5),
                               mode: .stretch, outset: 1.2)
-    static let panel = Piece(name: "rkit-panel", pxPerPoint: 2.4, insets: EdgeInsets(top: 17.08, leading: 17.08, bottom: 17.08, trailing: 17.08),
-                             mode: .tile, outset: 2)
+    // Drawn at 1.5 times the kit's density (screws two thirds the size): at the kit's own scale the corner screws
+    // dominate IR Capture's smaller panels. Insets scale with it (17.08 pt at 2.4 px a pt).
+    static let panel = Piece(name: "rkit-panel", pxPerPoint: 3.6, insets: EdgeInsets(top: 11.39, leading: 11.39, bottom: 11.39, trailing: 11.39),
+                             mode: .tile, outset: 1.3)
     static let faceplate = Piece(name: "faceplate", pxPerPoint: 4.8, insets: EdgeInsets(top: 40, leading: 40, bottom: 40, trailing: 40),
                                  mode: .tile, outset: 0)
-    static let crinkle = Piece(name: "audio-panel", pxPerPoint: 64.0 / 26.0, insets: EdgeInsets(top: 26, leading: 26, bottom: 26, trailing: 26),
+    // Twice the kit's density, for the same reason (26 pt insets at 2.46 px a pt).
+    static let crinkle = Piece(name: "audio-panel", pxPerPoint: 128.0 / 26.0, insets: EdgeInsets(top: 13, leading: 13, bottom: 13, trailing: 13),
                                mode: .stretch, outset: 0)
     // frame (frame_camera.py): ref px = points, 1.6 px a point at 1x
     static let shelfBox = Piece(name: "frame-box-keys", pxPerPoint: 1.6, insets: EdgeInsets(top: 10, leading: 26, bottom: 8, trailing: 76),
@@ -281,8 +284,10 @@ struct JewelLamp: View {
     var on: Bool
     var diameter: CGFloat = 24
     var body: some View {
-        if let img = SwellPictures.shared.image("rlamp-jewel\(colour)-\(on ? "on" : "off")", pxPerPoint: 120 / diameter) {
-            Image(nsImage: img).accessibilityHidden(true)
+        // The picture is the jewel in its chrome ring with a shadow margin round it: the jewel's own size is
+        // `diameter`, so the picture is drawn 1.7 times larger and overhangs its frame.
+        if let img = SwellPictures.shared.image("rlamp-jewel\(colour)-\(on ? "on" : "off")", pxPerPoint: 120 / (diameter * 1.7)) {
+            Image(nsImage: img).frame(width: diameter, height: diameter).accessibilityHidden(true)
         }
     }
 }

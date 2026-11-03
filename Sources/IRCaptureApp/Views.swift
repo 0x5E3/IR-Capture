@@ -113,6 +113,9 @@ struct ContentView: View {
         } else if let i = args.firstIndex(of: "--render-diagrams"), i + 1 < args.count {
             DiagramExport.render(to: URL(fileURLWithPath: args[i + 1]))
             NSApp.terminate(nil)
+        } else if let i = args.firstIndex(of: "--render-gear"), i + 1 < args.count {
+            GearPreview.render(to: URL(fileURLWithPath: args[i + 1]).appendingPathComponent("screenshot-gear.png"))
+            NSApp.terminate(nil)
         } else if let i = args.firstIndex(of: "--help-page"), i + 1 < args.count {
             m.helpPage = HelpPage(rawValue: args[i + 1])
         } else if args.contains("--welcome") {
@@ -123,6 +126,51 @@ struct ContentView: View {
             m.job = .cab; m.cabImport = true
         } else if args.contains("--cab-tab") {
             m.job = .cab; m.cabImport = false
+        }
+    }
+}
+
+/// `IR Capture --render-gear <dir>`: the meters, nixies, keys and lamps with sample readings, as screenshot-gear.png
+/// (CI attaches it to the release; these pieces only appear during a level check or a capture).
+enum GearPreview {
+    @MainActor
+    static func render(to file: URL) {
+        let view = VStack(alignment: .leading, spacing: 18) {
+            MeterBridge {
+                MeterModule(label: "SM57", vu: 0, dbfs: "−6.0 dBFS", clipped: false, advice: ("OK", goodColor)) {
+                    HStack(spacing: 6) { Pill(text: "H2 −52", color: goodColor); Pill(text: "H3 −47", color: goodColor) }
+                }
+                MeterModule(label: "R121", vu: -9, dbfs: "−15.0 dBFS", clipped: false, advice: ("Turn up 9 dB", warnColor)) { EmptyView() }
+                MeterModule(label: "Room", vu: 4, dbfs: "−0.1 dBFS", clipped: true, advice: ("CLIP: turn down", badColor)) { EmptyView() }
+                MeterModule(label: "Reference", vu: nil, dbfs: "−72.0 dBFS", clipped: false, advice: ("No signal: check cable", badColor)) { EmptyView() }
+            }
+            HStack(spacing: 18) {
+                VStack(spacing: 3) { NixieReadout(value: 45); Engraved("Seconds left", size: 9, dim: true) }
+                Button("Capture") {}.buttonStyle(KeyButtonStyle(lit: true, size: 16, big: true))
+                Button("Check levels") {}.buttonStyle(KeyButtonStyle(size: 14, big: true))
+                Button("Mic") {}.buttonStyle(KeyButtonStyle(lit: true, size: 11))
+                Button("Off") {}.buttonStyle(KeyButtonStyle(size: 11))
+            }
+            HStack(spacing: 18) {
+                StatusLine(text: "Excellent", color: goodColor)
+                StatusLine(text: "Setting sweep level", color: warnColor)
+                StatusLine(text: "Record again", color: badColor)
+                Pill(text: "−11.6 dBFS", color: goodColor)
+                Lamp(state: .amber, size: 46)
+            }
+            JobStepper(steps: [("Connect", true), ("Set levels", true), ("Capture", false), ("Results", false)])
+        }
+        .padding(24).frame(width: 820)
+        .onPanel()
+        .padding(20)
+        .background(WorkshopWall())
+        .workshopDefaults()
+        let r = ImageRenderer(content: view)
+        r.scale = 2
+        if let img = r.nsImage, let tiff = img.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
+           let png = rep.representation(using: .png, properties: [:]) {
+            try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try? png.write(to: file)
         }
     }
 }
