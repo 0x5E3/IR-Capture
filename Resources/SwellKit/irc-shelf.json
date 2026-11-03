@@ -1,0 +1,30 @@
+{
+ "about": "IR Capture's shelf, laid out from irc-pieces.json (design/render/ircapture_kit.py) at 3.0 px a pt (8 pt a cm, so the boxes' fronts are 56 pt tall). Points. boxFace is the flat of the front face from the box picture's edges (top, leading, bottom, trailing); boxInsets the 3-slice (along x only, drawn at its own height); the plank strip's top sits plankBelowBoxTop under the box picture's top (box bottom on the plank's front top edge), its front edge ends plankFrontBottom into the strip. boxTop: the box pictures' top under the title bar (negative: their transparent top margin runs up behind it). gapBelowPlank: wall between the plank's front edge and the opening, where the opening's top moulding sits; the plank's shadow falls there.",
+ "pxPerPoint": 3.0,
+ "plank": "irc-plank",
+ "plankHeight": 126.0,
+ "plankBelowBoxTop": 73.736,
+ "plankFrontBottom": 45.728,
+ "boxes": {
+  "bronze": "irc-box-bronze",
+  "oxblood": "irc-box-oxblood"
+ },
+ "boxHeight": 98.664,
+ "boxInsets": [
+  0,
+  34.336,
+  0,
+  100.0
+ ],
+ "boxFace": [
+  43.656,
+  16.8,
+  10.208,
+  81.736
+ ],
+ "boxTop": -12,
+ "trimH": "irc-trim-h",
+ "trimV": "irc-trim-v",
+ "trimWidth": 20.664,
+ "gapBelowPlank": 19.0
+}

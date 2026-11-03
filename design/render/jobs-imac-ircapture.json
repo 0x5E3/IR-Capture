@@ -1,0 +1,8 @@
+{
+ "runner": "imac",
+ "note": "IR Capture's own pieces (11-03) at full quality (48 px/cm, 192 samples; the pictures in Resources/SwellKit/pictures came from a 48 px/cm, 16-20 sample proof in the container). ircapture_kit.py and ircapture_kit_post.py sit beside the bench's scripts in design/render/ (they import toolkit, shelf_gear, shelf_wood, gear_kit, parts, instrument, metal_kit). After: python3 design/render/ircapture_kit_post.py <out>/panels Resources/SwellKit, then the same for <out>/shelf (the post reads every irc-render-*.json in the folder it's given and merges into irc-pieces.json). No fonts needed. Estimate on the iMac's 8 cores (about 8 x the container's 2 cores per sample): panels 2 x 3 min, plank 5 min, boxes 2 x 4 min, trims 2 x 1.5 min.",
+ "jobs": [
+  {"id": "panels", "cmd": "design/render/ircapture_kit.py OUT panel-fine,panel-nam 48 192"},
+  {"id": "shelf", "cmd": "design/render/ircapture_kit.py OUT plank,box-bronze,box-oxblood,trim-h,trim-v 48 192"}
+ ]
+}

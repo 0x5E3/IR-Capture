@@ -1,0 +1,325 @@
+{
+ "about": "IR Capture's own rendered pieces (ircapture_kit.py, the desktop bench's Tools studio: orthographic, 10 degrees above, key light up and to the left). Points at 10 pt a cm; px_per_pt is the 1x file's; @2x has twice the pixels. capInsets in points (top, leading, bottom, trailing). shadow_outset_pt: how far the picture runs past the object on each side (shadow and margin).",
+ "renders": {
+  "panel-fine": {
+   "pxcm": 48.0,
+   "samples": 20,
+   "s": 88.5
+  },
+  "box-oxblood": {
+   "pxcm": 48.0,
+   "samples": 16,
+   "s": 194.4
+  },
+  "box-bronze": {
+   "pxcm": 48.0,
+   "samples": 16,
+   "s": 151.1
+  },
+  "trim-v": {
+   "pxcm": 48.0,
+   "samples": 16,
+   "s": 22.9
+  },
+  "plank": {
+   "pxcm": 48.0,
+   "samples": 16,
+   "s": 229.9
+  },
+  "panel-nam": {
+   "pxcm": 48.0,
+   "samples": 20,
+   "s": 84.6
+  },
+  "trim-h": {
+   "pxcm": 48.0,
+   "samples": 16,
+   "s": 22.9
+  }
+ },
+ "pieces": {
+  "rkit-panel-fine": {
+   "file": "rkit-panel-fine.webp",
+   "x2": "rkit-panel-fine@2x.webp",
+   "px": [
+    394,
+    394
+   ],
+   "px_per_pt": 2.4,
+   "pt": [
+    164.17,
+    164.17
+   ],
+   "kind": "nine",
+   "capInsets": {
+    "top": 17.08,
+    "leading": 17.08,
+    "bottom": 17.08,
+    "trailing": 17.08
+   },
+   "resizingMode": "tile",
+   "shadow_outset_pt": {
+    "top": 2.0,
+    "leading": 2.0,
+    "bottom": 2.0,
+    "trailing": 2.0
+   },
+   "content_padding_pt": 12.5,
+   "mean_tile_srgb": "#35322F",
+   "contrast_on_mean": {
+    "#E6E1D4": 9.77,
+    "#D9D2C2": 8.47
+   }
+  },
+  "rkit-panel-nam": {
+   "file": "rkit-panel-nam.webp",
+   "x2": "rkit-panel-nam@2x.webp",
+   "px": [
+    394,
+    394
+   ],
+   "px_per_pt": 2.4,
+   "pt": [
+    164.17,
+    164.17
+   ],
+   "kind": "nine",
+   "capInsets": {
+    "top": 17.08,
+    "leading": 17.08,
+    "bottom": 17.08,
+    "trailing": 17.08
+   },
+   "resizingMode": "tile",
+   "shadow_outset_pt": {
+    "top": 2.0,
+    "leading": 2.0,
+    "bottom": 2.0,
+    "trailing": 2.0
+   },
+   "content_padding_pt": 12.5,
+   "mean_tile_srgb": "#2D2D2E",
+   "contrast_on_mean": {
+    "#E6E1D4": 10.5,
+    "#D9D2C2": 9.1
+   }
+  },
+  "irc-plank": {
+   "file": "irc-plank.webp",
+   "x2": "irc-plank@2x.webp",
+   "px": [
+    1440,
+    378
+   ],
+   "px_per_pt": 2.4,
+   "pt": [
+    600.0,
+    157.5
+   ],
+   "kind": "strip-h",
+   "capInsets": {
+    "top": 0,
+    "leading": 0,
+    "bottom": 0,
+    "trailing": 0
+   },
+   "resizingMode": "tile",
+   "repeat_pt": 600.0,
+   "how": "repeat along x (one period is the whole picture); never resize vertically",
+   "y_pt": {
+    "top_back_edge": 10.0,
+    "front_top_edge": 31.16,
+    "front_bottom_edge": 57.16
+   },
+   "thickness_pt": 26.0,
+   "top_surface_pt": 21.16,
+   "shadow_outset_pt": {
+    "top": 10.0,
+    "leading": 0,
+    "bottom": 100.34,
+    "trailing": 0
+   },
+   "measures_cm": {
+    "thick": 2.6,
+    "depth": 12.0,
+    "edge_round": 0.28
+   }
+  },
+  "irc-box-bronze": {
+   "file": "irc-box-bronze.webp",
+   "x2": "irc-box-bronze@2x.webp",
+   "px": [
+    1126,
+    296
+   ],
+   "px_per_pt": 2.4,
+   "pt": [
+    469.17,
+    123.33
+   ],
+   "kind": "three-h",
+   "capInsets": {
+    "top": 0,
+    "leading": 42.92,
+    "bottom": 0,
+    "trailing": 125.0
+   },
+   "resizingMode": "tile",
+   "how": "resize along x only (the middle repeats); draw at the picture's own height",
+   "front_face_pt": {
+    "x": 14.0,
+    "y": 47.57,
+    "w": 360.0,
+    "h": 70.0,
+    "trailing_from_right": 95.17
+   },
+   "face_flat_inset_pt": 7.0,
+   "lid_pt": {
+    "y_back": 29.94,
+    "y_front": 47.57
+   },
+   "feet_pt": {
+    "center_in_from_face_ends": 18.0,
+    "radius": 6.0,
+    "gap_under_face": 4.0
+   },
+   "shadow_outset_pt": {
+    "top": 29.94,
+    "leading": 14.0,
+    "bottom": 5.76,
+    "trailing": 95.17
+   },
+   "plank_overlap_pt": 31.16,
+   "measures_cm": {
+    "face_h": 7.0,
+    "depth": 10.0,
+    "corner_r": 0.45,
+    "roll": 0.25,
+    "front_z": 11.0,
+    "feet_h": 0.4
+   },
+   "place_on_plank": "box.maxY = plank.minY + 31.16 pt (the plank strip's front top edge): the box picture overlaps the strip's top 31.16 pt; draw the box over the plank"
+  },
+  "irc-box-oxblood": {
+   "file": "irc-box-oxblood.webp",
+   "x2": "irc-box-oxblood@2x.webp",
+   "px": [
+    1126,
+    296
+   ],
+   "px_per_pt": 2.4,
+   "pt": [
+    469.17,
+    123.33
+   ],
+   "kind": "three-h",
+   "capInsets": {
+    "top": 0,
+    "leading": 42.92,
+    "bottom": 0,
+    "trailing": 125.0
+   },
+   "resizingMode": "tile",
+   "how": "resize along x only (the middle repeats); draw at the picture's own height",
+   "front_face_pt": {
+    "x": 14.0,
+    "y": 47.57,
+    "w": 360.0,
+    "h": 70.0,
+    "trailing_from_right": 95.17
+   },
+   "face_flat_inset_pt": 7.0,
+   "lid_pt": {
+    "y_back": 29.94,
+    "y_front": 47.57
+   },
+   "feet_pt": {
+    "center_in_from_face_ends": 18.0,
+    "radius": 6.0,
+    "gap_under_face": 4.0
+   },
+   "shadow_outset_pt": {
+    "top": 29.94,
+    "leading": 14.0,
+    "bottom": 5.76,
+    "trailing": 95.17
+   },
+   "plank_overlap_pt": 31.16,
+   "measures_cm": {
+    "face_h": 7.0,
+    "depth": 10.0,
+    "corner_r": 0.45,
+    "roll": 0.25,
+    "front_z": 11.0,
+    "feet_h": 0.4
+   },
+   "place_on_plank": "box.maxY = plank.minY + 31.16 pt (the plank strip's front top edge): the box picture overlaps the strip's top 31.16 pt; draw the box over the plank"
+  },
+  "irc-trim-h": {
+   "file": "irc-trim-h.webp",
+   "x2": "irc-trim-h@2x.webp",
+   "px": [
+    720,
+    62
+   ],
+   "px_per_pt": 2.4,
+   "pt": [
+    300.0,
+    25.83
+   ],
+   "kind": "strip-h",
+   "capInsets": {
+    "top": 0,
+    "leading": 0,
+    "bottom": 0,
+    "trailing": 0
+   },
+   "resizingMode": "tile",
+   "repeat_pt": 300.0,
+   "face_pt": {
+    "y_top": 6.0,
+    "y_bottom": 22.0,
+    "w": 16.0
+   },
+   "shadow_outset_pt": {
+    "top": 6.0,
+    "leading": 0,
+    "bottom": 3.83,
+    "trailing": 0
+   }
+  },
+  "irc-trim-v": {
+   "file": "irc-trim-v.webp",
+   "x2": "irc-trim-v@2x.webp",
+   "px": [
+    62,
+    720
+   ],
+   "px_per_pt": 2.4,
+   "pt": [
+    25.83,
+    300.0
+   ],
+   "kind": "strip-v",
+   "capInsets": {
+    "top": 0,
+    "leading": 0,
+    "bottom": 0,
+    "trailing": 0
+   },
+   "resizingMode": "tile",
+   "repeat_pt": 300.0,
+   "face_pt": {
+    "x_left": 6.0,
+    "x_right": 22.0,
+    "w": 16.0
+   },
+   "shadow_outset_pt": {
+    "top": 0,
+    "leading": 6.0,
+    "bottom": 0,
+    "trailing": 3.83
+   }
+  }
+ }
+}

@@ -739,6 +739,7 @@ struct FrameStrip: View {
             img.resizable(resizingMode: .tile)
                 .frame(width: vertical ? height : nil, height: vertical ? nil : height)
                 .frame(maxWidth: vertical ? nil : .infinity, maxHeight: vertical ? .infinity : nil, alignment: .topLeading)
+                .allowsHitTesting(false)
                 .accessibilityHidden(true)
         }
     }
@@ -769,9 +770,8 @@ struct ShelfBox<Content: View>: View {
 /// The opening in the wall the steps sit in: the stage cloth behind, a moulding round it.
 struct StageOpening<Content: View>: View {
     @ViewBuilder let content: Content
-    /// IR Capture's own trim (the Tools studio's camera) when it is in the kit; else the bench's frame trim.
-    var ownTrim: Bool { SwellPictures.shared.cgImage("irc-trim-v.webp") != nil && SwellPictures.shared.cgImage("irc-trim-h.webp") != nil }
     var body: some View {
+        let g = ShelfGeometry.own
         content
             .background(
                 Group {
@@ -783,16 +783,19 @@ struct StageOpening<Content: View>: View {
                 .accessibilityHidden(true))
             .overlay { StageLight().allowsHitTesting(false) }
             .overlay(alignment: .leading) {
-                if ownTrim { FrameStrip(name: "irc-trim-v", height: 16, vertical: true, pxPerPoint: 2.4).offset(x: -12) }
+                if let g { FrameStrip(name: g.trimV, height: g.trimWidth, vertical: true, pxPerPoint: g.pxPerPoint).offset(x: -0.755 * g.trimWidth) }
                 else { FrameStrip(name: "frame-trim-left", height: 22, vertical: true).offset(x: -16) }
             }
             .overlay(alignment: .trailing) {
-                if ownTrim { FrameStrip(name: "irc-trim-v", height: 16, vertical: true, pxPerPoint: 2.4).offset(x: 12) }
+                if let g { FrameStrip(name: g.trimV, height: g.trimWidth, vertical: true, pxPerPoint: g.pxPerPoint).offset(x: 0.67 * g.trimWidth) }
                 else { FrameStrip(name: "frame-trim-right", height: 22, vertical: true).offset(x: 16) }
             }
             .overlay(alignment: .bottom) {
-                if ownTrim { FrameStrip(name: "irc-trim-h", height: 16, pxPerPoint: 2.4).offset(y: 12) }
+                if let g { FrameStrip(name: g.trimH, height: g.trimWidth, pxPerPoint: g.pxPerPoint).offset(y: 0.67 * g.trimWidth) }
                 else { FrameStrip(name: "frame-trim-bot", height: 22).offset(y: 14) }
+            }
+            .overlay(alignment: .top) {
+                if let g { FrameStrip(name: g.trimH, height: g.trimWidth, pxPerPoint: g.pxPerPoint).offset(y: -0.755 * g.trimWidth) }
             }
     }
 }

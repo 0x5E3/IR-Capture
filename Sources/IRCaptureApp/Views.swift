@@ -249,12 +249,13 @@ struct Shelf: View {
         let g = ShelfGeometry.own
         ZStack(alignment: .topLeading) {
             if let g {
-                FrameStrip(name: g.plank, height: g.plankHeight, pxPerPoint: g.pxPerPoint).padding(.top, g.plankTop)
+                FrameStrip(name: g.plank, height: g.plankHeight, pxPerPoint: g.pxPerPoint).offset(y: g.plankTop)
             } else {
                 FrameStrip(name: "frame-plank", height: 53.75).padding(.top, 56)
                 FrameStrip(name: "frame-trim-top", height: 21.88).padding(.top, 97)
             }
-            HStack(alignment: .top, spacing: 16) {
+            // With the own pieces each box picture carries its right end's shadow (about 76 pt): the boxes overlap there.
+            HStack(alignment: .top, spacing: g == nil ? 16 : -36) {
                 ShelfBox(finish: "bronze") {
                     Button("Cab IR") { m.job = .cab }.buttonStyle(KeyButtonStyle(lit: m.job == .cab, size: 13))
                     Button("Amp NAM") { m.job = .nam }.buttonStyle(KeyButtonStyle(lit: m.job == .nam, size: 13))
@@ -276,7 +277,7 @@ struct Shelf: View {
                             Text(st.1).textCase(.uppercase).tracking(1.4)
                             Text(rig).font(.swellLegend(10)).tracking(0.6).opacity(0.78)
                         }
-                        .frame(minWidth: 190, alignment: .leading)
+                        .frame(minWidth: 172, alignment: .leading)
                     }
                 }
                 .accessibilityElement(children: .combine)
@@ -286,7 +287,7 @@ struct Shelf: View {
                     Button("Help") { m.helpPage = .quickStart }.buttonStyle(KeyButtonStyle(size: 13))
                 }
             }
-            .padding(.horizontal, 26).padding(.top, g?.boxTop ?? 2)
+            .padding(.horizontal, 26).offset(y: g?.boxTop ?? 2)
         }
         .frame(height: g?.height ?? 119, alignment: .top)
         .onAppear {
@@ -302,18 +303,26 @@ struct Shelf: View {
 struct ShelfGeometry: Decodable {
     let pxPerPoint: CGFloat
     let plank: String
-    /// The plank strip's height (pt), and how far its top sits below the box picture's top.
+    /// The plank strip's height (pt, its shadow included), how far its top sits below the box picture's top, and
+    /// where its front edge ends in the strip (the shelf's frame ends there; the shadow runs on over the stage).
     let plankHeight: CGFloat
     let plankBelowBoxTop: CGFloat
+    let plankFrontBottom: CGFloat
     /// Box pictures by finish ("bronze", "oxblood"); their height, 9-slice insets and front face (pt from the picture's edges).
     let boxes: [String: String]
     let boxHeight: CGFloat
     let boxInsets: [CGFloat]       // top, leading, bottom, trailing
     let boxFace: [CGFloat]         // top, leading, bottom, trailing
-    /// Wall above the boxes (pt), under the title bar.
+    /// The box pictures' top under the title bar (pt; negative runs their transparent margin up behind it).
     let boxTop: CGFloat
+    /// The opening's moulding, seen from the same camera: strips this wide (pt), at the same scale.
+    let trimH: String
+    let trimV: String
+    let trimWidth: CGFloat
     var plankTop: CGFloat { boxTop + plankBelowBoxTop }
-    var height: CGFloat { plankTop + plankHeight }
+    /// Wall between the plank's front edge and the opening (the opening's top moulding sits in it).
+    let gapBelowPlank: CGFloat
+    var height: CGFloat { plankTop + plankFrontBottom + gapBelowPlank }
     func insets(_ a: [CGFloat]) -> EdgeInsets { EdgeInsets(top: a[0], leading: a[1], bottom: a[2], trailing: a[3]) }
     func boxPiece(_ finish: String) -> SwellNine.Piece {
         SwellNine.Piece(name: boxes[finish] ?? boxes["bronze"] ?? "", pxPerPoint: pxPerPoint, insets: insets(boxInsets), mode: .tile, outset: 0)
@@ -323,7 +332,7 @@ struct ShelfGeometry: Decodable {
         let url = SwellKit.folder.appendingPathComponent("irc-shelf.json")
         guard let data = try? Data(contentsOf: url), let g = try? JSONDecoder().decode(ShelfGeometry.self, from: data),
               g.boxInsets.count == 4, g.boxFace.count == 4 else { return nil }
-        let files = [g.plank] + Array(g.boxes.values)
+        let files = [g.plank, g.trimH, g.trimV] + Array(g.boxes.values)
         guard files.allSatisfy({ SwellPictures.shared.cgImage($0 + ".webp") != nil }) else { return nil }
         return g
     }()
