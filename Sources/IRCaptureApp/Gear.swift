@@ -69,8 +69,8 @@ struct PaperBackground: View {
     var body: some View {
         ZStack {
             Swell.tagPaper
-            if let p = SwellPictures.shared.image("paper", pxPerPoint: 512.0 / 220.0) {
-                Image(nsImage: p).resizable(resizingMode: .tile).blendMode(.multiply).opacity(0.85)
+            if let p = SwellPictures.shared.tileImage("paper", pxPerPoint: 512.0 / 220.0) {
+                p.resizable(resizingMode: .tile).blendMode(.multiply).opacity(0.85)
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 2))
@@ -448,8 +448,8 @@ struct WorkshopWall: View {
     var body: some View {
         ZStack {
             Swell.wall
-            if let peg = SwellPictures.shared.image("frame-peg", pxPerPoint: 1.6) {
-                Image(nsImage: peg).resizable(resizingMode: .tile)
+            if let peg = SwellPictures.shared.tileImage("frame-peg", pxPerPoint: 1.6) {
+                peg.resizable(resizingMode: .tile)
             }
         }
         .accessibilityHidden(true)
@@ -462,8 +462,8 @@ struct FrameStrip: View {
     let height: CGFloat
     var vertical = false
     var body: some View {
-        if let img = SwellPictures.shared.image(name, pxPerPoint: 1.6) {
-            Image(nsImage: img).resizable(resizingMode: .tile)
+        if let img = SwellPictures.shared.tileImage(name, pxPerPoint: 1.6) {
+            img.resizable(resizingMode: .tile)
                 .frame(width: vertical ? height : nil, height: vertical ? nil : height)
                 .frame(maxWidth: vertical ? nil : .infinity, maxHeight: vertical ? .infinity : nil, alignment: .topLeading)
                 .accessibilityHidden(true)

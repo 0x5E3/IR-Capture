@@ -1,6 +1,6 @@
 // SwellKit.swift: the desktop bench's rendered workshop look, for IR Capture (SwiftUI, macOS 13).
-// From desktop-bench, branch irkit (127th desktop chat, 2026-11-03). A starter, NOT compiled where it was written (no
-// Swift toolchain there): expect small fixes on the first build. Read HANDOFF-desktop-to-ircapture.md first.
+// From desktop-bench, branch irkit (2026-11-03), adapted and compiled in IR Capture's CI. Spec:
+// docs/design/HANDOFF-desktop-to-ircapture.md.
 //
 // The kit's files go in the app bundle at Contents/Resources/SwellKit/{pictures,fonts,layout.json}
 // (scripts/make_app.sh: `cp -R Resources/SwellKit "$APP/Contents/Resources/"`). While developing with `swift run`,
@@ -102,10 +102,27 @@ final class SwellPictures {
     static let shared = SwellPictures()
     private var cache: [String: NSImage] = [:]
 
+    private var cgCache: [String: CGImage] = [:]
+    private var missing: Set<String> = []
+
     func cgImage(_ file: String) -> CGImage? {
+        if let c = cgCache[file] { return c }
+        if missing.contains(file) { return nil }
         let url = SwellKit.pictures.appendingPathComponent(file)
-        guard let src = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
-        return CGImageSourceCreateImageAtIndex(src, 0, nil)
+        guard let src = CGImageSourceCreateWithURL(url as CFURL, nil), let c = CGImageSourceCreateImageAtIndex(src, 0, nil) else {
+            missing.insert(file); return nil
+        }
+        cgCache[file] = c
+        return c
+    }
+
+    /// A SwiftUI Image with its scale stated, for tiling and 9-slicing: SwiftUI tiles an NSImage by its pixels, not
+    /// its point size, so a tiled NSImage comes out at the render's pixel size. The @2x file is used when there is one.
+    func tileImage(_ name: String, pxPerPoint: CGFloat) -> Image? {
+        if let c2 = cgImage(name + "@2x.webp") { return Image(decorative: c2, scale: pxPerPoint * 2) }
+        if let c1 = cgImage(name + ".webp") { return Image(decorative: c1, scale: pxPerPoint) }
+        NSLog("SwellKit: missing %@.webp", name)
+        return nil
     }
 
     /// `name` without extension: "frame-win-circ" loads frame-win-circ.webp and, if present, frame-win-circ@2x.webp.
@@ -171,8 +188,8 @@ enum SwellNine {
 struct Panel9Slice: View {
     let piece: SwellNine.Piece
     var body: some View {
-        if let img = SwellPictures.shared.image(piece.name, pxPerPoint: piece.pxPerPoint) {
-            Image(nsImage: img)
+        if let img = SwellPictures.shared.tileImage(piece.name, pxPerPoint: piece.pxPerPoint) {
+            img
                 .resizable(capInsets: piece.insets, resizingMode: piece.mode)
                 .padding(-piece.outset)          // the render's shadow margin falls outside the box, as border-image-outset
                 .accessibilityHidden(true)
@@ -287,7 +304,9 @@ struct JewelLamp: View {
         // The picture is the jewel in its chrome ring with a shadow margin round it: the jewel's own size is
         // `diameter`, so the picture is drawn 1.7 times larger and overhangs its frame.
         if let img = SwellPictures.shared.image("rlamp-jewel\(colour)-\(on ? "on" : "off")", pxPerPoint: 120 / (diameter * 1.7)) {
-            Image(nsImage: img).frame(width: diameter, height: diameter).accessibilityHidden(true)
+            Image(nsImage: img).resizable().interpolation(.high)
+                .frame(width: diameter * 1.7, height: diameter * 1.7)
+                .frame(width: diameter, height: diameter).accessibilityHidden(true)
         }
     }
 }
