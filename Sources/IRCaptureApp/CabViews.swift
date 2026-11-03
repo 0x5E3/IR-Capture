@@ -43,7 +43,7 @@ struct CabConnectStep: View {
     let done: Bool
     var body: some View {
         Step(n: 1, title: "Connect", subtitle: "Wire the rig as shown. Then set the use of each input.", done: done) {
-            WiringDiagram(wiring: m.refSource == .none ? .cabNoRef : .cabRef).onPaper()
+            WiringDiagram(wiring: m.refSource == .none ? .cabNoRef : .cabRef).onPaper(padding: 14, style: .drawing)
             Checklist(items: [
                 "Interface output → amp FX return (power amp in) or clean power amp → cab. Do not use the guitar input. The preamp distorts the sweeps and the IR is incorrect.",
                 "Set the amp master low to start. The remaining levels are set in the level check.",
@@ -221,7 +221,7 @@ struct CabLevelStep: View {
                 m.levelChoice == 0 ? "Wait for “Sweep level set”. Then adjust each preamp until its row shows OK. No row may show CLIP."
                                    : "Adjust each preamp until its row shows OK (sweep peak near −6 dBFS). No row may show CLIP.",
                 "If distortion is orange or red, lower the amp volume. An IR is linear. Higher speaker drive does not improve it.",
-            ])
+            ], style: PaperStyle(stock: .manila, tape: true, tilt: 0.25, ring: true))
             HStack(spacing: 12) {
                 Button(m.levelRunning ? "Stop" : "Check levels") { m.toggleLevelCheck() }
                     .buttonStyle(KeyButtonStyle(lit: m.levelRunning, size: 14, big: true))
@@ -251,17 +251,31 @@ struct LevelTable: View {
         return (d > 0 ? "Turn up \(Int(d.rounded())) dB" : "Turn down \(Int((-d).rounded())) dB", warnColor)
     }
     func distColor(_ v: Double) -> Color { v > -30 ? badColor : v > -40 ? warnColor : goodColor }
+    /// How far the sweep stands above the room noise, as the magic eye's closure: open at 20 dB, closed at 60 dB.
+    func eye(_ r: LevelReading) -> (closure: Double?, lit: Bool) {
+        guard let n = m.noise[r.channel] else { return (nil, m.levelRunning) }
+        if r.peakDBFS < -60 { return (0, true) }
+        return (max(0, min(1, (r.peakDBFS - n - 20) / 40)), true)
+    }
     var body: some View {
+        let compact = MeterBridge<EmptyView>.compact(readings.count)
         VStack(alignment: .leading, spacing: 10) {
-            MeterBridge {
+            MeterBridge(count: readings.count) {
                 ForEach(readings) { r in
                     // 0 VU is this input's target: changeDB is how far the preamp must move to reach it.
                     MeterModule(label: r.label, vu: r.peakDBFS < -60 ? nil : -r.changeDB,
-                                dbfs: String(format: "%.1f dBFS", r.peakDBFS), clipped: r.clipped, advice: advice(r)) {
+                                dbfs: String(format: "%.1f dBFS", r.peakDBFS), clipped: r.clipped, advice: advice(r),
+                                eye: eye(r), compact: compact) {
                         if r.label != "Reference" {
-                            HStack(spacing: 6) {
-                                Pill(text: String(format: "H2 %.0f", r.h2), color: distColor(r.h2))
-                                Pill(text: String(format: "H3 %.0f", r.h3), color: distColor(r.h3))
+                            ViewThatFits(in: .horizontal) {
+                                HStack(spacing: 6) {
+                                    Pill(text: String(format: "H2 %.0f", r.h2), color: distColor(r.h2))
+                                    Pill(text: String(format: "H3 %.0f", r.h3), color: distColor(r.h3))
+                                }
+                                VStack(alignment: .leading, spacing: 5) {
+                                    Pill(text: String(format: "H2 %.0f", r.h2), color: distColor(r.h2))
+                                    Pill(text: String(format: "H3 %.0f", r.h3), color: distColor(r.h3))
+                                }
                             }
                         }
                         if let n = m.noise[r.channel] {
@@ -271,7 +285,7 @@ struct LevelTable: View {
                     }
                 }
             }
-            Note("0 VU on each meter is that input's target level (sweep peak \(Int(readings.first?.target.rounded() ?? -6)) dBFS). Within ±3 VU is OK. The figure under each meter is the peak in dBFS.")
+            Note("0 VU on each meter is that input's target level (sweep peak \(Int(readings.first?.target.rounded() ?? -6)) dBFS). Within ±3 VU is OK. The figure under each meter is the peak in dBFS. The green eye closes as the input stands clear of the room noise: fully closed at 60 dB or more.")
             ForEach(readings.compactMap { m.noiseNote($0.channel) }, id: \.self) { Note($0, color: warnColor) }
         }
     }
@@ -305,9 +319,10 @@ struct PreflightList: View {
             Engraved("Before you capture")
             ForEach(items) { i in
                 StatusLine(text: i.text, color: i.level == .ok ? goodColor : i.level == .warn ? warnColor : badColor, diameter: 13)
+                    .frame(minHeight: 16)
             }
         }
-        .onPaper()
+        .onPaper(style: .index)
     }
 }
 
@@ -332,7 +347,7 @@ struct CabImportSteps: View {
             }
 
             Step(n: 2, title: "Record in your DAW", subtitle: "The steps apply to any DAW. Menu names below are from Logic.") {
-                WiringDiagram(wiring: .cabRef, compact: true).onPaper()
+                WiringDiagram(wiring: .cabRef, compact: true).onPaper(padding: 14, style: .drawing)
                 Checklist(items: [
                     "Set the project to the capture rate above. Drag the sweep WAV onto a new audio track at the start (bar 1 in Logic).",
                     "Route that track only to the interface output connected to the amp FX return or a clean power amp (not the guitar input). Mute the studio monitors. Otherwise the room mic records them.",

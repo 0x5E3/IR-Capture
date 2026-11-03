@@ -168,6 +168,14 @@ enum SwellNine {
     // dominate IR Capture's smaller panels. Insets scale with it (17.08 pt at 2.4 px a pt).
     static let panel = Piece(name: "rkit-panel", pxPerPoint: 3.6, insets: EdgeInsets(top: 11.39, leading: 11.39, bottom: 11.39, trailing: 11.39),
                              mode: .tile, outset: 1.3)
+    /// The step panels' stock for a job: rkit-panel-fine (Cab IR) and rkit-panel-nam (Amp NAM) are IR Capture's own
+    /// renders (design/render/ircapture_kit.py, the Tools studio), the same size and slices as rkit-panel. A job whose
+    /// picture is missing uses rkit-panel.
+    static func stepPanel(for theme: SwellTheme) -> Piece {
+        let name = theme == .nam ? "rkit-panel-nam" : "rkit-panel-fine"
+        guard SwellPictures.shared.cgImage(name + ".webp") != nil else { return panel }
+        return Piece(name: name, pxPerPoint: panel.pxPerPoint, insets: panel.insets, mode: .tile, outset: panel.outset)
+    }
     static let faceplate = Piece(name: "faceplate", pxPerPoint: 4.8, insets: EdgeInsets(top: 40, leading: 40, bottom: 40, trailing: 40),
                                  mode: .tile, outset: 0)
     // Twice the kit's density, for the same reason (26 pt insets at 2.46 px a pt).
@@ -307,6 +315,39 @@ struct JewelLamp: View {
             Image(nsImage: img).resizable().interpolation(.high)
                 .frame(width: diameter * 1.7, height: diameter * 1.7)
                 .frame(width: diameter, height: diameter).accessibilityHidden(true)
+        }
+    }
+}
+
+/// A panel LED in a chrome bezel (the bench's rlamp-led<colour>-<on|off>, 120 px and @2x): the Amp (NAM) job's lamps.
+/// Colours: green, red, blue.
+struct LEDLamp: View {
+    var colour = "green"
+    var on: Bool
+    var diameter: CGFloat = 16
+    var body: some View {
+        if let img = SwellPictures.shared.image("rlamp-led\(colour)-\(on ? "on" : "off")", pxPerPoint: 120 / (diameter * 1.7)) {
+            Image(nsImage: img).resizable().interpolation(.high)
+                .frame(width: diameter * 1.7, height: diameter * 1.7)
+                .frame(width: diameter, height: diameter).accessibilityHidden(true)
+        }
+    }
+}
+
+/// A step's done/to-do lamp in the job's own gear: a jewel (amber to do, green done) for Cab IR, a green LED (unlit to
+/// do, lit done) for Amp (NAM).
+struct DoneLamp: View {
+    let done: Bool
+    var diameter: CGFloat = 26
+    var offIsAmber = true
+    @Environment(\.swellTheme) private var theme
+    var body: some View {
+        if theme == .nam {
+            LEDLamp(colour: "green", on: done, diameter: diameter * 0.8)
+        } else if offIsAmber {
+            JewelLamp(colour: done ? "green" : "amber", on: true, diameter: diameter)
+        } else {
+            JewelLamp(colour: "green", on: done, diameter: diameter)
         }
     }
 }

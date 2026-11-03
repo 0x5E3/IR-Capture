@@ -55,6 +55,19 @@ extension SwellSurface {
     }
 }
 
+// ------------------------------------------------------------------ the two jobs' gear
+/// Cab IR is 1950s workshop gear (bronze hammertone, jewel lamps, VU meters). Amp (NAM) is the same wall and shelf with
+/// gear a little more modern (graphite anodised panels, LED lamps, LED-ladder meters). Set once, on the job's views.
+enum SwellTheme { case cab, nam }
+
+private struct SwellThemeKey: EnvironmentKey { static let defaultValue = SwellTheme.cab }
+extension EnvironmentValues {
+    var swellTheme: SwellTheme {
+        get { self[SwellThemeKey.self] }
+        set { self[SwellThemeKey.self] = newValue }
+    }
+}
+
 /// The jewel that goes with a status colour.
 func jewel(for c: Color) -> String {
     if c == goodColor { return "green" }
@@ -64,38 +77,138 @@ func jewel(for c: Color) -> String {
 }
 
 // ------------------------------------------------------------------ surfaces
-/// Manila card stock (paper.webp tiled at 220 pt over #D9C69A).
+/// The paper a card is printed on. The bench mixes its stocks the same way: manila tags for notes, white drafting
+/// bond for drawings, a ruled index card for a list to tick off.
+enum PaperStock {
+    case manila      // paper.webp over #D9C69A, the bench's tag
+    case bond        // the bench's white drafting bond (paper.webp as rendered), a faint drafting grid on it
+    case index       // a cream index card, blue rules and a red head rule
+}
+
+/// How a card sits on the panel: its stock, masking tape on its top corners (the bench's tape-1..3 renders), a tilt of
+/// a fraction of a degree (cards are stuck on by hand), and an optional coffee ring (the bench's paper-ring).
+struct PaperStyle {
+    var stock: PaperStock = .manila
+    var tape = false
+    var tilt: Double = 0
+    var ring = false
+    static let tag = PaperStyle()
+    static let card = PaperStyle(stock: .manila, tape: true, tilt: -0.3)
+    static let drawing = PaperStyle(stock: .bond, tape: true, tilt: 0.2)
+    static let index = PaperStyle(stock: .index, tape: false, tilt: 0.35)
+}
+
+/// Card stock: the paper picture over its tint, the bench's faint stains on manila, rules or a grid where the stock has them.
 struct PaperBackground: View {
+    var style = PaperStyle.tag
     var body: some View {
-        ZStack {
-            Swell.tagPaper
+        ZStack(alignment: .topLeading) {
+            switch style.stock {
+            case .manila: Swell.tagPaper
+            case .bond: Color(swellHex: 0xF4EFE4)
+            case .index: Color(swellHex: 0xF2EAD6)
+            }
             if let p = SwellPictures.shared.tileImage("paper", pxPerPoint: 512.0 / 220.0) {
-                p.resizable(resizingMode: .tile).blendMode(.multiply).opacity(0.85)
+                p.resizable(resizingMode: .tile).blendMode(.multiply).opacity(style.stock == .manila ? 0.85 : 0.7)
+            }
+            if style.stock == .manila, let w = SwellPictures.shared.tileImage("paper-wash", pxPerPoint: 512.0 / 300.0) {
+                w.resizable(resizingMode: .tile).blendMode(.multiply).opacity(0.5)
+            }
+            if style.stock == .bond { DraftingGrid() }
+            if style.stock == .index { IndexRules() }
+            if style.ring, let r = SwellPictures.shared.image("paper-ring", pxPerPoint: 384.0 / 92.0) {
+                Image(nsImage: r).resizable().frame(width: 92, height: 92).blendMode(.multiply).opacity(0.55)
+                    .rotationEffect(.degrees(24)).offset(x: -26, y: -30)
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: 2))
-        .shadow(color: .black.opacity(0.55), radius: 3, x: 0, y: 2)
+        .clipShape(RoundedRectangle(cornerRadius: style.stock == .index ? 3 : 1.5))
+        .shadow(color: .black.opacity(0.55), radius: 3, x: 1, y: 2)
+        .overlay(alignment: .topLeading) { if style.tape { TapePiece(n: 1, angle: -38).offset(x: -22, y: -12) } }
+        .overlay(alignment: .topTrailing) { if style.tape { TapePiece(n: 2, angle: 41).offset(x: 22, y: -12) } }
         .accessibilityHidden(true)
     }
 }
 
+/// One piece of the bench's masking tape (tape-1..3.webp, 32 px a cm), at 10 pt a cm.
+struct TapePiece: View {
+    let n: Int
+    let angle: Double
+    var body: some View {
+        if let t = SwellPictures.shared.image("tape-\(n)", pxPerPoint: 3.2) {
+            Image(nsImage: t).resizable().interpolation(.high)
+                .frame(width: t.size.width, height: t.size.height)
+                .rotationEffect(.degrees(angle))
+                .shadow(color: .black.opacity(0.25), radius: 0.8, x: 0.5, y: 0.8)
+                .allowsHitTesting(false)
+        }
+    }
+}
+
+/// A drafting sheet's faint printed grid (5 mm and 25 mm at 10 pt a cm), non-photo blue, as on engineering paper.
+struct DraftingGrid: View {
+    var body: some View {
+        Canvas { ctx, size in
+            let fine = GraphicsContext.Shading.color(Color(swellHex: 0x6F9DBA, opacity: 0.16))
+            let bold = GraphicsContext.Shading.color(Color(swellHex: 0x6F9DBA, opacity: 0.30))
+            var x: CGFloat = 0, k = 0
+            while x <= size.width {
+                var p = Path(); p.move(to: CGPoint(x: x, y: 0)); p.addLine(to: CGPoint(x: x, y: size.height))
+                ctx.stroke(p, with: k % 5 == 0 ? bold : fine, lineWidth: 0.5); x += 5; k += 1
+            }
+            var y: CGFloat = 0; k = 0
+            while y <= size.height {
+                var p = Path(); p.move(to: CGPoint(x: 0, y: y)); p.addLine(to: CGPoint(x: size.width, y: y))
+                ctx.stroke(p, with: k % 5 == 0 ? bold : fine, lineWidth: 0.5); y += 5; k += 1
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+/// An index card's printed rules: a red head rule, then blue rules every 20 pt.
+struct IndexRules: View {
+    var body: some View {
+        Canvas { ctx, size in
+            var y: CGFloat = 37
+            var red = Path(); red.move(to: CGPoint(x: 0, y: y)); red.addLine(to: CGPoint(x: size.width, y: y))
+            ctx.stroke(red, with: .color(Color(swellHex: 0xC4524A, opacity: 0.55)), lineWidth: 0.9)
+            y += 20
+            while y < size.height {
+                var p = Path(); p.move(to: CGPoint(x: 0, y: y)); p.addLine(to: CGPoint(x: size.width, y: y))
+                ctx.stroke(p, with: .color(Color(swellHex: 0x6F9DBA, opacity: 0.32)), lineWidth: 0.6); y += 20
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+/// The panel stock under a step: bronze hammertone (a finer grain when that render is in the kit) for Cab IR,
+/// graphite anodised aluminium for Amp (NAM). Falls back to the kit's own panel if a picture is missing.
+struct PanelStock: View {
+    @Environment(\.swellTheme) private var theme
+    var body: some View { Panel9Slice(piece: SwellNine.stepPanel(for: theme)) }
+}
+
 extension View {
     /// Printed matter: instructions, checklists, notes, warnings.
-    func onPaper(padding: CGFloat = 12, fill: Bool = true) -> some View {
+    func onPaper(padding: CGFloat = 12, fill: Bool = true, style: PaperStyle = .tag) -> some View {
         self.environment(\.swellSurface, .paper)
             .foregroundStyle(Swell.tagInk)
             .tint(Swell.tagError)
             .padding(padding)
+            .padding(.top, style.stock == .index ? 8 : 0)
             .frame(maxWidth: fill ? .infinity : nil, alignment: .leading)
-            .background(PaperBackground())
+            .background(PaperBackground(style: style))
+            .rotationEffect(.degrees(style.tilt))
+            .zIndex(style.tape ? 1 : 0)
     }
 
-    /// A hammertone panel with screws in the corners (a step, the results).
+    /// A step's panel with screws in the corners (a step, the results), in the job's stock.
     func onPanel(padding: CGFloat = 20) -> some View {
         self.environment(\.swellSurface, .panel)
             .foregroundStyle(Swell.panelLabel)
             .padding(.horizontal, padding + 2).padding(.vertical, padding)
-            .background(Panel9Slice(piece: SwellNine.panel))
+            .background(PanelStock())
     }
 
     /// A black crinkle rack face (meters, the Welcome and Help sheets).
@@ -352,45 +465,198 @@ struct VUMeter: View {
     }
 }
 
-/// One input's meter module: the VU face, its name engraved, the dBFS figure on glass, the CLIP jewel, the advice.
+/// One input's meter module: the VU face, its name engraved, the dBFS figure on glass, the CLIP jewel, the magic eye
+/// for how far the input stands above the room noise, the advice. `compact` (five or more inputs) narrows the face so
+/// five or six fit across the bridge at the default window size.
 struct MeterModule<Extra: View>: View {
     let label: String
     let vu: Double?
     let dbfs: String
     let clipped: Bool
     let advice: (String, Color)
+    /// The magic eye: nil hides it; otherwise its closure (0 open … 1 closed) and whether its tube is lit.
+    var eye: (closure: Double?, lit: Bool)? = nil
+    var compact = false
     @ViewBuilder var extra: Extra
+    var width: CGFloat { compact ? 112 : 150 }
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Engraved(label, size: 12).lineLimit(1)
-                Spacer(minLength: 4)
+        VStack(alignment: .leading, spacing: compact ? 6 : 8) {
+            HStack(spacing: 4) {
+                Engraved(label, size: compact ? 11 : 12).lineLimit(1).truncationMode(.tail)
+                Spacer(minLength: 2)
                 HStack(spacing: 4) {
-                    JewelLamp(colour: "red", on: clipped, diameter: 14)
-                    Engraved("Clip", size: 9, dim: !clipped)
+                    JewelLamp(colour: "red", on: clipped, diameter: compact ? 12 : 14)
+                    if !compact { Engraved("Clip", size: 9, dim: !clipped) }
                 }
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(clipped ? "Clipping" : "Not clipping")
             }
-            VUMeter(vu: vu)
-            HStack(spacing: 6) {
-                GlassWindow(size: 12) { Text(dbfs).monospacedDigit() }
+            VUMeter(vu: vu, width: width)
+            HStack(alignment: .center, spacing: 6) {
+                GlassWindow(size: compact ? 11 : 12) { Text(dbfs).monospacedDigit() }
                 Spacer(minLength: 0)
+                if let e = eye {
+                    VStack(spacing: 1) {
+                        MagicEye(closure: e.closure, lit: e.lit, diameter: compact ? 26 : 30)
+                        Engraved("Noise", size: 7, dim: true)
+                    }
+                    .help("The green closes as the input stands clear of the room noise: open at 20 dB, closed at 60 dB or more.")
+                }
             }
-            StatusLine(text: advice.0, color: advice.1, diameter: 13).font(.swellBody(12, semibold: true))
-            extra
+            StatusLine(text: advice.0, color: advice.1, diameter: compact ? 12 : 13).font(.swellBody(compact ? 11 : 12, semibold: true))
+            if compact { VStack(alignment: .leading, spacing: 5) { extra } } else { extra }
         }
-        .frame(width: 150)
-        .onCrinkle(padding: 12)
+        .frame(width: width)
+        .onCrinkle(padding: compact ? 10 : 12)
     }
 }
 
-/// Meter modules side by side, wrapping onto more rows for more inputs.
+/// Meter modules side by side, wrapping onto more rows for more inputs. Up to four inputs use the full-size face;
+/// five or more use the compact one (`MeterBridge.compact(count)`), so six inputs fit across a 920 pt window.
 struct MeterBridge<Content: View>: View {
+    var count = 0
     @ViewBuilder let content: Content
+    static func compact(_ n: Int) -> Bool { n > 4 }
     var body: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 174, maximum: 190), spacing: 12, alignment: .top)], alignment: .leading, spacing: 12) {
+        let c = MeterBridge.compact(count)
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: c ? 134 : 174, maximum: c ? 140 : 190), spacing: c ? 9 : 12, alignment: .top)],
+                  alignment: .leading, spacing: 12) {
             content
+        }
+    }
+}
+
+// ------------------------------------------------------------------ the magic eye
+/// A tuning eye from the rack's Monitor unit (rack-monitor.webp's unlit eye, rack-monitor-ineye.webp's 59 frames:
+/// warm0..2 as the tube heats, then x00 wide open … x55 closed), cropped round its bezel. As a radio's eye closes
+/// on a station, it closes here as the input stands clear of the room noise. Lit, it warms up for about a second.
+struct MagicEye: View {
+    /// 0 wide open … 1 closed; nil while lit with nothing measured yet (open).
+    let closure: Double?
+    let lit: Bool
+    var diameter: CGFloat = 30
+    @State private var warm = -1
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// The eye's centre in rack-monitor.webp (layout.json: ineye c = 424.78, 255.86); the crop is 200 px round it.
+    static let base = CGRect(x: 325, y: 156, width: 200, height: 200)
+    /// The same square in a frame of the sheet: frames are 216 x 210, 12 a row, their origin at the base box (312, 156).
+    static func cell(_ i: Int) -> CGRect {
+        CGRect(x: CGFloat(i % 12) * 216 + 13, y: CGFloat(i / 12) * 210, width: 200, height: 200)
+    }
+    var frameIndex: Int? {
+        guard lit else { return nil }
+        if warm >= 0 { return warm }                       // warm0, warm1, warm2
+        let x = Int(((closure ?? 0) * 55).rounded())
+        return 3 + max(0, min(55, x))
+    }
+    var body: some View {
+        let k = diameter / 200
+        ZStack {
+            if let b = SwellPictures.shared.sprite("rack-monitor.webp", rect: MagicEye.base, pxPerPoint: 1 / k) {
+                Image(nsImage: b).resizable().interpolation(.high)
+            } else { Color.black }
+            if let i = frameIndex, let f = SwellPictures.shared.sprite("rack-monitor-ineye.webp", rect: MagicEye.cell(i), pxPerPoint: 1 / k) {
+                Image(nsImage: f).resizable().interpolation(.high)
+            }
+        }
+        .frame(width: diameter, height: diameter)
+        .clipShape(Circle())
+        .shadow(color: frameIndex.map { $0 >= 3 } == true ? Color(red: 0.4, green: 1, blue: 0.5, opacity: 0.25) : .clear, radius: 3)
+        .task(id: lit) {
+            guard lit, !reduceMotion else { warm = -1; return }
+            for k in 0..<3 {
+                warm = k
+                try? await Task.sleep(nanoseconds: 370_000_000)
+            }
+            warm = -1
+        }
+        .accessibilityElement()
+        .accessibilityLabel("Noise eye")
+        .accessibilityValue(!lit ? "off" : closure.map { String(format: "%.0f percent closed", $0 * 100) } ?? "open")
+    }
+}
+
+// ------------------------------------------------------------------ the LED ladder (Amp NAM)
+/// The rack's LED peak meter (rack-led.webp: 16 segments, −42 to 0 dB; rack-led-ledin.webp: all of them lit), one
+/// row cropped. It reads dBFS directly: TONE3000's target, −8 dBFS, is the last green segment, so no remapping. The
+/// scale is engraved by the app under the row, the target figure in amber.
+struct LEDLadder: View {
+    /// Peak in dBFS; nil lights nothing.
+    let dbfs: Double?
+    var width: CGFloat = 420
+    static let db: [Double] = [-42, -36, -30, -24, -20, -16, -12, -10, -8, -6, -5, -4, -3, -2, -1, 0]
+    /// The row cropped from rack-led.webp (its px) and the same row's origin in the lit sheet (which starts at 330, 84).
+    static let row = CGRect(x: 343, y: 99, width: 792, height: 44)
+    static let sheetOrigin = CGPoint(x: 330, y: 84)
+    static let segX: [CGFloat] = [355.69, 404.32, 452.96, 501.59, 550.22, 598.86, 647.49, 696.13, 744.76, 793.39, 842.03, 890.66, 939.29, 987.93, 1036.56, 1085.2]
+    static let segW: CGFloat = 37.22
+    var k: CGFloat { width / LEDLadder.row.width }
+    func lit(_ i: Int) -> Bool { guard let d = dbfs else { return false }; return d >= LEDLadder.db[i] - 0.5 }
+    var body: some View {
+        let r = LEDLadder.row, h = r.height * k
+        VStack(spacing: 2) {
+            ZStack(alignment: .topLeading) {
+                if let b = SwellPictures.shared.sprite("rack-led.webp", rect: r, pxPerPoint: 1 / k) {
+                    Image(nsImage: b).resizable().interpolation(.high).frame(width: width, height: h)
+                } else { Color.black.frame(width: width, height: h) }
+                ForEach(0..<16, id: \.self) { i in
+                    if lit(i) {
+                        let x0 = LEDLadder.segX[i] - 6, y0 = r.minY
+                        let cell = CGRect(x: x0 - LEDLadder.sheetOrigin.x, y: y0 - LEDLadder.sheetOrigin.y, width: LEDLadder.segW + 12, height: r.height)
+                        if let s = SwellPictures.shared.sprite("rack-led-ledin.webp", rect: cell, pxPerPoint: 1 / k) {
+                            Image(nsImage: s).resizable().interpolation(.high)
+                                .frame(width: cell.width * k, height: h)
+                                .offset(x: (x0 - r.minX) * k)
+                        }
+                    }
+                }
+            }
+            .frame(width: width, height: h, alignment: .topLeading)
+            ZStack(alignment: .topLeading) {
+                ForEach(0..<16, id: \.self) { i in
+                    let cx = (LEDLadder.segX[i] + LEDLadder.segW / 2 - r.minX) * k
+                    let target = LEDLadder.db[i] == -8
+                    Text(LEDLadder.db[i] == 0 ? "0" : "\(Int(LEDLadder.db[i]))".replacingOccurrences(of: "-", with: "−"))
+                        .font(.swellLegend(8.5, bold: target))
+                        .foregroundColor(target ? Swell.amber : Swell.crinkleSub)
+                        .fixedSize()
+                        .frame(width: 30)
+                        .offset(x: cx - 15)
+                }
+            }
+            .frame(width: width, height: 11, alignment: .topLeading)
+        }
+        .accessibilityElement()
+        .accessibilityLabel("Peak meter")
+        .accessibilityValue(dbfs.map { String(format: "%.0f dBFS", $0) } ?? "no signal")
+    }
+}
+
+/// One input on the Amp (NAM) job's LED meter unit: name, CLIP LED, the ladder, the dBFS figure, the advice.
+struct LEDMeterRow: View {
+    let label: String
+    let dbfs: Double?
+    let figure: String
+    let clipped: Bool
+    let advice: (String, Color)
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 5) {
+                Engraved(label, size: 12).lineLimit(1).truncationMode(.tail)
+                HStack(spacing: 5) {
+                    LEDLamp(colour: "red", on: clipped, diameter: 11)
+                    Engraved("Clip", size: 8, dim: !clipped)
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(clipped ? "Clipping" : "Not clipping")
+            }
+            .frame(width: 92, alignment: .leading)
+            LEDLadder(dbfs: dbfs, width: 340)
+            VStack(alignment: .leading, spacing: 5) {
+                GlassWindow(size: 12) { Text(figure).monospacedDigit() }
+                StatusLine(text: advice.0, color: advice.1, diameter: 12).font(.swellBody(12, semibold: true))
+            }
+            .frame(minWidth: 150, alignment: .leading)
         }
     }
 }
@@ -461,8 +727,9 @@ struct FrameStrip: View {
     let name: String
     let height: CGFloat
     var vertical = false
+    var pxPerPoint: CGFloat = 1.6
     var body: some View {
-        if let img = SwellPictures.shared.tileImage(name, pxPerPoint: 1.6) {
+        if let img = SwellPictures.shared.tileImage(name, pxPerPoint: pxPerPoint) {
             img.resizable(resizingMode: .tile)
                 .frame(width: vertical ? height : nil, height: vertical ? nil : height)
                 .frame(maxWidth: vertical ? nil : .infinity, maxHeight: vertical ? .infinity : nil, alignment: .topLeading)
@@ -485,6 +752,8 @@ struct ShelfBox<Content: View>: View {
 /// The opening in the wall the steps sit in: the stage cloth behind, a moulding round it.
 struct StageOpening<Content: View>: View {
     @ViewBuilder let content: Content
+    /// IR Capture's own trim (the Tools studio's camera) when it is in the kit; else the bench's frame trim.
+    var ownTrim: Bool { SwellPictures.shared.cgImage("irc-trim-v.webp") != nil && SwellPictures.shared.cgImage("irc-trim-h.webp") != nil }
     var body: some View {
         content
             .background(
@@ -495,9 +764,33 @@ struct StageOpening<Content: View>: View {
                 }
                 .clipped()
                 .accessibilityHidden(true))
-            .overlay(alignment: .leading) { FrameStrip(name: "frame-trim-left", height: 22, vertical: true).offset(x: -16) }
-            .overlay(alignment: .trailing) { FrameStrip(name: "frame-trim-right", height: 22, vertical: true).offset(x: 16) }
-            .overlay(alignment: .bottom) { FrameStrip(name: "frame-trim-bot", height: 22).offset(y: 14) }
+            .overlay { StageLight().allowsHitTesting(false) }
+            .overlay(alignment: .leading) {
+                if ownTrim { FrameStrip(name: "irc-trim-v", height: 16, vertical: true, pxPerPoint: 2.4).offset(x: -12) }
+                else { FrameStrip(name: "frame-trim-left", height: 22, vertical: true).offset(x: -16) }
+            }
+            .overlay(alignment: .trailing) {
+                if ownTrim { FrameStrip(name: "irc-trim-v", height: 16, vertical: true, pxPerPoint: 2.4).offset(x: 12) }
+                else { FrameStrip(name: "frame-trim-right", height: 22, vertical: true).offset(x: 16) }
+            }
+            .overlay(alignment: .bottom) {
+                if ownTrim { FrameStrip(name: "irc-trim-h", height: 16, pxPerPoint: 2.4).offset(y: 12) }
+                else { FrameStrip(name: "frame-trim-bot", height: 22).offset(y: 14) }
+            }
+    }
+}
+
+/// The one light falling on the stage: the shelf's shadow along the top of the opening, and a gentle falloff away
+/// from the key light (up and to the left), so the panels at the edges sit a little darker, as in a real room.
+struct StageLight: View {
+    var body: some View {
+        ZStack(alignment: .top) {
+            RadialGradient(colors: [.clear, .clear, Color.black.opacity(0.32)], center: UnitPoint(x: 0.38, y: 0.12),
+                           startRadius: 0, endRadius: 980)
+            LinearGradient(colors: [Color.black.opacity(0.55), Color.black.opacity(0.18), .clear], startPoint: .top, endPoint: .bottom)
+                .frame(height: 34)
+        }
+        .accessibilityHidden(true)
     }
 }
 #endif

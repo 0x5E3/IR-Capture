@@ -21,6 +21,8 @@ struct IRCaptureApp: App {
                 .frame(minWidth: 780, minHeight: 640)
         }
         .defaultSize(width: 920, height: 960)
+        // The wall runs to the top of the window, behind the traffic lights; the shelf stands below them.
+        .windowStyle(.hiddenTitleBar)
         .commands {
             CommandGroup(replacing: .newItem) {}
             CommandGroup(replacing: .appInfo) {
@@ -52,7 +54,9 @@ struct ContentView: View {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 18) {
                             Text(m.job == .cab ? "Record the speaker cab's impulse response." : "Record the amp for a NAM model, trained at TONE3000.")
-                                .font(.swellBody(14, semibold: true)).onPaper(padding: 9, fill: false)
+                                .font(.swellBody(14, semibold: true))
+                                .onPaper(padding: 9, fill: false, style: PaperStyle(stock: .manila, tape: true, tilt: -0.6))
+                                .padding(.top, 6).padding(.leading, 8)
                             if m.job == .nam {
                                 NAMJob()
                                 if let r = m.namResult { NAMResultsView(r: r).id("namresults") }
@@ -62,6 +66,7 @@ struct ContentView: View {
                             }
                         }
                         .padding(22).frame(maxWidth: 900, alignment: .leading).frame(maxWidth: .infinity)
+                        .environment(\.swellTheme, m.job == .nam ? .nam : .cab)
                     }
                     .onChange(of: m.result?.folder) { _ in withAnimation { proxy.scrollTo("results", anchor: .top) } }
                     .onChange(of: m.namResult?.folder) { _ in withAnimation { proxy.scrollTo("namresults", anchor: .top) } }
@@ -69,7 +74,7 @@ struct ContentView: View {
             }
             .padding(.horizontal, 24).padding(.bottom, 22)
         }
-        .background(WorkshopWall())
+        .background(WorkshopWall().ignoresSafeArea())
         .workshopDefaults()
         .sheet(isPresented: $m.showWelcome) { WelcomeSheet().environmentObject(m).workshopDefaults(.panel) }
         .sheet(item: $m.helpPage) { p in HelpSheet(page: p).environmentObject(m).workshopDefaults(.panel) }
@@ -135,14 +140,34 @@ struct ContentView: View {
 enum GearPreview {
     @MainActor
     static func render(to file: URL) {
-        let view = VStack(alignment: .leading, spacing: 18) {
-            MeterBridge {
-                MeterModule(label: "SM57", vu: 0, dbfs: "−6.0 dBFS", clipped: false, advice: ("OK", goodColor)) {
+        let micNames = ["SM57", "R121", "MD421", "e906", "C414", "Room", "Reference"]
+        let vus: [Double] = [0.4, -1.5, 2.2, -2.8, -7, 1, -0.5]
+        let eyes: [Double] = [0.9, 0.75, 1.0, 0.6, 0.35, 0.5, 1.0]
+        let view = VStack(alignment: .leading, spacing: 22) {
+            Engraved("Cab IR: four inputs, full-size meters, noise eyes", size: 12)
+            MeterBridge(count: 4) {
+                MeterModule(label: "SM57", vu: 0, dbfs: "−6.0 dBFS", clipped: false, advice: ("OK", goodColor), eye: (1.0, true)) {
                     HStack(spacing: 6) { Pill(text: "H2 −52", color: goodColor); Pill(text: "H3 −47", color: goodColor) }
                 }
-                MeterModule(label: "R121", vu: -9, dbfs: "−15.0 dBFS", clipped: false, advice: ("Turn up 9 dB", warnColor)) { EmptyView() }
-                MeterModule(label: "Room", vu: 4, dbfs: "−0.1 dBFS", clipped: true, advice: ("CLIP: turn down", badColor)) { EmptyView() }
-                MeterModule(label: "Reference", vu: nil, dbfs: "−72.0 dBFS", clipped: false, advice: ("No signal: check cable", badColor)) { EmptyView() }
+                MeterModule(label: "R121", vu: -9, dbfs: "−15.0 dBFS", clipped: false, advice: ("Turn up 9 dB", warnColor), eye: (0.55, true)) { EmptyView() }
+                MeterModule(label: "Room", vu: 4, dbfs: "−0.1 dBFS", clipped: true, advice: ("CLIP: turn down", badColor), eye: (0.2, true)) { EmptyView() }
+                MeterModule(label: "Reference", vu: nil, dbfs: "−72.0 dBFS", clipped: false, advice: ("No signal: check cable", badColor), eye: (nil, false)) { EmptyView() }
+            }
+            Engraved("Cab IR: six mics and a reference, compact meters", size: 12)
+            MeterBridge(count: 7) {
+                ForEach(0..<7, id: \.self) { i in
+                    MeterModule(label: micNames[i], vu: vus[i],
+                                dbfs: String(format: "%.1f dBFS", -6 + vus[i]), clipped: false,
+                                advice: i == 4 ? ("Turn up 7 dB", warnColor) : ("OK", goodColor),
+                                eye: (closure: eyes[i], lit: true), compact: true) {
+                        if i < 6 {
+                            ViewThatFits(in: .horizontal) {
+                                HStack(spacing: 6) { Pill(text: "H2 −51", color: goodColor); Pill(text: "H3 −48", color: goodColor) }
+                                VStack(alignment: .leading, spacing: 5) { Pill(text: "H2 −51", color: goodColor); Pill(text: "H3 −48", color: goodColor) }
+                            }
+                        }
+                    }
+                }
             }
             HStack(spacing: 18) {
                 VStack(spacing: 3) { NixieReadout(value: 45); Engraved("Seconds left", size: 9, dim: true) }
@@ -159,13 +184,33 @@ enum GearPreview {
                 Lamp(state: .amber, size: 46)
             }
             JobStepper(steps: [("Connect", true), ("Set levels", true), ("Capture", false), ("Results", false)])
+            HStack(alignment: .top, spacing: 16) {
+                Checklist(items: ["A manila card, taped on.", "Its second line, for the look of it."], style: PaperStyle(stock: .manila, tape: true, tilt: 0.25, ring: true))
+                    .frame(width: 250)
+                PreflightList(items: [PreflightItem(level: .ok, text: "2 mics (SM57, R121)"), PreflightItem(level: .warn, text: "Room is noisy"),
+                                      PreflightItem(level: .block, text: "Choose a capture name")])
+                    .frame(width: 250)
+            }
+            .padding(.top, 8)
+            WiringDiagram(wiring: .cabRef).onPaper(padding: 14, style: .drawing)
         }
-        .padding(24).frame(width: 820)
+        .padding(24).frame(width: 880)
         .onPanel()
-        .padding(20)
-        .background(WorkshopWall())
-        .workshopDefaults()
-        let r = ImageRenderer(content: view)
+        let nam = VStack(alignment: .leading, spacing: 18) {
+            Engraved("Amp (NAM): graphite panel, LED lamps, LED-ladder meters", size: 12)
+            JobStepper(steps: [("Signal", true), ("Connect", true), ("Set levels", false), ("Record", false), ("Upload", false)])
+            NAMMeterTable(meters: [NAMMeter(id: 0, label: "Suhr", peakDB: -8.2, clipped: false), NAMMeter(id: 1, label: "SM57", peakDB: -19.5, clipped: false),
+                                   NAMMeter(id: 2, label: "R121", peakDB: -0.2, clipped: true)])
+            WiringDiagram(wiring: .namAmp).onPaper(padding: 14, style: .drawing)
+        }
+        .padding(24).frame(width: 880)
+        .onPanel()
+        .environment(\.swellTheme, .nam)
+        let sheet = VStack(alignment: .leading, spacing: 24) { view; nam }
+            .padding(20)
+            .background(WorkshopWall())
+            .workshopDefaults()
+        let r = ImageRenderer(content: sheet)
         r.scale = 2
         if let img = r.nsImage, let tiff = img.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
            let png = rep.representation(using: .png, properties: [:]) {
@@ -193,6 +238,12 @@ struct Shelf: View {
         if m.levelRunning || m.namLevelRunning { return (.amber, "Checking levels") }
         return (.off, "Ready")
     }
+    /// The interface and the rate it runs at, under the status (the bench's status box shows its rate the same way).
+    var rig: String {
+        guard let d = m.device else { return "No interface connected" }
+        let rate = m.job == .nam ? 48000 : m.captureRate
+        return "\(d.name) · \(rateTag(rate).dropLast()) kHz"
+    }
     var body: some View {
         let st = status
         ZStack(alignment: .topLeading) {
@@ -208,7 +259,13 @@ struct Shelf: View {
                 ShelfBox {
                     Lamp(state: st.0, size: 46)
                         .opacity(st.0 == .amber && pulse ? 0.72 : 1)
-                    GlassWindow(size: 13) { Text(st.1).textCase(.uppercase).tracking(1.4).frame(minWidth: 150, alignment: .leading) }
+                    GlassWindow(size: 13) {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(st.1).textCase(.uppercase).tracking(1.4)
+                            Text(rig).font(.swellLegend(10)).tracking(0.6).opacity(0.78)
+                        }
+                        .frame(minWidth: 190, alignment: .leading)
+                    }
                 }
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("Status: \(st.1)")
@@ -238,7 +295,8 @@ struct Step<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .center, spacing: 12) {
-                JewelLamp(colour: done ? "green" : "amber", on: true, diameter: 26)
+                DoneLamp(done: done, diameter: 26)
+                    .accessibilityElement()
                     .accessibilityLabel(done ? "Done" : "To do")
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -262,7 +320,7 @@ struct JobStepper: View {
         HStack(spacing: 18) {
             ForEach(Array(steps.enumerated()), id: \.offset) { i, s in
                 HStack(spacing: 7) {
-                    JewelLamp(colour: "green", on: s.1, diameter: 18)
+                    DoneLamp(done: s.1, diameter: 18, offIsAmber: false)
                     Engraved(s.0, size: 11, dim: !s.1)
                 }
                 .accessibilityElement(children: .ignore)
@@ -307,6 +365,7 @@ struct ErrorNote: View {
 /// Numbered instructions, printed on a card.
 struct Checklist: View {
     let items: [String]
+    var style = PaperStyle.card
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
             ForEach(Array(items.enumerated()), id: \.offset) { i, t in
@@ -316,7 +375,7 @@ struct Checklist: View {
                 }
             }
         }
-        .onPaper()
+        .onPaper(style: style)
     }
 }
 

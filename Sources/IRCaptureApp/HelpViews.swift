@@ -87,49 +87,192 @@ struct WiringDiagram: View {
         case .tap: return Color(red: 0.61, green: 0.45, blue: 0.7)
         }
     }
+    var nodeWidth: CGFloat { compact ? 112 : 132 }
+    var iconSize: CGSize { compact ? CGSize(width: 60, height: 36) : CGSize(width: 72, height: 44) }
     var body: some View {
-        VStack(alignment: .leading, spacing: compact ? 8 : 12) {
+        VStack(alignment: .leading, spacing: compact ? 10 : 14) {
             ForEach(Array(wiring.rows.enumerated()), id: \.offset) { _, row in
-                HStack(spacing: 0) {
+                HStack(alignment: .top, spacing: 0) {
                     ForEach(Array(row.enumerated()), id: \.offset) { i, n in
                         if i > 0 {
                             VStack(spacing: 1) {
                                 Text(n.via ?? "").font(ink ? Font.swellBody(10) : Font.system(size: 9)).foregroundStyle(ink ? Swell.tagInk.opacity(0.8) : Color.secondary).lineLimit(1).minimumScaleFactor(0.8)
-                                if ink { InkArrow() } else {
-                                    Image(systemName: "arrow.right").font(.system(size: 13, weight: .semibold)).foregroundStyle(.secondary)
-                                }
-                            }.frame(width: compact ? 60 : 78)
+                                InkArrow(color: ink ? Swell.tagInk : Color.secondary)
+                            }
+                            .frame(width: compact ? 58 : 74)
+                            .padding(.top, max(0, iconSize.height / 2 - 17))
                         }
-                        VStack(spacing: 2) {
-                            Text(n.title).font(ink ? Font.swellLegend(compact ? 11 : 12) : Font.system(size: compact ? 11 : 12, weight: .semibold))
-                                .textCase(ink ? Text.Case.uppercase : nil).multilineTextAlignment(.center)
+                        VStack(spacing: 3) {
+                            GearIcon(kind: GearIcon.Kind(n))
+                                .stroke(color(n.kind), style: StrokeStyle(lineWidth: ink ? 1.25 : 1.5, lineCap: .round, lineJoin: .round))
+                                .frame(width: iconSize.width, height: iconSize.height)
+                                .accessibilityHidden(true)
+                            Text(n.title).font(ink ? Font.swellLegend(compact ? 10.5 : 11.5) : Font.system(size: compact ? 11 : 12, weight: .semibold))
+                                .textCase(ink ? Text.Case.uppercase : nil).tracking(ink ? 0.6 : 0).multilineTextAlignment(.center)
                             if !n.sub.isEmpty {
                                 Text(n.sub).font(ink ? Font.swellBody(compact ? 10 : 11) : Font.system(size: compact ? 9 : 10))
                                     .foregroundStyle(ink ? Swell.tagInk.opacity(0.8) : Color.secondary).multilineTextAlignment(.center)
+                                    .fixedSize(horizontal: false, vertical: true)
                             }
                         }
-                        .padding(.horizontal, 6).padding(.vertical, compact ? 5 : 8)
-                        .frame(width: compact ? 120 : 140)
-                        .background(RoundedRectangle(cornerRadius: ink ? 2 : 7).fill(ink ? Color.clear : color(n.kind).opacity(0.16)))
-                        .overlay(RoundedRectangle(cornerRadius: ink ? 2 : 7).strokeBorder(color(n.kind), lineWidth: ink ? 1.2 : 1.5))
+                        .frame(width: nodeWidth)
                     }
                 }
             }
-            Text(wiring.footnote).font(ink ? Font.swellBody(11) : Font.caption).foregroundStyle(ink ? Swell.tagInk.opacity(0.8) : Color.secondary)
+            HStack(alignment: .bottom, spacing: 12) {
+                Text(wiring.footnote).font(ink ? Font.swellBody(11) : Font.caption).foregroundStyle(ink ? Swell.tagInk.opacity(0.8) : Color.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 8)
+                if ink && !compact { TitleBlock(title: wiring.title, number: (Wiring.allCases.firstIndex(of: wiring) ?? 0) + 1) }
+            }
         }
         .padding(ink ? 0 : (compact ? 8 : 12))
         .background(RoundedRectangle(cornerRadius: 8).fill(ink ? Color.clear : Color.secondary.opacity(0.05)))
     }
 }
 
+/// A drawing's title block in the lower right, as on a drafting sheet.
+struct TitleBlock: View {
+    let title: String
+    let number: Int
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(title).font(.swellLegend(9.5)).textCase(.uppercase).tracking(0.8)
+                .padding(.horizontal, 6).padding(.vertical, 3)
+            Rectangle().fill(Swell.tagInk.opacity(0.7)).frame(height: 0.8)
+            HStack(spacing: 0) {
+                Text("Wiring").font(.swellLegend(8)).textCase(.uppercase).tracking(0.8).padding(.horizontal, 6).padding(.vertical, 2)
+                Rectangle().fill(Swell.tagInk.opacity(0.7)).frame(width: 0.8)
+                Text("Dwg W-\(number)").font(.swellLegend(8)).textCase(.uppercase).tracking(0.8).padding(.horizontal, 6).padding(.vertical, 2)
+            }
+        }
+        .foregroundColor(Swell.tagInk)
+        .fixedSize()
+        .overlay(Rectangle().stroke(Swell.tagInk.opacity(0.8), lineWidth: 1))
+        .accessibilityHidden(true)
+    }
+}
+
+/// The gear in a wiring drawing, drawn as a draftsman would: an interface, an amp, a reamp box, a cab with its
+/// speakers, the speaker terminals, a mic, a load box, a pad, a jack. Line drawings only (the bench's rule: real-looking
+/// gear on the rig, line drawings on paper). Every figure fits its rect.
+struct GearIcon: Shape {
+    enum Kind {
+        case interface, amp, reamp, cab, terminals, mic, loadBox, pad, jack
+        init(_ n: DiagramNode) {
+            let t = n.title.lowercased()
+            if t.hasPrefix("interface") { self = .interface }
+            else if t.hasPrefix("reamp") { self = .reamp }
+            else if t.hasPrefix("amp") { self = .amp }
+            else if t.hasPrefix("cab") { self = .cab }
+            else if t.hasPrefix("speaker") { self = .terminals }
+            else if t.hasPrefix("mic") { self = .mic }
+            else if t.hasPrefix("load box") || t.hasPrefix("reference") { self = .loadBox }
+            else if t.hasPrefix("tap point") { self = .pad }
+            else if t.contains("jack") { self = .jack }
+            else {
+                switch n.kind {
+                case .interface: self = .interface
+                case .speaker: self = .cab
+                case .mic: self = .mic
+                case .tap: self = .loadBox
+                case .gear: self = .amp
+                }
+            }
+        }
+    }
+    let kind: Kind
+    func path(in r: CGRect) -> Path {
+        var p = Path()
+        let w = r.width, h = r.height, x0 = r.minX, y0 = r.minY
+        func P(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: x0 + x * w, y: y0 + y * h) }
+        func circle(_ cx: CGFloat, _ cy: CGFloat, _ rr: CGFloat) { p.addEllipse(in: CGRect(x: x0 + cx * w - rr, y: y0 + cy * h - rr, width: 2 * rr, height: 2 * rr)) }
+        func box(_ a: CGFloat, _ b: CGFloat, _ c: CGFloat, _ d: CGFloat, _ rad: CGFloat = 2) {
+            p.addRoundedRect(in: CGRect(x: x0 + a * w, y: y0 + b * h, width: (c - a) * w, height: (d - b) * h), cornerSize: CGSize(width: rad, height: rad))
+        }
+        func line(_ a: CGPoint, _ b: CGPoint) { p.move(to: a); p.addLine(to: b) }
+        let u = min(w, h)
+        switch kind {
+        case .interface:
+            // a desktop interface: the case, two gain knobs, two combo jacks, a little meter row
+            box(0.04, 0.3, 0.96, 0.86, 3)
+            line(P(0.04, 0.42), P(0.96, 0.42))
+            circle(0.17, 0.64, u * 0.1); line(P(0.17, 0.64), P(0.21, 0.56))
+            circle(0.36, 0.64, u * 0.1); line(P(0.36, 0.64), P(0.40, 0.56))
+            circle(0.62, 0.64, u * 0.11); circle(0.62, 0.64, u * 0.04)
+            circle(0.84, 0.64, u * 0.11); circle(0.84, 0.64, u * 0.04)
+            for k in 0..<5 { box(0.5 + CGFloat(k) * 0.08, 0.33, 0.55 + CGFloat(k) * 0.08, 0.38, 0.5) }
+        case .amp:
+            // an amp head: the handle, the cabinet, the control panel with a row of knobs and a pilot
+            p.move(to: P(0.36, 0.22)); p.addQuadCurve(to: P(0.64, 0.22), control: P(0.5, 0.02))
+            box(0.04, 0.22, 0.96, 0.9, 3)
+            box(0.1, 0.32, 0.9, 0.62, 1.5)
+            for k in 0..<5 { circle(0.2 + CGFloat(k) * 0.13, 0.47, u * 0.06) }
+            circle(0.84, 0.47, u * 0.035)
+            line(P(0.1, 0.76), P(0.9, 0.76))
+        case .reamp:
+            // a small reamp box: two jacks and a ground-lift switch
+            box(0.22, 0.36, 0.78, 0.84, 3)
+            circle(0.36, 0.6, u * 0.09); circle(0.36, 0.6, u * 0.035)
+            circle(0.64, 0.6, u * 0.09); circle(0.64, 0.6, u * 0.035)
+            line(P(0.5, 0.48), P(0.5, 0.56))
+        case .cab:
+            // a closed-back cab: the box, the baffle, four speakers with their dust caps
+            box(0.16, 0.06, 0.84, 0.96, 3)
+            box(0.21, 0.12, 0.79, 0.9, 1.5)
+            for (cx, cy) in [(0.37, 0.32), (0.63, 0.32), (0.37, 0.7), (0.63, 0.7)] as [(CGFloat, CGFloat)] {
+                circle(cx, cy, u * 0.17); circle(cx, cy, u * 0.05)
+            }
+        case .terminals:
+            // two binding posts on a plate, + and −
+            box(0.18, 0.3, 0.82, 0.86, 2.5)
+            circle(0.36, 0.58, u * 0.12); circle(0.36, 0.58, u * 0.05)
+            circle(0.64, 0.58, u * 0.12); circle(0.64, 0.58, u * 0.05)
+            line(P(0.32, 0.36), P(0.40, 0.36)); line(P(0.36, 0.32), P(0.36, 0.40))
+            line(P(0.60, 0.36), P(0.68, 0.36))
+        case .mic:
+            // a dynamic mic on its side, aimed left at a speaker: grille, body, XLR end, a few grille lines
+            box(0.12, 0.42, 0.32, 0.7, 6)
+            for k in 1..<4 { line(P(0.12 + CGFloat(k) * 0.05, 0.43), P(0.12 + CGFloat(k) * 0.05, 0.69)) }
+            p.move(to: P(0.32, 0.46)); p.addLine(to: P(0.8, 0.5)); p.addLine(to: P(0.8, 0.62)); p.addLine(to: P(0.32, 0.66))
+            box(0.8, 0.48, 0.9, 0.64, 1)
+            line(P(0.9, 0.56), P(0.98, 0.56))
+        case .loadBox:
+            // a load box: the case with cooling slots, a resistor drawn on its face
+            box(0.1, 0.3, 0.9, 0.88, 3)
+            for k in 0..<6 { line(P(0.2 + CGFloat(k) * 0.12, 0.36), P(0.2 + CGFloat(k) * 0.12, 0.46)) }
+            p.move(to: P(0.18, 0.68))
+            p.addLine(to: P(0.3, 0.68))
+            for k in 0..<6 { p.addLine(to: P(0.33 + CGFloat(k) * 0.06, k % 2 == 0 ? 0.58 : 0.78)) }
+            p.addLine(to: P(0.7, 0.68)); p.addLine(to: P(0.82, 0.68))
+        case .pad:
+            // two resistors in series and the tap point between them
+            p.move(to: P(0.04, 0.6)); p.addLine(to: P(0.12, 0.6))
+            for k in 0..<6 { p.addLine(to: P(0.15 + CGFloat(k) * 0.045, k % 2 == 0 ? 0.48 : 0.72)) }
+            p.addLine(to: P(0.42, 0.6)); p.addLine(to: P(0.58, 0.6))
+            for k in 0..<6 { p.addLine(to: P(0.61 + CGFloat(k) * 0.045, k % 2 == 0 ? 0.48 : 0.72)) }
+            p.addLine(to: P(0.88, 0.6)); p.addLine(to: P(0.96, 0.6))
+            circle(0.5, 0.6, u * 0.04); line(P(0.5, 0.6), P(0.5, 0.92))
+        case .jack:
+            // a quarter-inch jack: the barrel, the nut, the tip and sleeve lugs
+            box(0.24, 0.44, 0.62, 0.74, 2)
+            box(0.62, 0.48, 0.72, 0.7, 1)
+            line(P(0.72, 0.59), P(0.86, 0.59))
+            line(P(0.3, 0.74), P(0.3, 0.88)); line(P(0.5, 0.74), P(0.5, 0.88))
+        }
+        return p
+    }
+}
+
 /// An arrow drawn in ink, for the line drawings.
 struct InkArrow: View {
+    var color: Color = Swell.tagInk
     var body: some View {
         Path { p in
             p.move(to: CGPoint(x: 2, y: 5)); p.addLine(to: CGPoint(x: 30, y: 5))
             p.move(to: CGPoint(x: 24, y: 1)); p.addLine(to: CGPoint(x: 30, y: 5)); p.addLine(to: CGPoint(x: 24, y: 9))
         }
-        .stroke(Swell.tagInk, style: StrokeStyle(lineWidth: 1.3, lineCap: .round, lineJoin: .round))
+        .stroke(color, style: StrokeStyle(lineWidth: 1.3, lineCap: .round, lineJoin: .round))
         .frame(width: 32, height: 10)
         .accessibilityHidden(true)
     }

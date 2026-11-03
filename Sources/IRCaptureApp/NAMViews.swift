@@ -95,7 +95,7 @@ struct NAMDirectSteps: View {
 
             Step(n: 2, title: "Connect", subtitle: "One interface is used for both. The output is connected to the reamp box. The inputs record the amp.") {
                 NAMModelChoice()
-                WiringDiagram(wiring: m.namKind == .amp ? .namAmp : .namFull).onPaper()
+                WiringDiagram(wiring: m.namKind == .amp ? .namAmp : .namFull).onPaper(padding: 14, style: .drawing)
                 Checklist(items: [
                     "Interface output → reamp box → amp guitar input. The preamp is included in the capture. Turn off noise gates, reverb, delay and all effects-loop devices.",
                     m.namKind == .amp
@@ -176,16 +176,16 @@ struct NAMMeterTable: View {
     }
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            MeterBridge {
+            // One LED meter unit for every input (the rack's LED ladder reads dBFS: −8 dBFS is the last green segment).
+            VStack(alignment: .leading, spacing: 12) {
                 ForEach(meters) { x in
-                    // 0 VU is the −8 dBFS target.
-                    MeterModule(label: x.label, vu: x.peakDB < -60 ? nil : x.peakDB - NAMMeterTable.target,
-                                dbfs: x.peakDB < -100 ? "—" : String(format: "%.1f dBFS", x.peakDB), clipped: x.clipped, advice: advice(x)) {
-                        EmptyView()
-                    }
+                    LEDMeterRow(label: x.label, dbfs: x.peakDB < -100 ? nil : x.peakDB,
+                                figure: x.peakDB < -100 ? "—" : String(format: "%.1f dBFS", x.peakDB), clipped: x.clipped, advice: advice(x))
                 }
             }
-            Note("0 VU on each meter is the target level, a peak of −8 dBFS. Within ±3 VU is OK. The figure under each meter is the peak in dBFS.")
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .onCrinkle(padding: 16)
+            Note("Each meter reads the peak in dBFS. The target is −8 dBFS, the last green segment. Within 3 dB of it (−11 to −5 dBFS) is OK. The amber and red segments are above the target.")
         }
     }
 }
