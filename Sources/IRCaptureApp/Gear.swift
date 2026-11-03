@@ -123,18 +123,19 @@ struct PaperBackground: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: style.stock == .index ? 3 : 1.5))
         .shadow(color: .black.opacity(0.55), radius: 3, x: 1, y: 2)
-        .overlay(alignment: .topLeading) { if style.tape { TapePiece(n: 1, angle: -38).offset(x: -22, y: -12) } }
-        .overlay(alignment: .topTrailing) { if style.tape { TapePiece(n: 2, angle: 41).offset(x: 22, y: -12) } }
+        .overlay(alignment: .topLeading) { if style.tape { TapePiece(n: 1, angle: -36).offset(x: -13, y: -6) } }
+        .overlay(alignment: .topTrailing) { if style.tape { TapePiece(n: 2, angle: 39).offset(x: 13, y: -6) } }
         .accessibilityHidden(true)
     }
 }
 
-/// One piece of the bench's masking tape (tape-1..3.webp, 32 px a cm), at 10 pt a cm.
+/// One piece of the bench's masking tape (tape-1..3.webp, 32 px a cm), drawn at 40 x 16 pt: a short tab across the
+/// corner, small beside the card, as the bench lays it at half its picture on the sheet.
 struct TapePiece: View {
     let n: Int
     let angle: Double
     var body: some View {
-        if let t = SwellPictures.shared.image("tape-\(n)", pxPerPoint: 3.2) {
+        if let t = SwellPictures.shared.image("tape-\(n)", pxPerPoint: 5.0) {
             Image(nsImage: t).resizable().interpolation(.high)
                 .frame(width: t.size.width, height: t.size.height)
                 .rotationEffect(.degrees(angle))
@@ -185,8 +186,13 @@ struct IndexRules: View {
 /// The panel stock under a step: bronze hammertone (a finer grain when that render is in the kit) for Cab IR,
 /// graphite anodised aluminium for Amp (NAM). Falls back to the kit's own panel if a picture is missing.
 struct PanelStock: View {
+    /// Panels made at different times never match exactly: each seed shifts the stock's tone a hair (under 3 %).
+    var seed = 0
     @Environment(\.swellTheme) private var theme
-    var body: some View { Panel9Slice(piece: SwellNine.stepPanel(for: theme)) }
+    var body: some View {
+        let b = Double((seed * 37) % 7 - 3) * 0.007, sat = 1 + Double((seed * 53) % 5 - 2) * 0.025
+        Panel9Slice(piece: SwellNine.stepPanel(for: theme)).brightness(b).saturation(sat)
+    }
 }
 
 extension View {
@@ -204,11 +210,11 @@ extension View {
     }
 
     /// A step's panel with screws in the corners (a step, the results), in the job's stock.
-    func onPanel(padding: CGFloat = 20) -> some View {
+    func onPanel(padding: CGFloat = 20, seed: Int = 0) -> some View {
         self.environment(\.swellSurface, .panel)
             .foregroundStyle(Swell.panelLabel)
             .padding(.horizontal, padding + 2).padding(.vertical, padding)
-            .background(PanelStock())
+            .background(PanelStock(seed: seed))
     }
 
     /// A black crinkle rack face (meters, the Welcome and Help sheets).
@@ -478,7 +484,7 @@ struct MeterModule<Extra: View>: View {
     var eye: (closure: Double?, lit: Bool)? = nil
     var compact = false
     @ViewBuilder var extra: Extra
-    var width: CGFloat { compact ? 112 : 150 }
+    var width: CGFloat { compact ? 100 : 150 }
     var body: some View {
         VStack(alignment: .leading, spacing: compact ? 6 : 8) {
             HStack(spacing: 4) {
@@ -493,11 +499,11 @@ struct MeterModule<Extra: View>: View {
             }
             VUMeter(vu: vu, width: width)
             HStack(alignment: .center, spacing: 6) {
-                GlassWindow(size: compact ? 11 : 12) { Text(dbfs).monospacedDigit() }
+                GlassWindow(size: compact ? 10 : 12) { Text(dbfs).monospacedDigit() }
                 Spacer(minLength: 0)
                 if let e = eye {
                     VStack(spacing: 1) {
-                        MagicEye(closure: e.closure, lit: e.lit, diameter: compact ? 26 : 30)
+                        MagicEye(closure: e.closure, lit: e.lit, diameter: compact ? 24 : 30)
                         Engraved("Noise", size: 7, dim: true)
                     }
                     .help("The green closes as the input stands clear of the room noise: open at 20 dB, closed at 60 dB or more.")
@@ -519,7 +525,7 @@ struct MeterBridge<Content: View>: View {
     static func compact(_ n: Int) -> Bool { n > 4 }
     var body: some View {
         let c = MeterBridge.compact(count)
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: c ? 134 : 174, maximum: c ? 140 : 190), spacing: c ? 9 : 12, alignment: .top)],
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: c ? 120 : 174, maximum: c ? 126 : 190), spacing: c ? 8 : 12, alignment: .top)],
                   alignment: .leading, spacing: 12) {
             content
         }
@@ -738,14 +744,25 @@ struct FrameStrip: View {
     }
 }
 
-/// A homemade hammertone box standing on the shelf, holding keys or a lamp.
+/// A homemade steel box standing on the shelf, holding keys or a lamp: bronze hammertone, or oxblood crackle (the
+/// bench's shelf mixes the two). With IR Capture's own shelf pieces the content sits on the box's rendered front face.
 struct ShelfBox<Content: View>: View {
+    var finish = "bronze"
     @ViewBuilder let content: Content
     var body: some View {
-        HStack(spacing: 10) { content }
-            .padding(.leading, 22).padding(.trailing, 50).padding(.top, 9).padding(.bottom, 14)
-            .frame(height: 68)
-            .background(Panel9Slice(piece: SwellNine.shelfBox))
+        if let g = ShelfGeometry.own {
+            HStack(spacing: 10) { content }
+                .padding(.horizontal, 12)
+                .frame(height: g.boxHeight - g.boxFace[0] - g.boxFace[2])
+                .padding(.top, g.boxFace[0]).padding(.leading, g.boxFace[1])
+                .padding(.bottom, g.boxFace[2]).padding(.trailing, g.boxFace[3])
+                .background(Panel9Slice(piece: g.boxPiece(finish)))
+        } else {
+            HStack(spacing: 10) { content }
+                .padding(.leading, 22).padding(.trailing, 50).padding(.top, 9).padding(.bottom, 14)
+                .frame(height: 68)
+                .background(Panel9Slice(piece: SwellNine.shelfBox))
+        }
     }
 }
 

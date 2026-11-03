@@ -246,19 +246,31 @@ struct Shelf: View {
     }
     var body: some View {
         let st = status
+        let g = ShelfGeometry.own
         ZStack(alignment: .topLeading) {
-            FrameStrip(name: "frame-plank", height: 53.75).padding(.top, 56)
-            FrameStrip(name: "frame-trim-top", height: 21.88).padding(.top, 97)
+            if let g {
+                FrameStrip(name: g.plank, height: g.plankHeight, pxPerPoint: g.pxPerPoint).padding(.top, g.plankTop)
+            } else {
+                FrameStrip(name: "frame-plank", height: 53.75).padding(.top, 56)
+                FrameStrip(name: "frame-trim-top", height: 21.88).padding(.top, 97)
+            }
             HStack(alignment: .top, spacing: 16) {
-                ShelfBox {
+                ShelfBox(finish: "bronze") {
                     Button("Cab IR") { m.job = .cab }.buttonStyle(KeyButtonStyle(lit: m.job == .cab, size: 13))
                     Button("Amp NAM") { m.job = .nam }.buttonStyle(KeyButtonStyle(lit: m.job == .nam, size: 13))
                 }
                 .disabled(m.busy != nil)
                 Spacer(minLength: 0)
-                ShelfBox {
-                    Lamp(state: st.0, size: 46)
-                        .opacity(st.0 == .amber && pulse ? 0.72 : 1)
+                ShelfBox(finish: "oxblood") {
+                    Group {
+                        if g != nil {
+                            JewelLamp(colour: st.0 == .red ? "red" : "amber", on: st.0 != .off, diameter: 22)
+                        } else {
+                            Lamp(state: st.0, size: 46)
+                        }
+                    }
+                    .opacity(st.0 == .amber && pulse ? 0.72 : 1)
+                    .accessibilityHidden(true)
                     GlassWindow(size: 13) {
                         VStack(alignment: .leading, spacing: 1) {
                             Text(st.1).textCase(.uppercase).tracking(1.4)
@@ -270,18 +282,51 @@ struct Shelf: View {
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("Status: \(st.1)")
                 Spacer(minLength: 0)
-                ShelfBox {
+                ShelfBox(finish: "bronze") {
                     Button("Help") { m.helpPage = .quickStart }.buttonStyle(KeyButtonStyle(size: 13))
                 }
             }
-            .padding(.horizontal, 26).padding(.top, 2)
+            .padding(.horizontal, 26).padding(.top, g?.boxTop ?? 2)
         }
-        .frame(height: 119, alignment: .top)
+        .frame(height: g?.height ?? 119, alignment: .top)
         .onAppear {
             guard !reduceMotion else { return }
             withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) { pulse = true }
         }
     }
+}
+
+/// IR Capture's own shelf (design/render/ircapture_kit.py: the plank and the boxes rendered in the Tools studio,
+/// orthographic and 10 degrees above, like every key, lamp and panel under it), read from SwellKit/irc-shelf.json.
+/// nil when the file or a picture is missing: the shelf then uses the bench's frame pieces (seen from below).
+struct ShelfGeometry: Decodable {
+    let pxPerPoint: CGFloat
+    let plank: String
+    /// The plank strip's height (pt), and how far its top sits below the box picture's top.
+    let plankHeight: CGFloat
+    let plankBelowBoxTop: CGFloat
+    /// Box pictures by finish ("bronze", "oxblood"); their height, 9-slice insets and front face (pt from the picture's edges).
+    let boxes: [String: String]
+    let boxHeight: CGFloat
+    let boxInsets: [CGFloat]       // top, leading, bottom, trailing
+    let boxFace: [CGFloat]         // top, leading, bottom, trailing
+    /// Wall above the boxes (pt), under the title bar.
+    let boxTop: CGFloat
+    var plankTop: CGFloat { boxTop + plankBelowBoxTop }
+    var height: CGFloat { plankTop + plankHeight }
+    func insets(_ a: [CGFloat]) -> EdgeInsets { EdgeInsets(top: a[0], leading: a[1], bottom: a[2], trailing: a[3]) }
+    func boxPiece(_ finish: String) -> SwellNine.Piece {
+        SwellNine.Piece(name: boxes[finish] ?? boxes["bronze"] ?? "", pxPerPoint: pxPerPoint, insets: insets(boxInsets), mode: .tile, outset: 0)
+    }
+
+    static let own: ShelfGeometry? = {
+        let url = SwellKit.folder.appendingPathComponent("irc-shelf.json")
+        guard let data = try? Data(contentsOf: url), let g = try? JSONDecoder().decode(ShelfGeometry.self, from: data),
+              g.boxInsets.count == 4, g.boxFace.count == 4 else { return nil }
+        let files = [g.plank] + Array(g.boxes.values)
+        guard files.allSatisfy({ SwellPictures.shared.cgImage($0 + ".webp") != nil }) else { return nil }
+        return g
+    }()
 }
 
 // ------------------------------------------------------------------ building blocks
@@ -309,7 +354,7 @@ struct Step<Content: View>: View {
             content
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .onPanel()
+        .onPanel(seed: n)
     }
 }
 
@@ -662,7 +707,8 @@ struct ResultsView: View {
                             }
                         }
                     }
-                    ResponsePlot(fc: r.curves.fc, curves: r.names.map { r.curves.curves[$0] ?? [] }, onScreen: true).frame(height: 300)
+                    SweptResponsePlot(fc: r.curves.fc, curves: r.names.map { r.curves.curves[$0] ?? [] }).frame(height: 300)
+                        .id(r.folder)
                 }
             }
             HStack(spacing: 10) {
@@ -741,11 +787,36 @@ struct DiagnosticsTable: View {
     }
 }
 
+/// The response plot drawn on as the beam sweeps from 20 Hz to 20 kHz when the results arrive, as a sweep would.
+struct SweptResponsePlot: View {
+    let fc: [Double]
+    let curves: [[Double]]
+    @State private var progress = 0.0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    var body: some View {
+        BeamPlot(fc: fc, curves: curves, progress: progress)
+            .onAppear {
+                if reduceMotion { progress = 1; return }
+                progress = 0
+                withAnimation(.easeInOut(duration: 1.6)) { progress = 1 }
+            }
+    }
+    private struct BeamPlot: View, Animatable {
+        let fc: [Double]
+        let curves: [[Double]]
+        var progress: Double
+        var animatableData: Double { get { progress } set { progress = newValue } }
+        var body: some View { ResponsePlot(fc: fc, curves: curves, onScreen: true, progress: progress) }
+    }
+}
+
 struct ResponsePlot: View {
     let fc: [Double]
     let curves: [[Double]]
     /// Drawn on the instrument's dark screen (dim phosphor grid, lifted mic colours).
     var onScreen = false
+    /// How much of the plot the beam has drawn, left to right (1: all of it).
+    var progress: Double = 1
     var body: some View {
         Canvas { ctx, size in
             let L = 44.0, R = 10.0, T = 8.0, B = 24.0
@@ -774,15 +845,23 @@ struct ResponsePlot: View {
                          at: CGPoint(x: L - 6, y: Y(v)), anchor: .trailing)
                 v += 10
             }
+            let reach = L + max(0, min(1, progress)) * (W - L - R)
             for (k, c) in curves.enumerated() where c.count == fc.count {
                 var p = Path()
+                var head: CGPoint? = nil
                 for (i, f) in fc.enumerated() {
                     let pt = CGPoint(x: X(f), y: Y(c[i]))
+                    if pt.x > reach + 0.5 { break }
                     if i == 0 { p.move(to: pt) } else { p.addLine(to: pt) }
+                    head = pt
                 }
                 let col = onScreen ? screenColor(k) : micColors[k % micColors.count]
                 if onScreen { ctx.stroke(p, with: .color(col.opacity(0.35)), style: StrokeStyle(lineWidth: 5, lineJoin: .round)) }
                 ctx.stroke(p, with: .color(col), style: StrokeStyle(lineWidth: 2, lineJoin: .round))
+                if onScreen, progress < 0.999, let h = head {
+                    ctx.fill(Path(ellipseIn: CGRect(x: h.x - 4, y: h.y - 4, width: 8, height: 8)), with: .color(col.opacity(0.45)))
+                    ctx.fill(Path(ellipseIn: CGRect(x: h.x - 2, y: h.y - 2, width: 4, height: 4)), with: .color(.white.opacity(0.9)))
+                }
             }
             ctx.draw(Text("dB").font(onScreen ? Font.swellMono(10) : Font.system(size: 10, design: .monospaced)).foregroundColor(ink), at: CGPoint(x: 4, y: T + 6), anchor: .leading)
         }
