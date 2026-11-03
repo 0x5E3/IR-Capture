@@ -16,6 +16,9 @@ BIN="$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)"
 APP="dist/${APP_NAME}.app"
 rm -rf "$APP" dist/IR-Capture.zip && mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN/IRCaptureApp" "$APP/Contents/MacOS/${APP_NAME}"
+# The workshop look: rendered pictures, fonts (OFL licences beside them) and their layout (docs/design/).
+[ -f Resources/SwellKit/layout.json ] || { echo "Resources/SwellKit is missing"; exit 1; }
+cp -R Resources/SwellKit "$APP/Contents/Resources/"
 
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -42,7 +45,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
-# App icon, drawn by a small script (no binary assets in the repo).
+# App icon, drawn by a small script.
 if swift scripts/make_icon.swift "$APP/Contents/Resources/icon.png" 2>/dev/null; then
   ICONSET="dist/AppIcon.iconset"; rm -rf "$ICONSET"; mkdir -p "$ICONSET"
   for s in 16 32 128 256 512; do

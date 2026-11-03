@@ -1,0 +1,2877 @@
+{
+ "about": "The bench's rendered pieces for IR Capture (desktop-bench, branch irkit, helper irkit, 2026-11-03). Sizes in px are the file's pixels; points (pt) are SwiftUI points, px_per_pt says how many of the 1x file's pixels make a point (the @2x file has twice). capInsets are SwiftUI EdgeInsets in points for Image(nsImage:).resizable(capInsets:resizingMode:) on an NSImage whose size is set in points (SwellKit.swift's SwellPictures does it). rects are in the named file's pixels, origin top left.",
+ "ref": {
+  "window": [
+   1440,
+   900
+  ],
+  "frame_k2": 3.2,
+  "frame_note": "frame-* pieces: 1 pt = 1 ref px of the bench's 1440x900 layout; the 1x picture has 1.6 px a pt, the @2x 3.2",
+  "rack_note": "rack units and the capture player have no fixed point size: 10 pt a cm (the Tools views' scale) makes a 3U rack unit (1128 x 342 px at 22.5 px/cm) 501 x 152 pt; px_per_pt = pxcm / 10"
+ },
+ "colours": {
+  "amber_digits": "#F2C46D",
+  "window_ink": "#f1c983",
+  "nixie": "#ff9a4a",
+  "warn": "#ff8a6a",
+  "key_legend": "#1d150b",
+  "key_legend_lit": "#2a1506",
+  "panel_legend": "#e6e1d4",
+  "panel_label": "#d9d2c2",
+  "crinkle_legend": "#d8d0bd",
+  "crinkle_sub": "#9d968a",
+  "tag_ink": "#2a2117",
+  "tag_paper": "#d9c69a",
+  "tag_error": "#7a1c10",
+  "wall": "#1c1d1e",
+  "stage": "#120f0c",
+  "glass": "#050505",
+  "focus_ring": "#ffb547",
+  "rack_button_lit": [
+   "#ffbb5c",
+   "#e08c2a"
+  ]
+ },
+ "fonts": {
+  "legends": "Barlow Semi Condensed 600/700, capitals, tracked .14-.3em",
+  "body": "Barlow 400/600",
+  "values": "B612 Mono 400/700 or Barlow Semi Condensed 600 amber on glass",
+  "nixie": "Nixie One (only in a rendered nixie tube's window)"
+ },
+ "pictures": {
+  "frame-peg": {
+   "file": "frame-peg.webp",
+   "x2": "frame-peg@2x.webp",
+   "px": [
+    288,
+    288
+   ],
+   "px_per_pt": 1.6,
+   "pt": [
+    180.0,
+    180.0
+   ],
+   "ref_rect": null,
+   "kind": "tile",
+   "tile_pt": 180,
+   "how": "the pegboard wall: Image(...).resizable(resizingMode: .tile)"
+  },
+  "frame-plank": {
+   "file": "frame-plank.webp",
+   "x2": "frame-plank@2x.webp",
+   "px": [
+    3520,
+    86
+   ],
+   "px_per_pt": 1.6,
+   "pt": [
+    2200.0,
+    53.75
+   ],
+   "ref_rect": [
+    -1100,
+    56,
+    1100,
+    110
+   ],
+   "kind": "strip",
+   "how": "crop to the length needed from its start (never stretch); for a longer run repeat it"
+  },
+  "frame-box-circ": {
+   "file": "frame-box-circ.webp",
+   "x2": "frame-box-circ@2x.webp",
+   "px": [
+    1606,
+    109
+   ],
+   "px_per_pt": 1.6,
+   "pt": [
+    1003.75,
+    68.12
+   ],
+   "ref_rect": [
+    -804,
+    2,
+    200,
+    70
+   ],
+   "kind": "nine",
+   "capInsets": {
+    "top": 10,
+    "leading": 26,
+    "bottom": 8,
+    "trailing": 76
+   },
+   "resizingMode": "tile",
+   "how": "corners whole; edges and middle repeated from the render (the bench crops or repeats, never stretches)"
+  },
+  "frame-box-keys": {
+   "file": "frame-box-keys.webp",
+   "x2": "frame-box-keys@2x.webp",
+   "px": [
+    646,
+    109
+   ],
+   "px_per_pt": 1.6,
+   "pt": [
+    403.75,
+    68.12
+   ],
+   "ref_rect": [
+    66,
+    2,
+    470,
+    70
+   ],
+   "kind": "nine",
+   "capInsets": {
+    "top": 10,
+    "leading": 26,
+    "bottom": 8,
+    "trailing": 76
+   },
+   "resizingMode": "tile",
+   "how": "corners whole; edges and middle repeated from the render (the bench crops or repeats, never stretches)"
+  },
+  "frame-box-pages": {
+   "file": "frame-box-pages.webp",
+   "x2": "frame-box-pages@2x.webp",
+   "px": [
+    685,
+    109
+   ],
+   "px_per_pt": 1.6,
+   "pt": [
+    428.12,
+    68.12
+   ],
+   "ref_rect": [
+    412,
+    2,
+    840,
+    70
+   ],
+   "kind": "nine",
+   "capInsets": {
+    "top": 10,
+    "leading": 26,
+    "bottom": 8,
+    "trailing": 76
+   },
+   "resizingMode": "tile",
+   "how": "corners whole; edges and middle repeated from the render (the bench crops or repeats, never stretches)"
+  },
+  "frame-window": {
+   "file": "frame-window.webp",
+   "x2": "frame-window@2x.webp",
+   "px": [
+    1018,
+    90
+   ],
+   "px_per_pt": 1.6,
+   "pt": [
+    636.25,
+    56.25
+   ],
+   "ref_rect": [
+    -654,
+    9,
+    -18,
+    65
+   ],
+   "kind": "nine",
+   "capInsets": {
+    "top": 16,
+    "leading": 16,
+    "bottom": 16,
+    "trailing": 16
+   },
+   "resizingMode": "tile",
+   "how": "corners whole; edges and middle repeated from the render (the bench crops or repeats, never stretches)",
+   "glass_inset_pt": 8
+  },
+  "frame-trim-top": {
+   "file": "frame-trim-top.webp",
+   "x2": "frame-trim-top@2x.webp",
+   "px": [
+    3219,
+    35
+   ],
+   "px_per_pt": 1.6,
+   "pt": [
+    2011.88,
+    21.88
+   ],
+   "ref_rect": [
+    -1006,
+    97,
+    1006,
+    119
+   ],
+   "kind": "strip",
+   "how": "crop to the length needed from its start (never stretch); for a longer run repeat it"
+  },
+  "frame-trim-bot": {
+   "file": "frame-trim-bot.webp",
+   "x2": "frame-trim-bot@2x.webp",
+   "px": [
+    3219,
+    35
+   ],
+   "px_per_pt": 1.6,
+   "pt": [
+    2011.88,
+    21.88
+   ],
+   "ref_rect": [
+    -1006,
+    880,
+    1006,
+    902
+   ],
+   "kind": "strip",
+   "how": "crop to the length needed from its start (never stretch); for a longer run repeat it"
+  },
+  "frame-trim-left": {
+   "file": "frame-trim-left.webp",
+   "x2": "frame-trim-left@2x.webp",
+   "px": [
+    35,
+    1342
+   ],
+   "px_per_pt": 1.6,
+   "pt": [
+    21.88,
+    838.75
+   ],
+   "ref_rect": [
+    -718,
+    97,
+    -696,
+    936
+   ],
+   "kind": "strip",
+   "how": "crop to the length needed from its start (never stretch); for a longer run repeat it"
+  },
+  "frame-trim-right": {
+   "file": "frame-trim-right.webp",
+   "x2": "frame-trim-right@2x.webp",
+   "px": [
+    35,
+    1342
+   ],
+   "px_per_pt": 1.6,
+   "pt": [
+    21.88,
+    838.75
+   ],
+   "ref_rect": [
+    338,
+    97,
+    360,
+    936
+   ],
+   "kind": "strip",
+   "how": "crop to the length needed from its start (never stretch); for a longer run repeat it"
+  },
+  "frame-cabinet": {
+   "file": "frame-cabinet.webp",
+   "x2": "frame-cabinet@2x.webp",
+   "px": [
+    662,
+    1301
+   ],
+   "px_per_pt": 1.6,
+   "pt": [
+    413.75,
+    813.12
+   ],
+   "ref_rect": [
+    300,
+    91,
+    714,
+    904
+   ],
+   "kind": "nine",
+   "capInsets": {
+    "top": 10,
+    "leading": 37,
+    "bottom": 22,
+    "trailing": 25
+   },
+   "resizingMode": "tile",
+   "how": "corners whole; edges and middle repeated from the render (the bench crops or repeats, never stretches)"
+  },
+  "frame-card": {
+   "file": "frame-card.webp",
+   "x2": "frame-card@2x.webp",
+   "px": [
+    560,
+    922
+   ],
+   "px_per_pt": 1.6,
+   "pt": [
+    350.0,
+    576.25
+   ],
+   "ref_rect": [
+    370,
+    352,
+    720,
+    928
+   ],
+   "kind": "nine",
+   "capInsets": {
+    "top": 34,
+    "leading": 30,
+    "bottom": 34,
+    "trailing": 30
+   },
+   "resizingMode": "tile",
+   "how": "corners whole; edges and middle repeated from the render (the bench crops or repeats, never stretches)"
+  },
+  "frame-backdrop": {
+   "file": "frame-backdrop.webp",
+   "x2": null,
+   "px": [
+    2080,
+    1328
+   ],
+   "px_per_pt": 1.6,
+   "pt": [
+    1300.0,
+    830.0
+   ],
+   "ref_rect": [
+    -760,
+    100,
+    540,
+    930
+   ],
+   "kind": "cover",
+   "how": "the dark stage cloth behind the content: scaledToFill, clipped"
+  },
+  "frame-keys": {
+   "file": "frame-keys.webp",
+   "x2": "frame-keys@2x.webp",
+   "px": [
+    1100,
+    384
+   ],
+   "px_per_pt": 1.6,
+   "pt": [
+    687.5,
+    240.0
+   ],
+   "ref_rect": [
+    -43.0,
+    7.0,
+    43.0,
+    67.0
+   ],
+   "kind": "sprite",
+   "names": [
+    "RIG",
+    "BENCH",
+    "PROBES",
+    "TOOLS",
+    "AUDIO",
+    "ADD",
+    "FILE",
+    "BROWSE"
+   ],
+   "rows": [
+    "off",
+    "lit",
+    "down",
+    "litdown"
+   ],
+   "cell_px_2x": [
+    275,
+    192
+   ],
+   "rects_px_2x": {
+    "RIG/off": [
+     0,
+     0,
+     275,
+     192
+    ],
+    "BENCH/off": [
+     275,
+     0,
+     275,
+     192
+    ],
+    "PROBES/off": [
+     550,
+     0,
+     275,
+     192
+    ],
+    "TOOLS/off": [
+     825,
+     0,
+     275,
+     192
+    ],
+    "AUDIO/off": [
+     1100,
+     0,
+     275,
+     192
+    ],
+    "ADD/off": [
+     1375,
+     0,
+     275,
+     192
+    ],
+    "FILE/off": [
+     1650,
+     0,
+     275,
+     192
+    ],
+    "BROWSE/off": [
+     1925,
+     0,
+     275,
+     192
+    ],
+    "RIG/lit": [
+     0,
+     192,
+     275,
+     192
+    ],
+    "BENCH/lit": [
+     275,
+     192,
+     275,
+     192
+    ],
+    "PROBES/lit": [
+     550,
+     192,
+     275,
+     192
+    ],
+    "TOOLS/lit": [
+     825,
+     192,
+     275,
+     192
+    ],
+    "AUDIO/lit": [
+     1100,
+     192,
+     275,
+     192
+    ],
+    "ADD/lit": [
+     1375,
+     192,
+     275,
+     192
+    ],
+    "FILE/lit": [
+     1650,
+     192,
+     275,
+     192
+    ],
+    "BROWSE/lit": [
+     1925,
+     192,
+     275,
+     192
+    ],
+    "RIG/down": [
+     0,
+     384,
+     275,
+     192
+    ],
+    "BENCH/down": [
+     275,
+     384,
+     275,
+     192
+    ],
+    "PROBES/down": [
+     550,
+     384,
+     275,
+     192
+    ],
+    "TOOLS/down": [
+     825,
+     384,
+     275,
+     192
+    ],
+    "AUDIO/down": [
+     1100,
+     384,
+     275,
+     192
+    ],
+    "ADD/down": [
+     1375,
+     384,
+     275,
+     192
+    ],
+    "FILE/down": [
+     1650,
+     384,
+     275,
+     192
+    ],
+    "BROWSE/down": [
+     1925,
+     384,
+     275,
+     192
+    ],
+    "RIG/litdown": [
+     0,
+     576,
+     275,
+     192
+    ],
+    "BENCH/litdown": [
+     275,
+     576,
+     275,
+     192
+    ],
+    "PROBES/litdown": [
+     550,
+     576,
+     275,
+     192
+    ],
+    "TOOLS/litdown": [
+     825,
+     576,
+     275,
+     192
+    ],
+    "AUDIO/litdown": [
+     1100,
+     576,
+     275,
+     192
+    ],
+    "ADD/litdown": [
+     1375,
+     576,
+     275,
+     192
+    ],
+    "FILE/litdown": [
+     1650,
+     576,
+     275,
+     192
+    ],
+    "BROWSE/litdown": [
+     1925,
+     576,
+     275,
+     192
+    ]
+   },
+   "cap_with_bezel_pt": [
+    66,
+    40
+   ],
+   "cell_pt": [
+    85.94,
+    60.0
+   ],
+   "how": "legends are baked in (the bench's page names); IR Capture uses rkit-key-* (blank) or a new render with its own legends. Rows: off, lit, down, litdown. 1x cells are 137.5 px wide: crop from the @2x"
+  },
+  "frame-knob": {
+   "file": "frame-knob.webp",
+   "x2": "frame-knob@2x.webp",
+   "px": [
+    1344,
+    106
+   ],
+   "px_per_pt": 1.6,
+   "pt": [
+    840.0,
+    66.25
+   ],
+   "ref_rect": [
+    -710,
+    7,
+    -640,
+    73
+   ],
+   "kind": "sprite",
+   "frames": 12,
+   "cell_px_2x": [
+    224,
+    211
+   ],
+   "rects_px_2x": [
+    [
+     0,
+     0,
+     224,
+     211
+    ],
+    [
+     224,
+     0,
+     224,
+     211
+    ],
+    [
+     448,
+     0,
+     224,
+     211
+    ],
+    [
+     672,
+     0,
+     224,
+     211
+    ],
+    [
+     896,
+     0,
+     224,
+     211
+    ],
+    [
+     1120,
+     0,
+     224,
+     211
+    ],
+    [
+     1344,
+     0,
+     224,
+     211
+    ],
+    [
+     1568,
+     0,
+     224,
+     211
+    ],
+    [
+     1792,
+     0,
+     224,
+     211
+    ],
+    [
+     2016,
+     0,
+     224,
+     211
+    ],
+    [
+     2240,
+     0,
+     224,
+     211
+    ],
+    [
+     2464,
+     0,
+     224,
+     211
+    ]
+   ],
+   "how": "the shelf's stepping knob (12 frames, 30 degrees apart)"
+  },
+  "frame-win-circ": {
+   "file": "frame-win-circ.webp",
+   "x2": "frame-win-circ@2x.webp",
+   "px": [
+    1341,
+    93
+   ],
+   "px_per_pt": 1.6,
+   "pt": [
+    838.12,
+    58.12
+   ],
+   "ref_rect": [
+    -659,
+    8,
+    179,
+    66
+   ],
+   "kind": "three",
+   "capInsets": {
+    "top": 0,
+    "leading": 31,
+    "bottom": 0,
+    "trailing": 31
+   },
+   "resizingMode": "tile",
+   "glass_pt": [
+    9,
+    9,
+    829,
+    49
+   ],
+   "how": "its height is the render's; lengthen by repeating the middle; the text sits on glass_pt (x0, y0, x1, y1)"
+  },
+  "frame-win-find": {
+   "file": "frame-win-find.webp",
+   "x2": "frame-win-find@2x.webp",
+   "px": [
+    349,
+    74
+   ],
+   "px_per_pt": 1.6,
+   "pt": [
+    218.12,
+    46.25
+   ],
+   "ref_rect": [
+    71,
+    14,
+    289,
+    60
+   ],
+   "kind": "three",
+   "capInsets": {
+    "top": 0,
+    "leading": 31,
+    "bottom": 0,
+    "trailing": 31
+   },
+   "resizingMode": "tile",
+   "glass_pt": [
+    9,
+    9,
+    209,
+    37
+   ],
+   "how": "its height is the render's; lengthen by repeating the middle; the text sits on glass_pt (x0, y0, x1, y1)"
+  },
+  "frame-lamp": {
+   "file": "frame-lamp.webp",
+   "x2": "frame-lamp@2x.webp",
+   "px": [
+    279,
+    93
+   ],
+   "px_per_pt": 1.6,
+   "pt": [
+    174.38,
+    58.12
+   ],
+   "ref_rect": [
+    -29,
+    8,
+    29,
+    66
+   ],
+   "kind": "sprite",
+   "states": [
+    "off",
+    "amber",
+    "red"
+   ],
+   "cell_px_2x": [
+    186,
+    186
+   ],
+   "rects_px_2x": {
+    "off": [
+     0,
+     0,
+     186,
+     186
+    ],
+    "amber": [
+     186,
+     0,
+     186,
+     186
+    ],
+    "red": [
+     372,
+     0,
+     186,
+     186
+    ]
+   },
+   "how": "the shelf's jewel pilot: off, amber (busy), red (error); dark while all is well"
+  },
+  "rkit-key-off": {
+   "file": "rkit-key-off.webp",
+   "x2": null,
+   "px": [
+    122,
+    60
+   ],
+   "px_per_pt": 2.4,
+   "pt": [
+    50.83,
+    25.0
+   ],
+   "kind": "nine",
+   "capInsets": {
+    "top": 5.42,
+    "leading": 5.42,
+    "bottom": 5.42,
+    "trailing": 5.42
+   },
+   "resizingMode": "stretch",
+   "shadow_margin_pt": 1.2,
+   "how": "blank illuminated key, off (ivory cap, black cast bezel); legend is your text, #1d150b"
+  },
+  "rkit-key-lit": {
+   "file": "rkit-key-lit.webp",
+   "x2": null,
+   "px": [
+    122,
+    60
+   ],
+   "px_per_pt": 2.4,
+   "pt": [
+    50.83,
+    25.0
+   ],
+   "kind": "nine",
+   "capInsets": {
+    "top": 5.42,
+    "leading": 5.42,
+    "bottom": 5.42,
+    "trailing": 5.42
+   },
+   "resizingMode": "stretch",
+   "shadow_margin_pt": 1.2,
+   "how": "the key lit (selected / on); legend #2a1506"
+  },
+  "rkit-key-down": {
+   "file": "rkit-key-down.webp",
+   "x2": null,
+   "px": [
+    122,
+    60
+   ],
+   "px_per_pt": 2.4,
+   "pt": [
+    50.83,
+    25.0
+   ],
+   "kind": "nine",
+   "capInsets": {
+    "top": 5.42,
+    "leading": 5.42,
+    "bottom": 5.42,
+    "trailing": 5.42
+   },
+   "resizingMode": "stretch",
+   "shadow_margin_pt": 1.2,
+   "how": "the key held down"
+  },
+  "rkit-key-litdown": {
+   "file": "rkit-key-litdown.webp",
+   "x2": null,
+   "px": [
+    122,
+    60
+   ],
+   "px_per_pt": 2.4,
+   "pt": [
+    50.83,
+    25.0
+   ],
+   "kind": "nine",
+   "capInsets": {
+    "top": 5.42,
+    "leading": 5.42,
+    "bottom": 5.42,
+    "trailing": 5.42
+   },
+   "resizingMode": "stretch",
+   "shadow_margin_pt": 1.2,
+   "how": "the lit key held down"
+  },
+  "rkit-win": {
+   "file": "rkit-win.webp",
+   "x2": null,
+   "px": [
+    161,
+    56
+   ],
+   "px_per_pt": 2.4,
+   "pt": [
+    67.08,
+    23.33
+   ],
+   "kind": "nine",
+   "capInsets": {
+    "top": 5.0,
+    "leading": 5.0,
+    "bottom": 5.0,
+    "trailing": 5.0
+   },
+   "resizingMode": "stretch",
+   "shadow_margin_pt": 1.2,
+   "how": "value window bezel (draw rkit-glass inside, #050505 under it); digits amber #F2C46D"
+  },
+  "rkit-panel": {
+   "file": "rkit-panel.webp",
+   "x2": null,
+   "px": [
+    394,
+    394
+   ],
+   "px_per_pt": 2.4,
+   "pt": [
+    164.17,
+    164.17
+   ],
+   "kind": "nine",
+   "capInsets": {
+    "top": 17.08,
+    "leading": 17.08,
+    "bottom": 17.08,
+    "trailing": 17.08
+   },
+   "resizingMode": "tile",
+   "shadow_margin_pt": 2.0,
+   "how": "bronze hammertone panel stock with a screw in each corner (CSS 'round': tile the middle)"
+  },
+  "rkit-glass": {
+   "file": "rkit-glass.webp",
+   "x2": null,
+   "px": [
+    137,
+    32
+   ],
+   "px_per_pt": 2.4,
+   "pt": [
+    57.08,
+    13.33
+   ],
+   "kind": "whole",
+   "how": "smoked glass, stretched to fill the window's opening"
+  },
+  "rkit-thumb": {
+   "file": "rkit-thumb.webp",
+   "x2": null,
+   "px": [
+    29,
+    46
+   ],
+   "px_per_pt": 2.4,
+   "pt": [
+    12.08,
+    19.17
+   ],
+   "kind": "whole",
+   "how": "a slider's bakelite fader cap (12 x 19 pt in the bench)"
+  },
+  "faceplate": {
+   "file": "faceplate.webp",
+   "x2": null,
+   "px": [
+    768,
+    768
+   ],
+   "px_per_pt": 4.8,
+   "kind": "nine",
+   "capInsets": {
+    "top": 40,
+    "leading": 40,
+    "bottom": 40,
+    "trailing": 40
+   },
+   "resizingMode": "tile",
+   "how": "satin aluminium instrument faceplate round a screen (a plot): the mask laps 2 pt over the screen's edge"
+  },
+  "audio-panel": {
+   "file": "audio-panel.webp",
+   "x2": null,
+   "px": [
+    1600,
+    1000
+   ],
+   "px_per_pt": 2.46,
+   "kind": "nine",
+   "capInsets": {
+    "top": 26,
+    "leading": 26,
+    "bottom": 26,
+    "trailing": 26
+   },
+   "resizingMode": "stretch",
+   "how": "the rack's black crinkle panel as the AUDIO INTERFACE unit's face; legends cream #d8d0bd"
+  },
+  "audio-keys": {
+   "file": "audio-keys.webp",
+   "x2": null,
+   "px": [
+    2502,
+    576
+   ],
+   "kind": "sprite",
+   "names": [
+    "CORE AUDIO",
+    "WINDOWS",
+    "ASIO",
+    "EXCLUSIVE",
+    "SHARED",
+    "APPLY",
+    "RESTART",
+    "STOP",
+    "CLOSE"
+   ],
+   "rows": [
+    "off",
+    "lit",
+    "down",
+    "litdown"
+   ],
+   "cell_px": [
+    278,
+    144
+   ],
+   "ref_px_per_px": 0.42,
+   "rects_px": {
+    "CORE AUDIO/off": [
+     0,
+     0,
+     278,
+     144
+    ],
+    "WINDOWS/off": [
+     278,
+     0,
+     278,
+     144
+    ],
+    "ASIO/off": [
+     556,
+     0,
+     278,
+     144
+    ],
+    "EXCLUSIVE/off": [
+     834,
+     0,
+     278,
+     144
+    ],
+    "SHARED/off": [
+     1112,
+     0,
+     278,
+     144
+    ],
+    "APPLY/off": [
+     1390,
+     0,
+     278,
+     144
+    ],
+    "RESTART/off": [
+     1668,
+     0,
+     278,
+     144
+    ],
+    "STOP/off": [
+     1946,
+     0,
+     278,
+     144
+    ],
+    "CLOSE/off": [
+     2224,
+     0,
+     278,
+     144
+    ],
+    "CORE AUDIO/lit": [
+     0,
+     144,
+     278,
+     144
+    ],
+    "WINDOWS/lit": [
+     278,
+     144,
+     278,
+     144
+    ],
+    "ASIO/lit": [
+     556,
+     144,
+     278,
+     144
+    ],
+    "EXCLUSIVE/lit": [
+     834,
+     144,
+     278,
+     144
+    ],
+    "SHARED/lit": [
+     1112,
+     144,
+     278,
+     144
+    ],
+    "APPLY/lit": [
+     1390,
+     144,
+     278,
+     144
+    ],
+    "RESTART/lit": [
+     1668,
+     144,
+     278,
+     144
+    ],
+    "STOP/lit": [
+     1946,
+     144,
+     278,
+     144
+    ],
+    "CLOSE/lit": [
+     2224,
+     144,
+     278,
+     144
+    ],
+    "CORE AUDIO/down": [
+     0,
+     288,
+     278,
+     144
+    ],
+    "WINDOWS/down": [
+     278,
+     288,
+     278,
+     144
+    ],
+    "ASIO/down": [
+     556,
+     288,
+     278,
+     144
+    ],
+    "EXCLUSIVE/down": [
+     834,
+     288,
+     278,
+     144
+    ],
+    "SHARED/down": [
+     1112,
+     288,
+     278,
+     144
+    ],
+    "APPLY/down": [
+     1390,
+     288,
+     278,
+     144
+    ],
+    "RESTART/down": [
+     1668,
+     288,
+     278,
+     144
+    ],
+    "STOP/down": [
+     1946,
+     288,
+     278,
+     144
+    ],
+    "CLOSE/down": [
+     2224,
+     288,
+     278,
+     144
+    ],
+    "CORE AUDIO/litdown": [
+     0,
+     432,
+     278,
+     144
+    ],
+    "WINDOWS/litdown": [
+     278,
+     432,
+     278,
+     144
+    ],
+    "ASIO/litdown": [
+     556,
+     432,
+     278,
+     144
+    ],
+    "EXCLUSIVE/litdown": [
+     834,
+     432,
+     278,
+     144
+    ],
+    "SHARED/litdown": [
+     1112,
+     432,
+     278,
+     144
+    ],
+    "APPLY/litdown": [
+     1390,
+     432,
+     278,
+     144
+    ],
+    "RESTART/litdown": [
+     1668,
+     432,
+     278,
+     144
+    ],
+    "STOP/litdown": [
+     1946,
+     432,
+     278,
+     144
+    ],
+    "CLOSE/litdown": [
+     2224,
+     432,
+     278,
+     144
+    ]
+   },
+   "how": "the shelf's key with the Audio page's legends baked in; STOP and CLOSE fit IR Capture as they are"
+  },
+  "rlamp-jewelamber-off": {
+   "file": "rlamp-jewelamber-off.webp",
+   "x2": "rlamp-jewelamber-off@2x.webp",
+   "px": [
+    120,
+    120
+   ],
+   "kind": "whole",
+   "how": "a jewel pilot lamp in its bezel (2x over 1x pt sizes as the page's hires.js)"
+  },
+  "rlamp-jewelamber-on": {
+   "file": "rlamp-jewelamber-on.webp",
+   "x2": "rlamp-jewelamber-on@2x.webp",
+   "px": [
+    120,
+    120
+   ],
+   "kind": "whole",
+   "how": "a jewel pilot lamp in its bezel (2x over 1x pt sizes as the page's hires.js)"
+  },
+  "rlamp-jewelred-off": {
+   "file": "rlamp-jewelred-off.webp",
+   "x2": "rlamp-jewelred-off@2x.webp",
+   "px": [
+    120,
+    120
+   ],
+   "kind": "whole",
+   "how": "a jewel pilot lamp in its bezel (2x over 1x pt sizes as the page's hires.js)"
+  },
+  "rlamp-jewelred-on": {
+   "file": "rlamp-jewelred-on.webp",
+   "x2": "rlamp-jewelred-on@2x.webp",
+   "px": [
+    120,
+    120
+   ],
+   "kind": "whole",
+   "how": "a jewel pilot lamp in its bezel (2x over 1x pt sizes as the page's hires.js)"
+  },
+  "rlamp-jewelgreen-off": {
+   "file": "rlamp-jewelgreen-off.webp",
+   "x2": "rlamp-jewelgreen-off@2x.webp",
+   "px": [
+    120,
+    120
+   ],
+   "kind": "whole",
+   "how": "a jewel pilot lamp in its bezel (2x over 1x pt sizes as the page's hires.js)"
+  },
+  "rlamp-jewelgreen-on": {
+   "file": "rlamp-jewelgreen-on.webp",
+   "x2": "rlamp-jewelgreen-on@2x.webp",
+   "px": [
+    120,
+    120
+   ],
+   "kind": "whole",
+   "how": "a jewel pilot lamp in its bezel (2x over 1x pt sizes as the page's hires.js)"
+  },
+  "rlamp-jewelclear-off": {
+   "file": "rlamp-jewelclear-off.webp",
+   "x2": "rlamp-jewelclear-off@2x.webp",
+   "px": [
+    120,
+    120
+   ],
+   "kind": "whole",
+   "how": "a jewel pilot lamp in its bezel (2x over 1x pt sizes as the page's hires.js)"
+  },
+  "rlamp-jewelclear-on": {
+   "file": "rlamp-jewelclear-on.webp",
+   "x2": "rlamp-jewelclear-on@2x.webp",
+   "px": [
+    120,
+    120
+   ],
+   "kind": "whole",
+   "how": "a jewel pilot lamp in its bezel (2x over 1x pt sizes as the page's hires.js)"
+  },
+  "rlamp-jewelblue-off": {
+   "file": "rlamp-jewelblue-off.webp",
+   "x2": "rlamp-jewelblue-off@2x.webp",
+   "px": [
+    120,
+    120
+   ],
+   "kind": "whole",
+   "how": "a jewel pilot lamp in its bezel (2x over 1x pt sizes as the page's hires.js)"
+  },
+  "rlamp-jewelblue-on": {
+   "file": "rlamp-jewelblue-on.webp",
+   "x2": "rlamp-jewelblue-on@2x.webp",
+   "px": [
+    120,
+    120
+   ],
+   "kind": "whole",
+   "how": "a jewel pilot lamp in its bezel (2x over 1x pt sizes as the page's hires.js)"
+  },
+  "rack-speaker": {
+   "file": "rack-speaker.webp",
+   "x2": null,
+   "px": [
+    1128,
+    342
+   ],
+   "kind": "unit",
+   "pxcm": 22.5,
+   "px_per_pt_suggested": 2.25,
+   "panel": {
+    "tl": [
+     20.23,
+     20.23
+    ],
+    "br": [
+     1106.09,
+     318.47
+    ]
+   },
+   "els": [
+    {
+     "id": "irsel",
+     "kind": "knob",
+     "box": [
+      72.0,
+      78.0,
+      252.0,
+      252.0
+     ],
+     "c": [
+      158.16,
+      160.35
+     ],
+     "r": 65.25,
+     "rest": "s00",
+     "states": [
+      "s01",
+      "s02",
+      "s03",
+      "s04",
+      "s05",
+      "s06",
+      "s07",
+      "s08",
+      "s09",
+      "s10",
+      "s11",
+      "s12",
+      "s13",
+      "s14",
+      "s15",
+      "s16",
+      "s17",
+      "s18",
+      "s19",
+      "s20",
+      "s21",
+      "s22",
+      "s23"
+     ],
+     "sheet": "rack-speaker-irsel.webp",
+     "frame": [
+      180,
+      174
+     ],
+     "cols": 12,
+     "rows": 2
+    },
+    {
+     "id": "irwin",
+     "kind": "window",
+     "win": [
+      258.97,
+      96.49,
+      798.01,
+      213.28
+     ],
+     "box": [
+      246.0,
+      84.0,
+      810.0,
+      222.0
+     ],
+     "c": [
+      528.49,
+      154.88
+     ],
+     "rest": "",
+     "states": []
+    },
+    {
+     "id": "irload",
+     "kind": "button",
+     "box": [
+      840.0,
+      108.0,
+      948.0,
+      210.0
+     ],
+     "c": [
+      887.16,
+      155.85
+     ],
+     "rest": "up",
+     "states": [
+      "down"
+     ],
+     "sheet": "rack-speaker-irload.webp",
+     "frame": [
+      108,
+      102
+     ],
+     "cols": 1,
+     "rows": 1
+    },
+    {
+     "id": "irremove",
+     "kind": "button",
+     "box": [
+      948.0,
+      108.0,
+      1062.0,
+      210.0
+     ],
+     "c": [
+      999.66,
+      155.85
+     ],
+     "rest": "up",
+     "states": [
+      "down"
+     ],
+     "sheet": "rack-speaker-irremove.webp",
+     "frame": [
+      114,
+      102
+     ],
+     "cols": 1,
+     "rows": 1
+    }
+   ],
+   "how": "a whole rack unit: draw it scaled to fit (no slicing); each element's box is in the picture's px, so scale it with the picture. A sprite element's frame i = states.index(state) at ((i % cols) * frame.w, (i // cols) * frame.h); its rest state is the base picture (draw nothing over it)",
+   "baked_words": "the unit's legends are baked in (SPEAKER / CAPTURE and its buttons' engravings): see the handoff, section E"
+  },
+  "rack-capture": {
+   "file": "rack-capture.webp",
+   "x2": null,
+   "px": [
+    1128,
+    342
+   ],
+   "kind": "unit",
+   "pxcm": 22.5,
+   "px_per_pt_suggested": 2.25,
+   "panel": {
+    "tl": [
+     20.23,
+     20.23
+    ],
+    "br": [
+     1106.09,
+     318.47
+    ]
+   },
+   "els": [
+    {
+     "id": "power",
+     "kind": "toggle",
+     "box": [
+      72.0,
+      60.0,
+      198.0,
+      270.0
+     ],
+     "c": [
+      126.66,
+      158.1
+     ],
+     "rest": "off",
+     "states": [
+      "on"
+     ],
+     "sheet": "rack-capture-power.webp",
+     "frame": [
+      126,
+      210
+     ],
+     "cols": 1,
+     "rows": 1
+    },
+    {
+     "id": "pilot",
+     "kind": "lamp",
+     "box": [
+      174.0,
+      108.0,
+      276.0,
+      210.0
+     ],
+     "c": [
+      221.16,
+      158.1
+     ],
+     "rest": "off",
+     "states": [
+      "on"
+     ],
+     "sheet": "rack-capture-pilot.webp",
+     "frame": [
+      102,
+      102
+     ],
+     "cols": 1,
+     "rows": 1
+    },
+    {
+     "id": "capwin",
+     "kind": "window",
+     "win": [
+      283.67,
+      95.95,
+      768.81,
+      212.75
+     ],
+     "box": [
+      276.0,
+      84.0,
+      780.0,
+      222.0
+     ],
+     "c": [
+      526.24,
+      154.35
+     ],
+     "rest": "",
+     "states": []
+    },
+    {
+     "id": "capload",
+     "kind": "button",
+     "box": [
+      786.0,
+      114.0,
+      882.0,
+      204.0
+     ],
+     "c": [
+      830.91,
+      155.85
+     ],
+     "rest": "up",
+     "states": [
+      "down"
+     ],
+     "sheet": "rack-capture-capload.webp",
+     "frame": [
+      96,
+      90
+     ],
+     "cols": 1,
+     "rows": 1
+    },
+    {
+     "id": "capremove",
+     "kind": "button",
+     "box": [
+      888.0,
+      114.0,
+      984.0,
+      204.0
+     ],
+     "c": [
+      929.91,
+      155.85
+     ],
+     "rest": "up",
+     "states": [
+      "down"
+     ],
+     "sheet": "rack-capture-capremove.webp",
+     "frame": [
+      96,
+      90
+     ],
+     "cols": 1,
+     "rows": 1
+    },
+    {
+     "id": "capmake",
+     "kind": "button",
+     "box": [
+      984.0,
+      114.0,
+      1080.0,
+      204.0
+     ],
+     "c": [
+      1028.91,
+      155.85
+     ],
+     "rest": "up",
+     "states": [
+      "down"
+     ],
+     "sheet": "rack-capture-capmake.webp",
+     "frame": [
+      96,
+      90
+     ],
+     "cols": 1,
+     "rows": 1
+    }
+   ],
+   "how": "a whole rack unit: draw it scaled to fit (no slicing); each element's box is in the picture's px, so scale it with the picture. A sprite element's frame i = states.index(state) at ((i % cols) * frame.w, (i // cols) * frame.h); its rest state is the base picture (draw nothing over it)",
+   "baked_words": "the unit's legends are baked in (SPEAKER / CAPTURE and its buttons' engravings): see the handoff, section E"
+  },
+  "rack-monitor": {
+   "file": "rack-monitor.webp",
+   "x2": null,
+   "px": [
+    1128,
+    540
+   ],
+   "kind": "unit",
+   "pxcm": 22.5,
+   "px_per_pt_suggested": 2.25,
+   "panel": {
+    "tl": [
+     20.23,
+     20.23
+    ],
+    "br": [
+     1106.09,
+     518.5
+    ]
+   },
+   "els": [
+    {
+     "id": "input",
+     "kind": "knob",
+     "box": [
+      72.0,
+      96.0,
+      282.0,
+      300.0
+     ],
+     "c": [
+      171.66,
+      204.11
+     ],
+     "r": 76.5,
+     "rest": "a00",
+     "states": [
+      "a01",
+      "a02",
+      "a03",
+      "a04",
+      "a05",
+      "a06",
+      "a07",
+      "a08",
+      "a09",
+      "a10",
+      "a11",
+      "a12",
+      "a13",
+      "a14",
+      "a15",
+      "a16",
+      "a17",
+      "a18",
+      "a19",
+      "a20",
+      "a21",
+      "a22",
+      "a23",
+      "a24",
+      "a25",
+      "a26",
+      "a27",
+      "a28",
+      "a29",
+      "a30",
+      "a31",
+      "a32",
+      "a33",
+      "a34",
+      "a35",
+      "a36",
+      "a37",
+      "a38",
+      "a39",
+      "a40",
+      "a41",
+      "a42",
+      "a43",
+      "a44",
+      "a45",
+      "a46",
+      "a47",
+      "a48",
+      "a49",
+      "a50",
+      "a51",
+      "a52",
+      "a53",
+      "a54",
+      "a55",
+      "a56",
+      "a57",
+      "a58",
+      "a59",
+      "a60"
+     ],
+     "sheet": "rack-monitor-input.webp",
+     "frame": [
+      210,
+      204
+     ],
+     "cols": 12,
+     "rows": 5
+    },
+    {
+     "id": "output",
+     "kind": "knob",
+     "box": [
+      852.0,
+      90.0,
+      1080.0,
+      312.0
+     ],
+     "c": [
+      954.66,
+      204.11
+     ],
+     "r": 81.0,
+     "rest": "a00",
+     "states": [
+      "a01",
+      "a02",
+      "a03",
+      "a04",
+      "a05",
+      "a06",
+      "a07",
+      "a08",
+      "a09",
+      "a10",
+      "a11",
+      "a12",
+      "a13",
+      "a14",
+      "a15",
+      "a16",
+      "a17",
+      "a18",
+      "a19",
+      "a20",
+      "a21",
+      "a22",
+      "a23",
+      "a24",
+      "a25",
+      "a26",
+      "a27",
+      "a28",
+      "a29",
+      "a30",
+      "a31",
+      "a32",
+      "a33",
+      "a34",
+      "a35",
+      "a36",
+      "a37",
+      "a38",
+      "a39",
+      "a40",
+      "a41",
+      "a42",
+      "a43",
+      "a44",
+      "a45",
+      "a46",
+      "a47",
+      "a48",
+      "a49",
+      "a50",
+      "a51",
+      "a52",
+      "a53",
+      "a54",
+      "a55",
+      "a56",
+      "a57",
+      "a58",
+      "a59",
+      "a60"
+     ],
+     "sheet": "rack-monitor-output.webp",
+     "frame": [
+      228,
+      222
+     ],
+     "cols": 12,
+     "rows": 5
+    },
+    {
+     "id": "clip",
+     "kind": "lamp",
+     "box": [
+      66.0,
+      384.0,
+      186.0,
+      498.0
+     ],
+     "c": [
+      122.16,
+      442.61
+     ],
+     "rest": "off",
+     "states": [
+      "on"
+     ],
+     "sheet": "rack-monitor-clip.webp",
+     "frame": [
+      120,
+      114
+     ],
+     "cols": 1,
+     "rows": 1
+    },
+    {
+     "id": "setlevel",
+     "kind": "button",
+     "box": [
+      174.0,
+      378.0,
+      300.0,
+      498.0
+     ],
+     "c": [
+      234.66,
+      442.61
+     ],
+     "rest": "up",
+     "states": [
+      "down"
+     ],
+     "sheet": "rack-monitor-setlevel.webp",
+     "frame": [
+      126,
+      120
+     ],
+     "cols": 1,
+     "rows": 1
+    },
+    {
+     "id": "pilot",
+     "kind": "lamp",
+     "box": [
+      900.0,
+      384.0,
+      1020.0,
+      498.0
+     ],
+     "c": [
+      954.66,
+      442.61
+     ],
+     "rest": "off",
+     "states": [
+      "on"
+     ],
+     "sheet": "rack-monitor-pilot.webp",
+     "frame": [
+      120,
+      114
+     ],
+     "cols": 1,
+     "rows": 1
+    },
+    {
+     "id": "ineye",
+     "kind": "eye",
+     "box": [
+      312.0,
+      156.0,
+      528.0,
+      366.0
+     ],
+     "c": [
+      424.78,
+      255.86
+     ],
+     "rest": "unlit",
+     "states": [
+      "warm0",
+      "warm1",
+      "warm2",
+      "x00",
+      "x01",
+      "x02",
+      "x03",
+      "x04",
+      "x05",
+      "x06",
+      "x07",
+      "x08",
+      "x09",
+      "x10",
+      "x11",
+      "x12",
+      "x13",
+      "x14",
+      "x15",
+      "x16",
+      "x17",
+      "x18",
+      "x19",
+      "x20",
+      "x21",
+      "x22",
+      "x23",
+      "x24",
+      "x25",
+      "x26",
+      "x27",
+      "x28",
+      "x29",
+      "x30",
+      "x31",
+      "x32",
+      "x33",
+      "x34",
+      "x35",
+      "x36",
+      "x37",
+      "x38",
+      "x39",
+      "x40",
+      "x41",
+      "x42",
+      "x43",
+      "x44",
+      "x45",
+      "x46",
+      "x47",
+      "x48",
+      "x49",
+      "x50",
+      "x51",
+      "x52",
+      "x53",
+      "x54",
+      "x55"
+     ],
+     "sheet": "rack-monitor-ineye.webp",
+     "frame": [
+      216,
+      210
+     ],
+     "cols": 12,
+     "rows": 5
+    },
+    {
+     "id": "outeye",
+     "kind": "eye",
+     "box": [
+      588.0,
+      156.0,
+      804.0,
+      366.0
+     ],
+     "c": [
+      701.53,
+      255.86
+     ],
+     "rest": "unlit",
+     "states": [
+      "warm0",
+      "warm1",
+      "warm2",
+      "x00",
+      "x01",
+      "x02",
+      "x03",
+      "x04",
+      "x05",
+      "x06",
+      "x07",
+      "x08",
+      "x09",
+      "x10",
+      "x11",
+      "x12",
+      "x13",
+      "x14",
+      "x15",
+      "x16",
+      "x17",
+      "x18",
+      "x19",
+      "x20",
+      "x21",
+      "x22",
+      "x23",
+      "x24",
+      "x25",
+      "x26",
+      "x27",
+      "x28",
+      "x29",
+      "x30",
+      "x31",
+      "x32",
+      "x33",
+      "x34",
+      "x35",
+      "x36",
+      "x37",
+      "x38",
+      "x39",
+      "x40",
+      "x41",
+      "x42",
+      "x43",
+      "x44",
+      "x45",
+      "x46",
+      "x47",
+      "x48",
+      "x49",
+      "x50",
+      "x51",
+      "x52",
+      "x53",
+      "x54",
+      "x55"
+     ],
+     "sheet": "rack-monitor-outeye.webp",
+     "frame": [
+      216,
+      210
+     ],
+     "cols": 12,
+     "rows": 5
+    }
+   ],
+   "how": "a whole rack unit: draw it scaled to fit (no slicing); each element's box is in the picture's px, so scale it with the picture. A sprite element's frame i = states.index(state) at ((i % cols) * frame.w, (i // cols) * frame.h); its rest state is the base picture (draw nothing over it)"
+  },
+  "rack-vu": {
+   "file": "rack-vu.webp",
+   "x2": null,
+   "px": [
+    1506,
+    324
+   ],
+   "kind": "unit",
+   "pxcm": 30.0,
+   "px_per_pt_suggested": 3.0,
+   "panel": {
+    "tl": [
+     26.98,
+     26.98
+    ],
+    "br": [
+     1474.78,
+     291.28
+    ]
+   },
+   "els": [
+    {
+     "id": "vuin",
+     "kind": "needle",
+     "zero": -47.0,
+     "span": [
+      -47.0,
+      47.0
+     ],
+     "db": [
+      -20,
+      -10,
+      -7,
+      -5,
+      -3,
+      -2,
+      -1,
+      0,
+      1,
+      2,
+      3
+     ],
+     "angle": {
+      "-20": -47.0,
+      "-10": -31.514416300811696,
+      "-7": -22.17156153307831,
+      "-5": -13.888501783479278,
+      "-3": -3.460747377299626,
+      "-2": 2.7257044809649784,
+      "-1": 9.667017632588546,
+      "0": 17.455299085799098,
+      "1": 26.193894603599034,
+      "2": 35.998760039251025,
+      "3": 47.0
+     },
+     "box": [
+      258.0,
+      60.0,
+      564.0,
+      246.0
+     ],
+     "c": [
+      409.67,
+      276.32
+     ],
+     "face": [
+      266.02,
+      69.84,
+      553.31,
+      237.42
+     ],
+     "len": 172.5,
+     "rest": "",
+     "states": [],
+     "needle": {
+      "pic": "rack-vu-needle.webp",
+      "box": [
+       390.0,
+       90.0,
+       426.0,
+       294.0
+      ],
+      "pivot": [
+       409.67,
+       276.32
+      ]
+     }
+    },
+    {
+     "id": "vuout",
+     "kind": "needle",
+     "zero": -47.0,
+     "span": [
+      -47.0,
+      47.0
+     ],
+     "db": [
+      -20,
+      -10,
+      -7,
+      -5,
+      -3,
+      -2,
+      -1,
+      0,
+      1,
+      2,
+      3
+     ],
+     "angle": {
+      "-20": -47.0,
+      "-10": -31.514416300811696,
+      "-7": -22.17156153307831,
+      "-5": -13.888501783479278,
+      "-3": -3.460747377299626,
+      "-2": 2.7257044809649784,
+      "-1": 9.667017632588546,
+      "0": 17.455299085799098,
+      "1": 26.193894603599034,
+      "2": 35.998760039251025,
+      "3": 47.0
+     },
+     "box": [
+      924.0,
+      60.0,
+      1236.0,
+      246.0
+     ],
+     "c": [
+      1079.99,
+      276.32
+     ],
+     "face": [
+      936.35,
+      69.84,
+      1223.63,
+      237.42
+     ],
+     "len": 172.5,
+     "rest": "",
+     "states": [],
+     "needle": {
+      "pic": "rack-vu-needle.webp",
+      "box": [
+       390.0,
+       90.0,
+       426.0,
+       294.0
+      ],
+      "pivot": [
+       409.67,
+       276.32
+      ]
+     }
+    }
+   ],
+   "how": "a whole rack unit: draw it scaled to fit (no slicing); each element's box is in the picture's px, so scale it with the picture. A sprite element's frame i = states.index(state) at ((i % cols) * frame.w, (i // cols) * frame.h); its rest state is the base picture (draw nothing over it)"
+  },
+  "rack-led": {
+   "file": "rack-led.webp",
+   "x2": null,
+   "px": [
+    1506,
+    324
+   ],
+   "kind": "unit",
+   "pxcm": 30.0,
+   "px_per_pt_suggested": 3.0,
+   "panel": {
+    "tl": [
+     26.98,
+     26.98
+    ],
+    "br": [
+     1474.78,
+     291.28
+    ]
+   },
+   "els": [
+    {
+     "id": "ledin",
+     "kind": "ladder",
+     "db": [
+      -42,
+      -36,
+      -30,
+      -24,
+      -20,
+      -16,
+      -12,
+      -10,
+      -8,
+      -6,
+      -5,
+      -4,
+      -3,
+      -2,
+      -1,
+      0
+     ],
+     "box": [
+      330.0,
+      84.0,
+      1146.0,
+      162.0
+     ],
+     "c": [
+      372.88,
+      121.63
+     ],
+     "segs": [
+      [
+       355.69,
+       109.04,
+       392.91,
+       133.06
+      ],
+      [
+       404.32,
+       109.04,
+       441.55,
+       133.06
+      ],
+      [
+       452.96,
+       109.04,
+       490.18,
+       133.06
+      ],
+      [
+       501.59,
+       109.04,
+       538.81,
+       133.06
+      ],
+      [
+       550.22,
+       109.04,
+       587.44,
+       133.06
+      ],
+      [
+       598.86,
+       109.04,
+       636.08,
+       133.06
+      ],
+      [
+       647.49,
+       109.04,
+       684.71,
+       133.06
+      ],
+      [
+       696.13,
+       109.04,
+       733.35,
+       133.06
+      ],
+      [
+       744.76,
+       109.04,
+       781.98,
+       133.06
+      ],
+      [
+       793.39,
+       109.04,
+       830.62,
+       133.06
+      ],
+      [
+       842.03,
+       109.04,
+       879.25,
+       133.06
+      ],
+      [
+       890.66,
+       109.04,
+       927.88,
+       133.06
+      ],
+      [
+       939.29,
+       109.04,
+       976.52,
+       133.06
+      ],
+      [
+       987.93,
+       109.04,
+       1025.15,
+       133.06
+      ],
+      [
+       1036.56,
+       109.04,
+       1073.79,
+       133.06
+      ],
+      [
+       1085.2,
+       109.04,
+       1122.42,
+       133.06
+      ]
+     ],
+     "rest": "off",
+     "states": [
+      "on"
+     ],
+     "sheet": "rack-led-ledin.webp",
+     "frame": [
+      816,
+      78
+     ],
+     "cols": 1,
+     "rows": 1
+    },
+    {
+     "id": "ledout",
+     "kind": "ladder",
+     "db": [
+      -42,
+      -36,
+      -30,
+      -24,
+      -20,
+      -16,
+      -12,
+      -10,
+      -8,
+      -6,
+      -5,
+      -4,
+      -3,
+      -2,
+      -1,
+      0
+     ],
+     "box": [
+      330.0,
+      174.0,
+      1146.0,
+      252.0
+     ],
+     "c": [
+      372.88,
+      211.63
+     ],
+     "segs": [
+      [
+       355.69,
+       199.1,
+       392.91,
+       223.12
+      ],
+      [
+       404.32,
+       199.1,
+       441.55,
+       223.12
+      ],
+      [
+       452.96,
+       199.1,
+       490.18,
+       223.12
+      ],
+      [
+       501.59,
+       199.1,
+       538.81,
+       223.12
+      ],
+      [
+       550.22,
+       199.1,
+       587.44,
+       223.12
+      ],
+      [
+       598.86,
+       199.1,
+       636.08,
+       223.12
+      ],
+      [
+       647.49,
+       199.1,
+       684.71,
+       223.12
+      ],
+      [
+       696.13,
+       199.1,
+       733.35,
+       223.12
+      ],
+      [
+       744.76,
+       199.1,
+       781.98,
+       223.12
+      ],
+      [
+       793.39,
+       199.1,
+       830.62,
+       223.12
+      ],
+      [
+       842.03,
+       199.1,
+       879.25,
+       223.12
+      ],
+      [
+       890.66,
+       199.1,
+       927.88,
+       223.12
+      ],
+      [
+       939.29,
+       199.1,
+       976.52,
+       223.12
+      ],
+      [
+       987.93,
+       199.1,
+       1025.15,
+       223.12
+      ],
+      [
+       1036.56,
+       199.1,
+       1073.79,
+       223.12
+      ],
+      [
+       1085.2,
+       199.1,
+       1122.42,
+       223.12
+      ]
+     ],
+     "rest": "off",
+     "states": [
+      "on"
+     ],
+     "sheet": "rack-led-ledout.webp",
+     "frame": [
+      816,
+      78
+     ],
+     "cols": 1,
+     "rows": 1
+    }
+   ],
+   "how": "a whole rack unit: draw it scaled to fit (no slicing); each element's box is in the picture's px, so scale it with the picture. A sprite element's frame i = states.index(state) at ((i % cols) * frame.w, (i // cols) * frame.h); its rest state is the base picture (draw nothing over it)"
+  },
+  "rack-blank": {
+   "file": "rack-blank.webp",
+   "x2": null,
+   "px": [
+    1506,
+    324
+   ],
+   "kind": "unit",
+   "pxcm": 30.0,
+   "px_per_pt_suggested": 3.0,
+   "panel": {
+    "tl": [
+     26.98,
+     26.98
+    ],
+    "br": [
+     1474.78,
+     291.28
+    ]
+   },
+   "els": [],
+   "how": "a whole rack unit: draw it scaled to fit (no slicing); each element's box is in the picture's px, so scale it with the picture. A sprite element's frame i = states.index(state) at ((i % cols) * frame.w, (i // cols) * frame.h); its rest state is the base picture (draw nothing over it)"
+  },
+  "nixie-tubes": {
+   "files": [
+    "rack-counter-delay0.webp",
+    "rack-counter-delay1.webp",
+    "rack-counter-delay2.webp",
+    "rack-counter-delay3.webp"
+   ],
+   "kind": "sprite",
+   "pxcm": 22.5,
+   "face": "rack-counter.webp",
+   "face_window_px": [
+    80,
+    80,
+    568,
+    257
+   ],
+   "tube_boxes_px": [
+    [
+     42.0,
+     0.0,
+     228.0,
+     300.0
+    ],
+    [
+     162.0,
+     0.0,
+     354.0,
+     300.0
+    ],
+    [
+     276.0,
+     0.0,
+     474.0,
+     300.0
+    ],
+    [
+     396.0,
+     0.0,
+     594.0,
+     300.0
+    ]
+   ],
+   "states": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "dp"
+   ],
+   "frames": [
+    [
+     186,
+     300
+    ],
+    [
+     192,
+     300
+    ],
+    [
+     198,
+     300
+    ],
+    [
+     198,
+     300
+    ]
+   ],
+   "how": "one tube a sheet, one row: frame i = states.index(digit) at (i * frame.w, 0). The frames are the lit glow only, made to lie over the Counter's face (rack-counter.webp, whose window holds the four unlit tubes): crop face_window_px from the face as the background (its tubes unlit, numerals showing), then draw each tube's frame at its tube_boxes_px (the face's px; the boxes overlap the window's top, where the frames are transparent). Alone on another background the frames show fringes. The face's other legends (COUNTER, ADDED DELAY ...) are the bench's: crop them out"
+  },
+  "namdev": {
+   "files": {
+    "clean": "namdev-clean.webp",
+    "played": "namdev-played.webp",
+    "beat": "namdev-beat.webp"
+   },
+   "px": [
+    924,
+    642
+   ],
+   "kind": "unit",
+   "pxcm": 30.0,
+   "px_per_pt_suggested": 3.0,
+   "els": [
+    {
+     "id": "toggle",
+     "kind": "toggle",
+     "states": [
+      "amp",
+      "capture"
+     ],
+     "rest": "amp",
+     "box": [
+      102.0,
+      372.0,
+      216.0,
+      564.0
+     ],
+     "c": [
+      159.0,
+      460.72
+     ],
+     "hot": [
+      117.0,
+      401.64,
+      201.0,
+      519.82
+     ],
+     "frame": [
+      114,
+      192
+     ]
+    },
+    {
+     "id": "lamp",
+     "kind": "lamp",
+     "states": [
+      "off",
+      "on"
+     ],
+     "rest": "off",
+     "box": [
+      204.0,
+      408.0,
+      312.0,
+      516.0
+     ],
+     "c": [
+      258.0,
+      460.72
+     ],
+     "frame": [
+      108,
+      108
+     ]
+    },
+    {
+     "id": "load",
+     "kind": "button",
+     "states": [
+      "up",
+      "down"
+     ],
+     "rest": "up",
+     "box": [
+      330.0,
+      402.0,
+      432.0,
+      510.0
+     ],
+     "c": [
+      381.0,
+      451.86
+     ],
+     "hot": [
+      343.5,
+      414.93,
+      418.5,
+      488.79
+     ],
+     "frame": [
+      102,
+      108
+     ]
+    },
+    {
+     "id": "remove",
+     "kind": "button",
+     "states": [
+      "up",
+      "down"
+     ],
+     "rest": "up",
+     "box": [
+      456.0,
+      402.0,
+      558.0,
+      510.0
+     ],
+     "c": [
+      507.0,
+      451.86
+     ],
+     "hot": [
+      469.5,
+      414.93,
+      544.5,
+      488.79
+     ],
+     "frame": [
+      102,
+      108
+     ]
+    },
+    {
+     "id": "speaker",
+     "kind": "rotary",
+     "angles": [
+      -55.0,
+      0.0,
+      55.0
+     ],
+     "states": [
+      "p0",
+      "p1",
+      "p2"
+     ],
+     "rest": "p0",
+     "box": [
+      594.0,
+      384.0,
+      744.0,
+      540.0
+     ],
+     "c": [
+      669.0,
+      456.29
+     ],
+     "r": 60.0,
+     "hot": [
+      609.0,
+      397.21,
+      729.0,
+      515.38
+     ],
+     "frame": [
+      150,
+      156
+     ]
+    }
+   ],
+   "window": [
+    [
+     102.0,
+     220.12
+    ],
+    [
+     732.0,
+     361.93
+    ]
+   ],
+   "panel": [
+    [
+     57.0,
+     187.44
+    ],
+    [
+     777.0,
+     571.51
+    ]
+   ],
+   "how": "the bench's stage NAM capture player in three wears (clean, played, beat). Element sprites namdev-<wear>-<id>.webp: one row; frame i = states.index(state) - 1 (frame 0 is the state after the rest)"
+  },
+  "paper": {
+   "file": "paper.webp",
+   "px": [
+    512,
+    512
+   ],
+   "kind": "tile",
+   "tile_pt": 220,
+   "how": "manila tag/card stock (frame.css: drawn at 220 pt square over #d9c69a); ink #2a2117"
+  }
+ }
+}

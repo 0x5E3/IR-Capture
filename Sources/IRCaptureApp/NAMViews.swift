@@ -8,9 +8,9 @@ struct NAMJob: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             if m.namMode == "logic" {
-                HStack {
-                    Button { m.namMode = "app" } label: { Label("Record here", systemImage: "chevron.left") }
-                    Text("Import DAW recordings").font(.headline)
+                HStack(spacing: 12) {
+                    Button("‹ Record here") { m.namMode = "app" }
+                    Engraved("Import DAW recordings", size: 15)
                 }
                 NAMLogicSteps()
             } else {
@@ -18,16 +18,15 @@ struct NAMJob: View {
                 JobStepper(steps: [("Signal", m.namSignal != nil), ("Connect", connected), ("Set levels", !m.namMeters.isEmpty && m.namMeters.allSatisfy { !$0.clipped }),
                                    ("Record", m.namResult != nil), ("Upload", false)])
                 NAMDirectSteps()
-                GroupBox {
-                    HStack(alignment: .firstTextBaseline) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Recorded in a DAW instead?").bold()
-                            Note("Record the TONE3000 sweep through the amp in Logic, Reaper or any other DAW. Prepare the files here.")
-                        }
-                        Spacer()
-                        Button("Import DAW recordings…") { m.namMode = "logic" }
-                    }.padding(6)
+                HStack(alignment: .center, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Engraved("Recorded in a DAW instead?", size: 12)
+                        Note("Record the TONE3000 sweep through the amp in Logic, Reaper or any other DAW. Prepare the files here.")
+                    }
+                    Spacer()
+                    Button("Import DAW recordings…") { m.namMode = "logic" }
                 }
+                .onPanel(padding: 16)
             }
         }
     }
@@ -37,10 +36,17 @@ struct NAMModelChoice: View {
     @EnvironmentObject var m: AppModel
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Picker("Capture type", selection: $m.namKind) {
-                Text("Amp only (load box line out). For use with any cab IR. Recommended.").tag(NAMKind.amp)
-                Text("Full chain (mics on the cab). Amp, cab and mic in one model.").tag(NAMKind.full)
-            }.pickerStyle(.radioGroup)
+            Engraved("Capture type")
+            HStack(alignment: .top, spacing: 14) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Button("Amp only") { m.namKind = .amp }.buttonStyle(KeyButtonStyle(lit: m.namKind == .amp, size: 12))
+                    Note("Load box line out. For use with any cab IR. Recommended.")
+                }.frame(maxWidth: .infinity, alignment: .topLeading)
+                VStack(alignment: .leading, spacing: 6) {
+                    Button("Full chain") { m.namKind = .full }.buttonStyle(KeyButtonStyle(lit: m.namKind == .full, size: 12))
+                    Note("Mics on the cab. Amp, cab and mic in one model.")
+                }.frame(maxWidth: .infinity, alignment: .topLeading)
+            }
             Note(m.namKind == .amp
                  ? "Use an amp-only model with cab IRs captured with a reference (any option except None). The load box line out already contains the speaker impedance peak. An IR made without a reference applies the peak a second time."
                  : "Each mic produces a separate model. Use close mics. NAM models a short time window only, so room sound is not reproduced accurately.")
@@ -51,9 +57,9 @@ struct NAMModelChoice: View {
 struct NAMNameRow: View {
     @EnvironmentObject var m: AppModel
     var body: some View {
-        HStack {
-            Text("Capture name").foregroundStyle(.secondary)
-            TextField("e.g. JCM800_Gain6_Bass5", text: $m.namName).frame(maxWidth: 320)
+        HStack(spacing: 10) {
+            Engraved("Capture name")
+            GlassField(placeholder: "e.g. JCM800_Gain6_Bass5", text: $m.namName).frame(maxWidth: 320)
         }
         Note("Amp and settings, e.g. JCM800_Gain6_Bass5. All file names start with this name.")
         SaveFolderRow()
@@ -73,11 +79,15 @@ struct NAMDirectSteps: View {
                 }
                 HStack(spacing: 12) {
                     Button("Open tone3000.com/capture") { m.openTONE3000() }
-                    if m.namSignal == nil { Button("Find it in Downloads") { m.findNAMSignal(inDownloads: true) }.buttonStyle(.borderedProminent).tint(lamp) }
+                    if m.namSignal == nil { Button("Find it in Downloads") { m.findNAMSignal(inDownloads: true) }.buttonStyle(KeyButtonStyle(size: 13)) }
                     Button(m.namSignal == nil ? "Choose sweep file…" : "Choose a different file…") { m.chooseNAMSignal() }
                 }
                 if m.namSignal != nil {
-                    Note("✓ \(m.namSignalName) loaded (190 s, 48 kHz). The file is played without modification.", color: goodColor)
+                    HStack(spacing: 8) {
+                        JewelLamp(colour: "green", on: true, diameter: 15)
+                        GlassWindow(size: 12) { Text(m.namSignalName) }
+                        Note("Loaded (190 s, 48 kHz). The file is played without modification.", color: goodColor)
+                    }
                 } else if let s = m.namSignalStatus {
                     Note(s, color: s.hasPrefix("Checking") ? .secondary : badColor)
                 }
@@ -85,7 +95,7 @@ struct NAMDirectSteps: View {
 
             Step(n: 2, title: "Connect", subtitle: "One interface is used for both. The output is connected to the reamp box. The inputs record the amp.") {
                 NAMModelChoice()
-                WiringDiagram(wiring: m.namKind == .amp ? .namAmp : .namFull)
+                WiringDiagram(wiring: m.namKind == .amp ? .namAmp : .namFull).onPaper()
                 Checklist(items: [
                     "Interface output → reamp box → amp guitar input. The preamp is included in the capture. Turn off noise gates, reverb, delay and all effects-loop devices.",
                     m.namKind == .amp
@@ -108,10 +118,10 @@ struct NAMDirectSteps: View {
                     "Adjust each input gain until its row shows OK (peaks near −8 dBFS). No row may show CLIP.",
                     "Click Stop. Do not adjust any controls after this point.",
                 ])
-                HStack {
+                HStack(spacing: 12) {
                     Button(m.namLevelRunning ? "Stop" : "Check levels") { m.toggleNAMLevelCheck() }
-                        .buttonStyle(.borderedProminent).tint(m.namLevelRunning ? .secondary : lamp).disabled(m.busy != nil)
-                    if m.namLevelRunning { ProgressView().controlSize(.small); Text("Looping…").foregroundStyle(.secondary) }
+                        .buttonStyle(KeyButtonStyle(lit: m.namLevelRunning, size: 14, big: true)).disabled(m.busy != nil)
+                    if m.namLevelRunning { StatusLine(text: "Looping…", color: warnColor) }
                 }
                 if let e = m.namLevelError { ErrorNote(e) }
                 if !m.namMeters.isEmpty { NAMMeterTable(meters: m.namMeters) }
@@ -119,11 +129,11 @@ struct NAMDirectSteps: View {
 
             Step(n: 4, title: "Record", subtitle: "The full training signal (3 minutes 10 seconds) is played and all inputs are recorded.", done: m.namResult != nil) {
                 NAMNameRow()
-                HStack {
+                HStack(spacing: 14) {
                     Button("Record (3 min 12 s)") { m.startNAMCapture() }
-                        .buttonStyle(.borderedProminent).tint(lamp).controlSize(.large)
+                        .buttonStyle(KeyButtonStyle(lit: m.busy?.progress != nil, size: 16, big: true))
                         .disabled(m.busy != nil || m.namDirectProblem != nil)
-                    if let p = m.namDirectProblem, m.busy == nil { Note(p, color: warnColor) }
+                    if let p = m.namDirectProblem, m.busy == nil { WarningTag(text: p) }
                 }
                 if let e = m.namError { ErrorNote(e) }
                 BusyLine()
@@ -139,14 +149,14 @@ struct NAMInputsGrid: View {
     var body: some View {
         Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 8) {
             GridRow {
-                Text("INPUT").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                Text("USE").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                Text("NAME").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                Engraved("Input", size: 10, dim: true)
+                Engraved("Use", size: 10, dim: true)
+                Engraved("Name", size: 10, dim: true)
             }
             ForEach($m.namRows) { $r in
                 GridRow {
-                    Text("Input \(r.id + 1)")
-                    Picker("", selection: $r.use) { Text("Use").tag(true); Text("Not used").tag(false) }.labelsHidden().frame(width: 130)
+                    Engraved("Input \(r.id + 1)", size: 12, dim: !r.use)
+                    KeyChoice(selection: $r.use, options: [(true, "Use"), (false, "Off")]).frame(width: 130, alignment: .leading)
                     MicNameField(name: $r.name, disabled: !r.use)
                 }
             }
@@ -165,25 +175,17 @@ struct NAMMeterTable: View {
         return (change > 0 ? "Raise about \(Int(change.rounded())) dB" : "Lower about \(Int((-change).rounded())) dB", warnColor)
     }
     var body: some View {
-        Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 8) {
-            ForEach(meters) { x in
-                let adv = advice(x)
-                let color = adv.1
-                GridRow {
-                    Text(x.label).frame(width: 130, alignment: .leading).lineLimit(1)
-                    GeometryReader { g in
-                        let frac = max(0, min(1, (x.peakDB + 48) / 48))
-                        ZStack(alignment: .leading) {
-                            RoundedRectangle(cornerRadius: 3).fill(Color.secondary.opacity(0.15))
-                            RoundedRectangle(cornerRadius: 3).fill(color).frame(width: g.size.width * frac)
-                            Rectangle().fill(Color.primary.opacity(0.5)).frame(width: 2)
-                                .offset(x: g.size.width * (NAMMeterTable.target + 48) / 48 - 1)
-                        }
-                    }.frame(width: 220, height: 12)
-                    Text(x.peakDB < -100 ? "—" : String(format: "%.1f dBFS", x.peakDB)).font(.system(.body, design: .monospaced)).frame(width: 100, alignment: .trailing)
-                    Text(adv.0).foregroundStyle(color)
+        VStack(alignment: .leading, spacing: 10) {
+            MeterBridge {
+                ForEach(meters) { x in
+                    // 0 VU is the −8 dBFS target.
+                    MeterModule(label: x.label, vu: x.peakDB < -60 ? nil : x.peakDB - NAMMeterTable.target,
+                                dbfs: x.peakDB < -100 ? "—" : String(format: "%.1f dBFS", x.peakDB), clipped: x.clipped, advice: advice(x)) {
+                        EmptyView()
+                    }
                 }
             }
+            Note("0 VU on each meter is the target level, a peak of −8 dBFS. Within ±3 VU is OK. The figure under each meter is the peak in dBFS.")
         }
     }
 }
@@ -216,13 +218,7 @@ struct NAMLogicSteps: View {
             }
 
             Step(n: 3, title: "Prepare the files", subtitle: "Add the exported WAV files, check the names, and click Prepare files.") {
-                VStack(spacing: 6) {
-                    Text("Drag the exported WAV files here").bold()
-                    Button("or choose them…") { m.chooseNAMFiles() }.buttonStyle(.link)
-                    Text("The sweep track file is skipped automatically.").font(.callout).foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity).padding(.vertical, 18)
-                .background(RoundedRectangle(cornerRadius: 6).strokeBorder(dropping ? lamp : Color.secondary.opacity(0.4), style: StrokeStyle(lineWidth: 2, dash: [6])))
+                DropPlate(dropping: dropping, note: "The sweep track file is skipped automatically.") { m.chooseNAMFiles() }
                 .onDrop(of: [.fileURL], isTargeted: $dropping) { providers in
                     for p in providers {
                         _ = p.loadObject(ofClass: URL.self) { url, _ in
@@ -234,11 +230,11 @@ struct NAMLogicSteps: View {
                 if let msg = m.namMessage { ErrorNote(msg) }
                 if !m.namInputs.isEmpty { NAMGrid() }
                 NAMNameRow()
-                HStack {
+                HStack(spacing: 14) {
                     Button("Prepare files") { m.prepareNAM() }
-                        .buttonStyle(.borderedProminent).tint(lamp).controlSize(.large)
+                        .buttonStyle(KeyButtonStyle(lit: m.busy != nil, size: 16, big: true))
                         .disabled(m.busy != nil || m.namProblem != nil)
-                    if let p = m.namProblem, m.busy == nil, !m.namInputs.isEmpty { Note(p, color: warnColor) }
+                    if let p = m.namProblem, m.busy == nil, !m.namInputs.isEmpty { WarningTag(text: p) }
                 }
                 if let e = m.namError { ErrorNote(e) }
                 BusyLine()
@@ -252,21 +248,21 @@ struct NAMGrid: View {
     var body: some View {
         Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 8) {
             GridRow {
-                Text("FILE").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                Text("NAME").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                Text("USE").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                Engraved("File", size: 10, dim: true)
+                Engraved("Name", size: 10, dim: true)
+                Engraved("Use", size: 10, dim: true)
                 Text("")
             }
             ForEach($m.namInputs) { $c in
                 GridRow {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(c.label).font(.system(.callout, design: .monospaced)).lineLimit(1).truncationMode(.middle)
-                        Text(c.meta).font(.caption).foregroundStyle(.secondary)
-                    }.frame(maxWidth: 280, alignment: .leading)
-                    TextField("", text: $c.name).frame(width: 180).disabled(!c.use)
-                    Picker("", selection: $c.use) { Text("Use").tag(true); Text("Skip").tag(false) }.labelsHidden().frame(width: 110)
+                        GlassWindow(size: 12) { Text(c.label).font(.swellMono(11)).truncationMode(.middle) }
+                        Note(c.meta)
+                    }.frame(maxWidth: 260, alignment: .leading)
+                    GlassField(placeholder: "", text: $c.name).frame(width: 180).disabled(!c.use).opacity(c.use ? 1 : 0.5)
+                    KeyChoice(selection: $c.use, options: [(true, "Use"), (false, "Skip")], size: 10)
                     if c.channel == 0 {
-                        Button { m.removeNAMFile(c.url) } label: { Image(systemName: "xmark.circle") }.buttonStyle(.borderless).help("Remove this file")
+                        Button("Remove") { m.removeNAMFile(c.url) }.buttonStyle(KeyButtonStyle(size: 10)).help("Remove this file")
                     } else { Text("") }
                 }
             }
@@ -278,37 +274,34 @@ struct NAMResultsView: View {
     @EnvironmentObject var m: AppModel
     let r: NAMSummary
     var body: some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack {
-                    Text("UPLOAD FOR TRAINING: \(r.title)").font(.system(size: 15, weight: .semibold)).kerning(0.8)
+        VStack(alignment: .leading, spacing: 14) {
+                HStack(spacing: 12) {
+                    Engraved("Upload for training", size: 17)
+                    GlassWindow(size: 14) { Text(r.title) }
                     Spacer()
-                    if r.droppedOut { Pill(text: "Record again", color: badColor) }
-                    else if r.warnings.isEmpty { Pill(text: "Ready to upload", color: goodColor) }
-                    else { Pill(text: r.warnings.count == 1 ? "1 item to check" : "\(r.warnings.count) items to check", color: warnColor) }
+                    if r.droppedOut { StatusLine(text: "Record again", color: badColor, diameter: 20).font(.swellLegend(14)) }
+                    else if r.warnings.isEmpty { StatusLine(text: "Ready to upload", color: goodColor, diameter: 20).font(.swellLegend(14)) }
+                    else { StatusLine(text: r.warnings.count == 1 ? "1 item to check" : "\(r.warnings.count) items to check", color: warnColor, diameter: 20).font(.swellLegend(14)) }
                 }
-                ForEach(r.warnings, id: \.self) { w in
-                    Text(w).padding(.horizontal, 10).padding(.vertical, 7).frame(maxWidth: .infinity, alignment: .leading)
-                        .background(warnColor.opacity(0.15)).overlay(Rectangle().fill(warnColor).frame(width: 3), alignment: .leading)
-                }
+                ForEach(r.warnings, id: \.self) { w in WarningTag(text: w, severe: r.droppedOut && w == r.warnings.first) }
                 if r.droppedOut {
                     HStack {
-                        Button("Record again") { m.startNAMCapture() }.buttonStyle(.borderedProminent).tint(lamp)
+                        Button("Record again") { m.startNAMCapture() }.buttonStyle(KeyButtonStyle(size: 13))
                             .disabled(m.busy != nil || m.namDirectProblem != nil)
                         Note("Quit other apps first (browsers, video calls, other audio software).")
                     }
                 }
                 Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 8) {
                     GridRow {
-                        ForEach(["CHANNEL", "PEAK", "NOISE", "START VS END", "LINED UP"], id: \.self) {
-                            Text($0).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                        ForEach(["Channel", "Peak", "Noise", "Start vs end", "Lined up"], id: \.self) {
+                            Engraved($0, size: 10, dim: true)
                         }
                     }
                     Divider().gridCellUnsizedAxes(.horizontal)
                     ForEach(r.names, id: \.self) { n in
                         let d = r.diagnostics[n]!
                         GridRow {
-                            Text(n)
+                            Engraved(n, size: 12)
                             Pill(text: String(format: "%.1f dBFS", d.peakDBFS),
                                  color: d.clippedSamples > 0 || d.peakDBFS > -3 ? badColor : d.peakDBFS < -24 ? warnColor : goodColor)
                             Pill(text: String(format: "%.0f dBFS", d.noiseDBFS) + (d.humHz.map { " · \($0) Hz hum" } ?? ""),
@@ -317,7 +310,7 @@ struct NAMResultsView: View {
                                  color: d.replicateESR > 0.005 ? badColor : d.replicateESR > 0.001 ? warnColor : goodColor)
                             Text(String(format: "%.1f ms", d.offsetMs) + (d.polarityInverted ? " · inverted" : "")
                                  + (abs(d.driftSamples) > 1 ? " · drift \(d.driftSamples)" : "")
-                                 + (r.names.count > 1 ? String(format: " · +%.2f ms", d.delayVsFirstMs) : "")).monospacedDigit()
+                                 + (r.names.count > 1 ? String(format: " · +%.2f ms", d.delayVsFirstMs) : "")).font(.swellMono(12))
                         }
                     }
                 }
@@ -328,13 +321,14 @@ struct NAMResultsView: View {
                     "Training time: about 5–20 minutes. Check the ESR after training. Below 0.01: very good. 0.3 or higher: the capture failed. Download the .nam file for use in a NAM player.",
                 ])
                 Note("“Start vs end” compares the first 9 seconds of the take with the last 9 seconds. Both sections contain the same signal. The value indicates amp drift during the recording. Model accuracy is limited to about this value. Below 0.001: excellent.")
-                HStack {
-                    Button("Show in Finder") { m.revealNAM() }.buttonStyle(.borderedProminent).tint(lamp)
+                HStack(spacing: 10) {
+                    Button("Show in Finder") { m.revealNAM() }.buttonStyle(KeyButtonStyle(size: 13))
                     Button("Open tone3000.com/capture") { m.openTONE3000() }
-                    Text(r.folder.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")).font(.callout).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                    Note(r.folder.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")).lineLimit(1).truncationMode(.middle)
                 }
-            }.padding(8)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .onPanel()
     }
 }
 #endif

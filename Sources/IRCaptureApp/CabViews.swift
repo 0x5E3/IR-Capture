@@ -12,9 +12,9 @@ struct CabJob: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             if m.cabImport {
-                HStack {
-                    Button { m.cabImport = false } label: { Label("Record here", systemImage: "chevron.left") }
-                    Text("Import DAW recordings").font(.headline)
+                HStack(spacing: 12) {
+                    Button("‹ Record here") { m.cabImport = false }
+                    Engraved("Import DAW recordings", size: 15)
                 }
                 CabImportSteps()
             } else {
@@ -22,17 +22,16 @@ struct CabJob: View {
                 CabConnectStep(done: connected)
                 CabLevelStep(done: levelsDone)
                 CabCaptureStep()
-                GroupBox {
-                    HStack(alignment: .firstTextBaseline) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Recorded in a DAW instead?").bold()
-                            Note("Play the test signal from Logic, Reaper, Ableton, Pro Tools or GarageBand. Record the mics in the DAW. Import the files here.")
-                        }
-                        Spacer()
-                        Button("Import DAW recordings…") { m.cabImport = true }
-                        Button("Re-export a past capture…") { m.chooseReexportFolder() }
-                    }.padding(6)
+                HStack(alignment: .center, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Engraved("Recorded in a DAW instead?", size: 12)
+                        Note("Play the test signal from Logic, Reaper, Ableton, Pro Tools or GarageBand. Record the mics in the DAW. Import the files here.")
+                    }
+                    Spacer()
+                    Button("Import DAW recordings…") { m.cabImport = true }
+                    Button("Re-export a past capture…") { m.chooseReexportFolder() }
                 }
+                .onPanel(padding: 16)
             }
         }
     }
@@ -44,7 +43,7 @@ struct CabConnectStep: View {
     let done: Bool
     var body: some View {
         Step(n: 1, title: "Connect", subtitle: "Wire the rig as shown. Then set the use of each input.", done: done) {
-            WiringDiagram(wiring: m.refSource == .none ? .cabNoRef : .cabRef)
+            WiringDiagram(wiring: m.refSource == .none ? .cabNoRef : .cabRef).onPaper()
             Checklist(items: [
                 "Interface output → amp FX return (power amp in) or clean power amp → cab. Do not use the guitar input. The preamp distorts the sweeps and the IR is incorrect.",
                 "Set the amp master low to start. The remaining levels are set in the level check.",
@@ -74,13 +73,10 @@ struct InterfaceRow: View {
                 .help("If inputs and outputs are on two devices, combine them into an aggregate device in Audio MIDI Setup")
         }
         HStack(spacing: 16) {
-            Picker("Interface", selection: $m.deviceUID) {
-                ForEach(m.duplexDevices) { d in Text("\(d.name)  (\(d.inputChannels) in / \(d.outputChannels) out)").tag(d.uid) }
-            }.frame(maxWidth: 420)
+            GlassMenu(title: "Interface", selection: $m.deviceUID,
+                      options: m.duplexDevices.map { d in (d.uid, "\(d.name)  (\(d.inputChannels) in / \(d.outputChannels) out)") }, minWidth: 240)
             if let dev = m.device {
-                Picker(outputLabel, selection: $output) {
-                    ForEach(0..<dev.outputChannels, id: \.self) { Text("Output \($0 + 1)").tag($0) }
-                }.frame(width: 260)
+                GlassMenu(title: outputLabel, selection: $output, options: (0..<dev.outputChannels).map { ($0, "Output \($0 + 1)") })
             }
         }
         .disabled(m.audioActive)
@@ -97,25 +93,27 @@ struct InputsGrid: View {
         VStack(alignment: .leading, spacing: 8) {
             Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 6) {
                 GridRow {
-                    Text("INPUT").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                    Text("USE").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                    Text("MIC NAME").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                    Engraved("Input", size: 10, dim: true)
+                    Engraved("Use", size: 10, dim: true)
+                    Engraved("Mic name", size: 10, dim: true)
                 }
                 ForEach($m.inputs) { $row in
                     GridRow {
-                        Text("Input \(row.id + 1)").monospacedDigit()
+                        Engraved("Input \(row.id + 1)", size: 12, dim: row.role == .off)
                         if row.role == .ref {
-                            HStack { Pill(text: "Reference", color: lamp); Button("Not used") { m.setRole(.off, for: row.id) }.buttonStyle(.link) }
-                                .frame(width: 150, alignment: .leading)
+                            HStack(spacing: 6) {
+                                StatusLine(text: "Reference", color: lamp, diameter: 13)
+                                Button("Off") { m.setRole(.off, for: row.id) }.buttonStyle(KeyButtonStyle(size: 11))
+                            }
+                            .frame(width: 150, alignment: .leading)
                             Text("")
                         } else {
-                            Picker("", selection: Binding(get: { row.role }, set: { m.setRole($0, for: row.id) })) {
-                                Text("Not used").tag(Role.off); Text("Mic").tag(Role.mic)
-                            }.labelsHidden().frame(width: 150)
+                            KeyChoice(selection: Binding(get: { row.role }, set: { m.setRole($0, for: row.id) }),
+                                      options: [(Role.mic, "Mic"), (Role.off, "Off")])
+                                .frame(width: 150, alignment: .leading)
                             MicNameField(name: $row.name, disabled: row.role != .mic)
                         }
                     }
-                    .foregroundStyle(row.role == .off ? .secondary : .primary)
                 }
             }
             Note("Enter a name for each mic. The name is used in the file names.")
@@ -129,22 +127,24 @@ struct IdleSignalChips: View {
     var body: some View {
         ForEach(m.idleSignals) { r in
             HStack(spacing: 10) {
-                Image(systemName: "waveform").foregroundStyle(lamp)
+                JewelLamp(colour: "amber", on: true, diameter: 15)
                 Text("Signal on Input \(r.channel + 1) (\(Int(r.peakDBFS.rounded())) dBFS). Use it?")
+                Spacer(minLength: 0)
                 Button("As a mic") { m.setRole(.mic, for: r.channel) }
                 if m.refCandidate == r.channel || m.refInput == nil {
                     Button(m.refCandidate == r.channel ? "As the reference (detected)" : "As the reference") { m.setRefInput(r.channel) }
                 }
             }
-            .padding(8).background(RoundedRectangle(cornerRadius: 6).fill(lamp.opacity(0.12)))
+            .onPaper(padding: 9)
         }
         if let c = m.refCandidate, m.refInput == nil, !m.idleSignals.contains(where: { $0.channel == c }) {
             HStack(spacing: 10) {
-                Image(systemName: "lightbulb").foregroundStyle(lamp)
+                JewelLamp(colour: "amber", on: true, diameter: 15)
                 Text("Input \(c + 1) is probably a reference tap. Its signal arrives first and contains no cab or room sound.")
+                Spacer(minLength: 0)
                 Button("Use it as the reference") { m.setRefInput(c) }
             }
-            .padding(8).background(RoundedRectangle(cornerRadius: 6).fill(lamp.opacity(0.12)))
+            .onPaper(padding: 9)
         }
     }
 }
@@ -161,32 +161,20 @@ struct ReferenceChooser: View {
     }
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("REFERENCE SOURCE").font(.caption.weight(.semibold)).kerning(0.8).foregroundStyle(.secondary)
-            HStack(alignment: .top, spacing: 10) {
+            Engraved("Reference source")
+            HStack(alignment: .top, spacing: 14) {
                 ForEach(RefSource.allCases) { s in
-                    Button { m.refSource = s } label: {
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack {
-                                Image(systemName: s == .none ? "speaker.wave.2" : s == .loadBox ? "rectangle.connected.to.line.below" : "cable.connector")
-                                Text(s.title).bold()
-                                Spacer()
-                                if m.refSource == s { Image(systemName: "checkmark.circle.fill").foregroundStyle(lamp) }
-                            }
-                            Text(blurb(s)).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                        }
-                        .padding(10).frame(maxWidth: .infinity, minHeight: 92, alignment: .topLeading)
-                        .background(RoundedRectangle(cornerRadius: 8).fill(m.refSource == s ? lamp.opacity(0.12) : Color.secondary.opacity(0.06)))
-                        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(m.refSource == s ? lamp : Color.secondary.opacity(0.25)))
-                        .contentShape(Rectangle())
-                    }.buttonStyle(.plain)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Button(s.title) { m.refSource = s }.buttonStyle(KeyButtonStyle(lit: m.refSource == s, size: 12))
+                        Note(blurb(s))
+                    }
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
                 }
             }
             if m.refSource != .none, let dev = m.device {
-                HStack {
-                    Picker("Connected to", selection: Binding(get: { m.refInput ?? -1 }, set: { m.setRefInput($0 < 0 ? nil : $0) })) {
-                        Text("Choose…").tag(-1)
-                        ForEach(0..<dev.inputChannels, id: \.self) { Text("Input \($0 + 1)").tag($0) }
-                    }.frame(width: 260)
+                HStack(spacing: 14) {
+                    GlassMenu(title: "Connected to", selection: Binding(get: { m.refInput ?? -1 }, set: { m.setRefInput($0 < 0 ? nil : $0) }),
+                              options: [(-1, "Choose…")] + (0..<dev.inputChannels).map { ($0, "Input \($0 + 1)") })
                     Button("Reference tap help…") { m.helpPage = .reference }.buttonStyle(.link)
                 }
                 if m.refSource == .loadBox {
@@ -207,14 +195,11 @@ struct CabAdvanced: View {
         DisclosureGroup("Advanced") {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 18) {
-                    Picker("Sample rate", selection: $m.rateChoice) {
-                        Text("Automatic (\(rateTag(m.device.map(CoreAudioHelper.bestRate) ?? 96000).dropLast()) kHz)").tag(0)
-                        ForEach(m.deviceRates, id: \.self) { Text("\(rateTag($0).dropLast()) kHz").tag($0) }
-                    }.frame(width: 260)
-                    Picker("Sweep level", selection: $m.levelChoice) {
-                        Text("Automatic").tag(0.0)
-                        ForEach([-6.0, -12, -18, -24], id: \.self) { Text("\(Int($0)) dBFS").tag($0) }
-                    }.frame(width: 220)
+                    GlassMenu(title: "Sample rate", selection: $m.rateChoice,
+                              options: [(0, "Automatic (\(rateTag(m.device.map(CoreAudioHelper.bestRate) ?? 96000).dropLast()) kHz)")]
+                                + m.deviceRates.map { ($0, "\(rateTag($0).dropLast()) kHz") })
+                    GlassMenu(title: "Sweep level", selection: $m.levelChoice,
+                              options: [(0.0, "Automatic")] + [-6.0, -12, -18, -24].map { ($0, "\(Int($0)) dBFS") })
                     Button("Open Audio MIDI Setup") { CoreAudioHelper.openAudioMIDISetup() }
                 }
                 Note("Automatic sweep level: starts at −18 dBFS and is raised in steps while speaker distortion stays low. It is reduced if distortion increases.")
@@ -237,11 +222,11 @@ struct CabLevelStep: View {
                                    : "Adjust each preamp until its row shows OK (sweep peak near −6 dBFS). No row may show CLIP.",
                 "If distortion is orange or red, lower the amp volume. An IR is linear. Higher speaker drive does not improve it.",
             ])
-            HStack {
+            HStack(spacing: 12) {
                 Button(m.levelRunning ? "Stop" : "Check levels") { m.toggleLevelCheck() }
-                    .buttonStyle(.borderedProminent).tint(m.levelRunning ? .secondary : lamp)
+                    .buttonStyle(KeyButtonStyle(lit: m.levelRunning, size: 14, big: true))
                     .disabled(m.busy != nil || m.device == nil)
-                if m.levelRunning { ProgressView().controlSize(.small); Text(m.levelPhase ?? "").foregroundStyle(.secondary) }
+                if m.levelRunning { StatusLine(text: m.levelPhase ?? "Looping…", color: warnColor) }
                 Spacer()
                 if m.levelChoice == 0 && (m.levelRunning || !m.levelReadings.isEmpty) {
                     Pill(text: m.autoLevelSettled ? "Sweep level set (\(Int(m.autoLevel)) dBFS)" : "Setting sweep level (\(Int(m.autoLevel)) dBFS)",
@@ -267,25 +252,13 @@ struct LevelTable: View {
     }
     func distColor(_ v: Double) -> Color { v > -30 ? badColor : v > -40 ? warnColor : goodColor }
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
+            MeterBridge {
                 ForEach(readings) { r in
-                    GridRow {
-                        Text(r.label).bold()
-                        GeometryReader { g in
-                            let frac = max(0, min(1, (r.peakDBFS + 60) / 60))
-                            ZStack(alignment: .leading) {
-                                RoundedRectangle(cornerRadius: 3).fill(Color.secondary.opacity(0.15))
-                                RoundedRectangle(cornerRadius: 3).fill(meterColor(r)).frame(width: g.size.width * frac)
-                                Rectangle().fill(Color.primary.opacity(0.6)).frame(width: 2).offset(x: g.size.width * 0.9 - 1)
-                            }
-                        }.frame(width: 200, height: 12)
-                        Text(String(format: "%.1f dBFS", r.peakDBFS)).monospacedDigit()
-                        let a = advice(r)
-                        Pill(text: a.0, color: a.1)
-                        if r.label == "Reference" {
-                            Text("")
-                        } else {
+                    // 0 VU is this input's target: changeDB is how far the preamp must move to reach it.
+                    MeterModule(label: r.label, vu: r.peakDBFS < -60 ? nil : -r.changeDB,
+                                dbfs: String(format: "%.1f dBFS", r.peakDBFS), clipped: r.clipped, advice: advice(r)) {
+                        if r.label != "Reference" {
                             HStack(spacing: 6) {
                                 Pill(text: String(format: "H2 %.0f", r.h2), color: distColor(r.h2))
                                 Pill(text: String(format: "H3 %.0f", r.h3), color: distColor(r.h3))
@@ -294,10 +267,11 @@ struct LevelTable: View {
                         if let n = m.noise[r.channel] {
                             Pill(text: m.noiseNote(r.channel) == nil ? "quiet" : "noisy \(Int(n.rounded()))", color: m.noiseNote(r.channel) == nil ? goodColor : warnColor)
                                 .help(m.noiseNote(r.channel) ?? String(format: "Room noise %.0f dBFS", n))
-                        } else { Text("") }
+                        }
                     }
                 }
             }
+            Note("0 VU on each meter is that input's target level (sweep peak \(Int(readings.first?.target.rounded() ?? -6)) dBFS). Within ±3 VU is OK. The figure under each meter is the peak in dBFS.")
             ForEach(readings.compactMap { m.noiseNote($0.channel) }, id: \.self) { Note($0, color: warnColor) }
         }
     }
@@ -313,11 +287,11 @@ struct CabCaptureStep: View {
             TargetsPicker()
             AdvancedOutput()
             PreflightList(items: m.preflight)
-            HStack {
+            HStack(spacing: 14) {
                 Button("Capture") { m.startCapture() }
-                    .buttonStyle(.borderedProminent).tint(lamp).controlSize(.large)
+                    .buttonStyle(KeyButtonStyle(lit: m.busy?.progress != nil, size: 16, big: true))
                     .disabled(m.busy != nil || m.captureProblem != nil)
-                if let p = m.captureProblem, m.busy == nil { Note(p, color: warnColor) }
+                if let p = m.captureProblem, m.busy == nil { WarningTag(text: p) }
             }
             BusyLine()
         }
@@ -328,17 +302,12 @@ struct PreflightList: View {
     let items: [PreflightItem]
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("BEFORE YOU CAPTURE").font(.caption.weight(.semibold)).kerning(0.8).foregroundStyle(.secondary)
+            Engraved("Before you capture")
             ForEach(items) { i in
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Image(systemName: i.level == .ok ? "checkmark.circle.fill" : i.level == .warn ? "exclamationmark.triangle.fill" : "xmark.octagon.fill")
-                        .foregroundStyle(i.level == .ok ? goodColor : i.level == .warn ? warnColor : badColor)
-                    Text(i.text).fixedSize(horizontal: false, vertical: true)
-                }.font(.callout)
+                StatusLine(text: i.text, color: i.level == .ok ? goodColor : i.level == .warn ? warnColor : badColor, diameter: 13)
             }
         }
-        .padding(10).frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 6).fill(Color.secondary.opacity(0.08)))
+        .onPaper()
     }
 }
 
@@ -349,22 +318,21 @@ struct CabImportSteps: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             Step(n: 1, title: "Test signal", subtitle: "Save the sweeps for playback from the DAW. Select the sample rate of the DAW project.") {
-                HStack(spacing: 16) {
-                    Picker("Capture rate", selection: $m.logicRate) {
-                        ForEach(CoreAudioHelper.captureRates, id: \.self) { Text("\(rateTag($0).dropLast()) kHz").tag($0) }
-                    }.frame(width: 200)
+                HStack(spacing: 18) {
+                    GlassMenu(title: "Capture rate", selection: $m.logicRate,
+                              options: CoreAudioHelper.captureRates.map { ($0, "\(rateTag($0).dropLast()) kHz") })
                     LevelPicker()
                 }
                 SweepSettings()
                 HStack {
-                    Button("Save test signal…") { m.saveTestSignal() }.buttonStyle(.borderedProminent).tint(lamp)
+                    Button("Save test signal…") { m.saveTestSignal() }.buttonStyle(KeyButtonStyle(size: 13))
                     Button("Load settings from a test signal…") { m.loadSignalSettings() }
                 }
                 Note(m.signalMessage ?? "Use the same settings when the recordings are added in step 3. The settings are saved.")
             }
 
             Step(n: 2, title: "Record in your DAW", subtitle: "The steps apply to any DAW. Menu names below are from Logic.") {
-                WiringDiagram(wiring: .cabRef, compact: true)
+                WiringDiagram(wiring: .cabRef, compact: true).onPaper()
                 Checklist(items: [
                     "Set the project to the capture rate above. Drag the sweep WAV onto a new audio track at the start (bar 1 in Logic).",
                     "Route that track only to the interface output connected to the amp FX return or a clean power amp (not the guitar input). Mute the studio monitors. Otherwise the room mic records them.",
@@ -376,13 +344,7 @@ struct CabImportSteps: View {
             }
 
             Step(n: 3, title: "Make the IRs", subtitle: "Add the exported WAV files, check the names, and click Make IRs.") {
-                VStack(spacing: 6) {
-                    Text("Drag the exported WAV files here").bold()
-                    Button("or choose them…") { m.chooseLogicFiles() }.buttonStyle(.link)
-                    Text("If the sweep track file is included, it is skipped automatically.").font(.callout).foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity).padding(.vertical, 18)
-                .background(RoundedRectangle(cornerRadius: 6).strokeBorder(dropping ? lamp : Color.secondary.opacity(0.4), style: StrokeStyle(lineWidth: 2, dash: [6])))
+                DropPlate(dropping: dropping, note: "If the sweep track file is included, it is skipped automatically.") { m.chooseLogicFiles() }
                 .onDrop(of: [.fileURL], isTargeted: $dropping) { providers in
                     for p in providers {
                         _ = p.loadObject(ofClass: URL.self) { url, _ in
@@ -396,11 +358,11 @@ struct CabImportSteps: View {
                 CaptureNameFields()
                 TargetsPicker()
                 AdvancedOutput()
-                HStack {
+                HStack(spacing: 14) {
                     Button("Make IRs") { m.processLogic() }
-                        .buttonStyle(.borderedProminent).tint(lamp).controlSize(.large)
+                        .buttonStyle(KeyButtonStyle(lit: m.busy != nil, size: 16, big: true))
                         .disabled(m.busy != nil || m.logicProblem != nil)
-                    if let p = m.logicProblem, m.busy == nil, !m.logicChannels.isEmpty { Note(p, color: warnColor) }
+                    if let p = m.logicProblem, m.busy == nil, !m.logicChannels.isEmpty { WarningTag(text: p) }
                 }
                 BusyLine()
             }
@@ -413,27 +375,44 @@ struct LogicGrid: View {
     var body: some View {
         Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 8) {
             GridRow {
-                Text("FILE").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                Text("MIC NAME").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                Text("ROLE").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                Engraved("File", size: 10, dim: true)
+                Engraved("Mic name", size: 10, dim: true)
+                Engraved("Role", size: 10, dim: true)
                 Text("")
             }
             ForEach($m.logicChannels) { $c in
                 GridRow {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(c.label).font(.system(.callout, design: .monospaced)).lineLimit(1).truncationMode(.middle)
-                        Text(c.meta).font(.caption).foregroundStyle(.secondary)
-                    }.frame(maxWidth: 280, alignment: .leading)
+                        GlassWindow(size: 12) { Text(c.label).font(.swellMono(11)).truncationMode(.middle) }
+                        Note(c.meta)
+                    }.frame(maxWidth: 260, alignment: .leading)
                     MicNameField(name: $c.name, disabled: c.role != .mic)
-                    Picker("", selection: Binding(get: { c.role }, set: { m.setLogicRole($0, for: c.id) })) {
-                        Text("Mic").tag(Role.mic); Text("Reference").tag(Role.ref); Text("Skip").tag(Role.off)
-                    }.labelsHidden().frame(width: 130)
+                    KeyChoice(selection: Binding(get: { c.role }, set: { m.setLogicRole($0, for: c.id) }),
+                              options: [(Role.mic, "Mic"), (Role.ref, "Ref"), (Role.off, "Skip")], size: 10)
                     if c.channel == 0 {
-                        Button { m.removeLogicFile(c.url) } label: { Image(systemName: "xmark.circle") }.buttonStyle(.borderless).help("Remove this file")
+                        Button("Remove") { m.removeLogicFile(c.url) }.buttonStyle(KeyButtonStyle(size: 10)).help("Remove this file")
                     } else { Text("") }
                 }
             }
         }
+    }
+}
+/// The drop zone: a dimmed plate with a warm edge, a tag saying what to drop, and a key to choose the files instead.
+struct DropPlate: View {
+    let dropping: Bool
+    let note: String
+    let choose: () -> Void
+    var body: some View {
+        VStack(spacing: 10) {
+            Engraved("Drop to load: the exported WAV files", size: 12).onPaper(padding: 8, fill: false)
+            Button("Choose files…") { choose() }
+            Note(note)
+        }
+        .frame(maxWidth: .infinity).padding(.vertical, 20)
+        .background(RoundedRectangle(cornerRadius: 6).fill(Color.black.opacity(dropping ? 0.55 : 0.35)))
+        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(dropping ? Swell.amber : Swell.crinkleSub.opacity(0.5),
+                                                                   style: StrokeStyle(lineWidth: dropping ? 2.5 : 1.5, dash: dropping ? [] : [6])))
+        .shadow(color: dropping ? Swell.amber.opacity(0.35) : .clear, radius: 8)
     }
 }
 #endif

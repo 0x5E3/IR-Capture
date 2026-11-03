@@ -103,6 +103,7 @@ enum Support {
         let small: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 11), .foregroundColor: NSColor.secondaryLabelColor]
         credits.append(NSAttributedString(string: "Guitar cab impulse responses and NAM amp captures, recorded through a standard audio interface.\n\n", attributes: small))
         credits.append(NSAttributedString(string: "Method: exponential sine sweeps (Farina), averaged, with harmonic distortion windowed out. With a reference tap, each IR is the response from speaker-terminal voltage to microphone.\n\n", attributes: small))
+        credits.append(NSAttributedString(string: "Fonts: Barlow and Barlow Semi Condensed (© 2017 The Barlow Project Authors), B612 Mono (© 2012 The B612 Project Authors), Nixie One (© 2011 Jovanny Lemonad), under the SIL Open Font License 1.1. The licence texts are in the app bundle, Contents/Resources/SwellKit/fonts.\n\n", attributes: small))
         credits.append(NSAttributedString(string: "Support: \(Product.supportEmail)\n", attributes: small))
         var link = small; link[.link] = Product.website
         credits.append(NSAttributedString(string: "swellamps.com", attributes: link))

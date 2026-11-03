@@ -14,6 +14,7 @@ let micColors: [Color] = [Color(red: 0.92, green: 0.6, blue: 0.24), Color(red: 0
 @main
 struct IRCaptureApp: App {
     @StateObject private var model = AppModel()
+    init() { SwellKit.registerFonts() }
     var body: some Scene {
         WindowGroup(Product.name) {
             ContentView().environmentObject(model)
@@ -45,36 +46,35 @@ struct ContentView: View {
     @EnvironmentObject var m: AppModel
     var body: some View {
         VStack(spacing: 0) {
-            Picker("", selection: $m.job) {
-                Text("Cab IR").tag(Job.cab)
-                Text("Amp (NAM)").tag(Job.nam)
-            }
-            .pickerStyle(.segmented).labelsHidden().frame(maxWidth: 360).padding(.top, 12).padding(.bottom, 4)
-            .disabled(m.busy != nil)
-            Text(m.job == .cab ? "Record the speaker cab's impulse response." : "Record the amp for a NAM model, trained at TONE3000.")
-                .font(.callout).foregroundStyle(.secondary).padding(.bottom, 10)
-            Divider()
-            ScrollViewReader { proxy in
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 18) {
-                        if m.job == .nam {
-                            NAMJob()
-                            if let r = m.namResult { NAMResultsView(r: r).id("namresults") }
-                        } else {
-                            CabJob()
-                            if let r = m.result { ResultsView(r: r).id("results") }
+            Shelf()
+            StageOpening {
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 18) {
+                            Text(m.job == .cab ? "Record the speaker cab's impulse response." : "Record the amp for a NAM model, trained at TONE3000.")
+                                .font(.swellBody(14, semibold: true)).onPaper(padding: 9, fill: false)
+                            if m.job == .nam {
+                                NAMJob()
+                                if let r = m.namResult { NAMResultsView(r: r).id("namresults") }
+                            } else {
+                                CabJob()
+                                if let r = m.result { ResultsView(r: r).id("results") }
+                            }
                         }
+                        .padding(22).frame(maxWidth: 900, alignment: .leading).frame(maxWidth: .infinity)
                     }
-                    .padding(22).frame(maxWidth: 900, alignment: .leading).frame(maxWidth: .infinity)
+                    .onChange(of: m.result?.folder) { _ in withAnimation { proxy.scrollTo("results", anchor: .top) } }
+                    .onChange(of: m.namResult?.folder) { _ in withAnimation { proxy.scrollTo("namresults", anchor: .top) } }
                 }
-                .onChange(of: m.result?.folder) { _ in withAnimation { proxy.scrollTo("results", anchor: .top) } }
-                .onChange(of: m.namResult?.folder) { _ in withAnimation { proxy.scrollTo("namresults", anchor: .top) } }
             }
+            .padding(.horizontal, 24).padding(.bottom, 22)
         }
-        .sheet(isPresented: $m.showWelcome) { WelcomeSheet().environmentObject(m) }
-        .sheet(item: $m.helpPage) { p in HelpSheet(page: p).environmentObject(m) }
+        .background(WorkshopWall())
+        .workshopDefaults()
+        .sheet(isPresented: $m.showWelcome) { WelcomeSheet().environmentObject(m).workshopDefaults(.panel) }
+        .sheet(item: $m.helpPage) { p in HelpSheet(page: p).environmentObject(m).workshopDefaults(.panel) }
         .sheet(isPresented: Binding(get: { m.reexportFolder != nil }, set: { if !$0 { m.reexportFolder = nil } })) {
-            ReexportSheet().environmentObject(m)
+            ReexportSheet().environmentObject(m).workshopDefaults(.panel)
         }
         .onAppear { runAutomation() }
     }
@@ -127,7 +127,60 @@ struct ContentView: View {
     }
 }
 
+// ------------------------------------------------------------------ the shelf
+/// The oak shelf across the top: the job keys, the pilot lamp with its words, the Help key.
+struct Shelf: View {
+    @EnvironmentObject var m: AppModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var pulse = false
+    var status: (Lamp.Glow, String) {
+        if m.errorText != nil || m.levelError != nil || m.namError != nil || m.namLevelError != nil { return (.red, "Error: see the message") }
+        if let b = m.busy {
+            switch b {
+            case .preparing: return (.amber, "Preparing")
+            case .recording, .namRecording: return (.amber, "Recording")
+            case .processing: return (.amber, "Processing")
+            }
+        }
+        if m.levelRunning || m.namLevelRunning { return (.amber, "Checking levels") }
+        return (.off, "Ready")
+    }
+    var body: some View {
+        let st = status
+        ZStack(alignment: .topLeading) {
+            FrameStrip(name: "frame-plank", height: 53.75).padding(.top, 56)
+            FrameStrip(name: "frame-trim-top", height: 21.88).padding(.top, 97)
+            HStack(alignment: .top, spacing: 16) {
+                ShelfBox {
+                    Button("Cab IR") { m.job = .cab }.buttonStyle(KeyButtonStyle(lit: m.job == .cab, size: 13))
+                    Button("Amp NAM") { m.job = .nam }.buttonStyle(KeyButtonStyle(lit: m.job == .nam, size: 13))
+                }
+                .disabled(m.busy != nil)
+                Spacer(minLength: 0)
+                ShelfBox {
+                    Lamp(state: st.0, size: 46)
+                        .opacity(st.0 == .amber && pulse ? 0.72 : 1)
+                    GlassWindow(size: 13) { Text(st.1).textCase(.uppercase).tracking(1.4).frame(minWidth: 150, alignment: .leading) }
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Status: \(st.1)")
+                Spacer(minLength: 0)
+                ShelfBox {
+                    Button("Help") { m.helpPage = .quickStart }.buttonStyle(KeyButtonStyle(size: 13))
+                }
+            }
+            .padding(.horizontal, 26).padding(.top, 2)
+        }
+        .frame(height: 119, alignment: .top)
+        .onAppear {
+            guard !reduceMotion else { return }
+            withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) { pulse = true }
+        }
+    }
+}
+
 // ------------------------------------------------------------------ building blocks
+/// One step: a hammertone panel, its title engraved, a jewel for its state (amber: to do; green: done).
 struct Step<Content: View>: View {
     let n: Int
     let title: String
@@ -135,115 +188,137 @@ struct Step<Content: View>: View {
     var done = false
     @ViewBuilder let content: Content
     var body: some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    ZStack {
-                        Circle().fill(done ? goodColor : lamp).frame(width: 24, height: 24)
-                        if done { Image(systemName: "checkmark").font(.system(size: 12, weight: .bold)).foregroundStyle(.white) }
-                        else { Text("\(n)").font(.system(size: 14, weight: .bold)).foregroundStyle(.black) }
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .center, spacing: 12) {
+                JewelLamp(colour: done ? "green" : "amber", on: true, diameter: 26)
+                    .accessibilityLabel(done ? "Done" : "To do")
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Engraved("Step \(n)", size: 10, dim: true)
+                        Engraved(title, size: 17)
                     }
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(title.uppercased()).font(.system(size: 15, weight: .semibold)).kerning(0.8)
-                        if let s = subtitle { Text(s).foregroundStyle(.secondary) }
-                    }
+                    if let s = subtitle { Text(s).font(.swellBody(13)).fixedSize(horizontal: false, vertical: true) }
                 }
-                content
             }
-            .padding(8).frame(maxWidth: .infinity, alignment: .leading)
+            content
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .onPanel()
     }
 }
 
-/// The Connect → Set levels → Capture → Results strip at the top of each job.
+/// The steps of a job as indicator lamps with engraved legends: green when done, unlit when not.
 struct JobStepper: View {
     let steps: [(String, Bool)]
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 18) {
             ForEach(Array(steps.enumerated()), id: \.offset) { i, s in
-                if i > 0 { Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary) }
-                HStack(spacing: 5) {
-                    Image(systemName: s.1 ? "checkmark.circle.fill" : "\(i + 1).circle")
-                        .foregroundStyle(s.1 ? goodColor : Color.secondary)
-                    Text(s.0).foregroundStyle(s.1 ? Color.primary : Color.secondary)
+                HStack(spacing: 7) {
+                    JewelLamp(colour: "green", on: s.1, diameter: 18)
+                    Engraved(s.0, size: 11, dim: !s.1)
                 }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Step \(i + 1), \(s.0): \(s.1 ? "done" : "not done")")
             }
         }
-        .font(.callout.weight(.medium))
-        .padding(.horizontal, 12).padding(.vertical, 8)
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.08)))
+        .padding(.horizontal, 6).padding(.vertical, 2)
+        .onPanel(padding: 12)
     }
 }
 
 struct Note: View {
     let text: String
     var color: Color = .secondary
+    @Environment(\.swellSurface) private var surface
     init(_ t: String, color: Color = .secondary) { text = t; self.color = color }
-    var body: some View { Text(text).font(.callout).foregroundStyle(color).fixedSize(horizontal: false, vertical: true) }
+    var body: some View {
+        Text(text).font(.swellBody(13)).foregroundColor(surface.tone(color)).fixedSize(horizontal: false, vertical: true)
+    }
 }
 
-/// An error line. If the fix is in Audio MIDI Setup, it carries a button that opens it.
+/// An error, on a tag with a red title. If the fix is in Audio MIDI Setup or Privacy & Security, its key opens it.
 struct ErrorNote: View {
     let text: String
     init(_ t: String) { text = t }
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Note(text, color: badColor)
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(spacing: 7) {
+                JewelLamp(colour: "red", on: true, diameter: 14)
+                Engraved("Error", size: 11)
+            }
+            Text(text).font(.swellBody(13, semibold: true)).foregroundColor(Swell.tagError).fixedSize(horizontal: false, vertical: true)
             HStack {
                 if text.contains("Audio MIDI Setup") { Button("Open Audio MIDI Setup") { CoreAudioHelper.openAudioMIDISetup() } }
                 if text.contains("Privacy & Security") { Button("Open Privacy & Security") { NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")!) } }
             }
         }
+        .onPaper(padding: 11)
     }
 }
 
+/// Numbered instructions, printed on a card.
 struct Checklist: View {
     let items: [String]
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
             ForEach(Array(items.enumerated()), id: \.offset) { i, t in
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text("\(i + 1).").bold().foregroundStyle(lamp).frame(width: 20, alignment: .trailing)
-                    Text(t).fixedSize(horizontal: false, vertical: true)
+                    Text("\(i + 1).").font(.swellBody(13, semibold: true)).foregroundColor(Swell.tagError).frame(width: 20, alignment: .trailing)
+                    Text(t).font(.swellBody(13)).fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
+        .onPaper()
     }
 }
 
+/// A figure with its status (was a coloured pill): a jewel and a small glass window.
 struct Pill: View {
     let text: String
     let color: Color
-    var body: some View {
-        Text(text).font(.caption.weight(.semibold)).padding(.horizontal, 8).padding(.vertical, 3)
-            .background(Capsule().fill(color.opacity(0.18))).foregroundStyle(color)
-    }
+    var body: some View { StatusWindow(text: text, color: color) }
 }
 
+/// A printed aside: a card with a heading.
 struct Aside<Content: View>: View {
     let title: String
     @ViewBuilder let content: Content
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(title.uppercased()).font(.caption.weight(.semibold)).kerning(0.8).foregroundStyle(.secondary)
+            Engraved(title, size: 11)
             content
         }
-        .padding(12).frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 6).fill(Color.secondary.opacity(0.1)))
+        .onPaper()
     }
 }
 
+/// Progress of a capture or processing: the seconds left on nixie tubes while recording, the words beside them.
 struct BusyLine: View {
     @EnvironmentObject var m: AppModel
+    var secondsLeft: Int? {
+        switch m.busy {
+        case .some(.recording(let p)): return Int(((1 - p) * m.signalSeconds).rounded(.up))
+        case .some(.namRecording(let p)): return Int(((1 - p) * 192).rounded(.up))
+        default: return nil
+        }
+    }
     var body: some View {
         if let b = m.busy {
-            VStack(alignment: .leading, spacing: 6) {
-                if let p = b.progress { ProgressView(value: p).tint(lamp) } else { ProgressView().controlSize(.small) }
-                HStack {
-                    Text(b.text).foregroundStyle(.secondary)
-                    Spacer()
-                    if b.progress != nil { Button("Stop") { m.cancelCapture() } }
+            HStack(alignment: .center, spacing: 14) {
+                if let s = secondsLeft {
+                    VStack(spacing: 3) {
+                        NixieReadout(value: s)
+                        Engraved("Seconds left", size: 9, dim: true)
+                    }
                 }
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 8) {
+                        JewelLamp(colour: "amber", on: true, diameter: 14)
+                        Text(b.text)
+                    }
+                    if let p = b.progress { ProgressView(value: p).tint(Swell.amber) } else { ProgressView().controlSize(.small) }
+                }
+                if b.progress != nil { Button("Stop") { m.cancelCapture() }.buttonStyle(KeyButtonStyle(lit: true, size: 13)) }
             }
         }
         if let e = m.errorText { ErrorNote(e) }
@@ -271,9 +346,7 @@ struct SweepSettings: View {
 struct LevelPicker: View {
     @EnvironmentObject var m: AppModel
     var body: some View {
-        Picker("Sweep level", selection: $m.level) {
-            ForEach([-6.0, -12, -18, -24], id: \.self) { Text("\(Int($0)) dBFS").tag($0) }
-        }.frame(width: 200)
+        GlassMenu(title: "Sweep level", selection: $m.level, options: [-6.0, -12, -18, -24].map { ($0, "\(Int($0)) dBFS") })
     }
 }
 
@@ -283,7 +356,7 @@ struct TargetsPicker: View {
     func row(_ t: ExportTarget) -> some View {
         VStack(alignment: .leading, spacing: 1) {
             Toggle(t.title, isOn: on(t.id)).toggleStyle(.checkbox).fontWeight(t.id == "universal" ? .semibold : .regular)
-            Text(t.detail).font(.caption).foregroundStyle(.secondary).padding(.leading, 20).fixedSize(horizontal: false, vertical: true)
+            Note(t.detail).padding(.leading, 20)
         }
     }
     func on(_ id: String) -> Binding<Bool> {
@@ -291,10 +364,10 @@ struct TargetsPicker: View {
     }
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("FILES TO MAKE").font(.caption.weight(.semibold)).kerning(0.8).foregroundStyle(.secondary)
+            Engraved("Files to make")
             ForEach(ExportTarget.destinations) { t in row(t) }
             Note("For unlisted devices (Quad Cortex, ToneX, Fractal, Kemper Cab Maker…), use Universal. These manufacturers do not publish a fixed format. Conversion is done by their software on import.")
-            Text("ALSO MAKE").font(.caption.weight(.semibold)).kerning(0.8).foregroundStyle(.secondary).padding(.top, 4)
+            Engraved("Also make").padding(.top, 4)
             ForEach(ExportTarget.extras) { t in row(t) }
             Note("Made for each single-file set selected above (Universal, Strymon Iridium). A mic named Room or Amb (Room L, Ambient…) is treated as a room mic. Room mics have no minimum-phase version and are mixed with close mics at 80/20 and 60/40.")
         }
@@ -357,10 +430,12 @@ struct AdvancedOutput: View {
 struct SaveFolderRow: View {
     @EnvironmentObject var m: AppModel
     var body: some View {
-        HStack {
-            Text("Save to").foregroundStyle(.secondary)
-            Text(m.outputFolder.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
-                .font(.system(.body, design: .monospaced)).lineLimit(1).truncationMode(.middle)
+        HStack(spacing: 10) {
+            Engraved("Save to")
+            GlassWindow(size: 12) {
+                Text(m.outputFolder.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
+                    .font(.swellBody(13)).truncationMode(.middle).frame(maxWidth: 420, alignment: .leading)
+            }
             Button("Change…") { m.chooseOutputFolder() }
         }
     }
@@ -371,16 +446,15 @@ struct CaptureNameFields: View {
     var withNotes = true
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Capture name").foregroundStyle(.secondary)
-                TextField("e.g. 412_V30_PosA", text: $m.captureName).frame(maxWidth: 320)
+            HStack(spacing: 10) {
+                Engraved("Capture name")
+                GlassField(placeholder: "e.g. 412_V30_PosA", text: $m.captureName).frame(maxWidth: 320)
             }
             Note("Cab and mic position, e.g. 412_V30_PosA. All file names start with this name.")
             if withNotes {
-                HStack(alignment: .firstTextBaseline) {
-                    Text("Notes").foregroundStyle(.secondary)
-                    TextField("Mic positions, distances, amp settings… (saved in report.json)", text: $m.notes, axis: .vertical)
-                        .lineLimit(1...3)
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    Engraved("Notes")
+                    GlassField(placeholder: "Mic positions, distances, amp settings… (saved in report.json)", text: $m.notes, vertical: true)
                 }
             }
             SaveFolderRow()
@@ -388,23 +462,53 @@ struct CaptureNameFields: View {
     }
 }
 
-/// A text field with a menu of common mic names next to it (names become file names).
+/// A mic name in a glass window, with a menu of common names on its chevron (names become file names).
 struct MicNameField: View {
     @Binding var name: String
     var disabled = false
     var body: some View {
-        HStack(spacing: 4) {
-            TextField("SM57, R121, Room…", text: $name).frame(width: 180).disabled(disabled)
-            Menu {
-                ForEach(commonMicNames, id: \.self) { n in Button(n) { name = n } }
-            } label: { Image(systemName: "chevron.down") }
-            .menuStyle(.borderlessButton).menuIndicator(.hidden).frame(width: 26).disabled(disabled)
-            .help("Common mic names")
+        HStack(spacing: 0) {
+            GlassWindow(size: 13) {
+                HStack(spacing: 6) {
+                    TextField("SM57, R121, Room…", text: $name).textFieldStyle(.plain)
+                        .font(.swellLegend(13)).foregroundColor(Swell.amber)
+                    Button {
+                        PopUpMenu.show(commonMicNames.map { n in (title: n, checked: n == name, action: { name = n }) })
+                    } label: { GlassChevron().padding(4).contentShape(Rectangle()) }
+                    .buttonStyle(.plain)
+                    .help("Common mic names")
+                    .accessibilityLabel("Common mic names")
+                }
+            }
+            .frame(width: 200)
         }
+        .disabled(disabled)
+        .opacity(disabled ? 0.5 : 1)
     }
 }
 
 // ------------------------------------------------------------------ results
+/// Mic colours lifted for the dark instrument screen.
+func screenColor(_ i: Int) -> Color {
+    let c = NSColor(micColors[i % micColors.count]).usingColorSpace(.sRGB) ?? .white
+    return Color(.sRGB, red: c.redComponent * 0.75 + 0.25, green: c.greenComponent * 0.75 + 0.25, blue: c.blueComponent * 0.75 + 0.25)
+}
+
+/// A warning on a tag (red title for the one that means "record again").
+struct WarningTag: View {
+    let text: String
+    var severe = false
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            JewelLamp(colour: severe ? "red" : "amber", on: true, diameter: 13)
+            Text(text).font(.swellBody(13, semibold: severe))
+                .foregroundColor(severe ? Swell.tagError : Swell.tagInk)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .onPaper(padding: 10)
+    }
+}
+
 struct ResultsView: View {
     @EnvironmentObject var m: AppModel
     let r: ResultSummary
@@ -414,51 +518,56 @@ struct ResultsView: View {
         return (r.warnings.count == 1 ? "Good: 1 item to check" : "Check \(r.warnings.count) items", warnColor)
     }
     var body: some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 12) {
+                Engraved("Results", size: 17)
+                GlassWindow(size: 14) { Text(r.title) }
+                Spacer()
+                StatusLine(text: quality.0, color: quality.1, diameter: 20).font(.swellLegend(14))
+            }
+            ForEach(r.warnings, id: \.self) { w in WarningTag(text: w, severe: r.droppedOut && w == r.warnings.first) }
+            if r.droppedOut {
                 HStack {
-                    Text("RESULTS: \(r.title)").font(.system(size: 15, weight: .semibold)).kerning(0.8)
-                    Spacer()
-                    Pill(text: quality.0, color: quality.1)
+                    Button("Record again") { m.startCapture() }.buttonStyle(KeyButtonStyle(size: 13))
+                        .disabled(m.busy != nil || m.captureProblem != nil)
+                    Note("Quit other apps first (browsers, video calls, other audio software).")
                 }
-                ForEach(r.warnings, id: \.self) { w in
-                    Text(w).padding(.horizontal, 10).padding(.vertical, 7).frame(maxWidth: .infinity, alignment: .leading)
-                        .background((r.droppedOut && w == r.warnings.first ? badColor : warnColor).opacity(0.15))
-                        .overlay(Rectangle().fill(r.droppedOut && w == r.warnings.first ? badColor : warnColor).frame(width: 3), alignment: .leading)
+            }
+            if !r.referenced { Note("No reference tap was used. These IRs include the power amp response.") }
+            ForEach(r.polarityNotes, id: \.self) { n in Note("Polarity: " + n, color: .primary) }
+            ForEach(r.exportNotes, id: \.self) { n in Note(n, color: .primary) }
+            if !r.topFiles.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    Engraved("Load these")
+                    ForEach(r.topFiles, id: \.self) { f in GlassWindow(size: 12) { Text(f).font(.swellMono(12)) } }
+                    Note("48 kHz, 24-bit, 500 ms. Compatible with IR loaders, DAW plug-ins and modelers. Other formats are in More formats.")
                 }
-                if r.droppedOut {
-                    HStack {
-                        Button("Record again") { m.startCapture() }.buttonStyle(.borderedProminent).tint(lamp)
-                            .disabled(m.busy != nil || m.captureProblem != nil)
-                        Note("Quit other apps first (browsers, video calls, other audio software).")
+            }
+            DiagnosticsTable(r: r)
+            Engraved("Frequency response, 1/6 octave")
+            FaceplateScreen {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 14) {
+                        ForEach(Array(r.names.enumerated()), id: \.offset) { i, n in
+                            HStack(spacing: 5) {
+                                RoundedRectangle(cornerRadius: 2).fill(screenColor(i)).frame(width: 10, height: 10)
+                                Text(n).font(.swellLegend(12)).foregroundColor(Color(swellHex: 0xCFE3D6))
+                            }
+                        }
                     }
+                    ResponsePlot(fc: r.curves.fc, curves: r.names.map { r.curves.curves[$0] ?? [] }, onScreen: true).frame(height: 300)
                 }
-                if !r.referenced { Note("No reference tap was used. These IRs include the power amp response.") }
-                ForEach(r.polarityNotes, id: \.self) { n in Note("Polarity: " + n, color: .primary) }
-                ForEach(r.exportNotes, id: \.self) { n in Note(n, color: .primary) }
-                if !r.topFiles.isEmpty {
-                    Aside(title: "Load these") {
-                        ForEach(r.topFiles, id: \.self) { f in Text(f).font(.system(.callout, design: .monospaced)) }
-                        Note("48 kHz, 24-bit, 500 ms. Compatible with IR loaders, DAW plug-ins and modelers. Other formats are in More formats.")
-                    }
-                }
-                DiagnosticsTable(r: r)
-                Text("FREQUENCY RESPONSE, 1/6 OCTAVE").font(.caption.weight(.semibold)).kerning(0.8).foregroundStyle(.secondary)
-                HStack(spacing: 14) {
-                    ForEach(Array(r.names.enumerated()), id: \.offset) { i, n in
-                        HStack(spacing: 5) { RoundedRectangle(cornerRadius: 2).fill(micColors[i % micColors.count]).frame(width: 10, height: 10); Text(n) }
-                    }
-                }
-                ResponsePlot(fc: r.curves.fc, curves: r.names.map { r.curves.curves[$0] ?? [] }).frame(height: 300)
-                HStack {
-                    Button("Show in Finder") { m.revealResult() }.buttonStyle(.borderedProminent).tint(lamp)
-                    Button("Re-export…") { m.reexportMessage = nil; m.reexportFolder = r.folder }
-                        .help("Make other formats from the raw take of this capture without a new recording")
-                    Text("\(r.fileCount) IR files, README.txt and report.json in \(r.folder.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))")
-                        .font(.callout).foregroundStyle(.secondary).lineLimit(2)
-                }
-            }.padding(8)
+            }
+            HStack(spacing: 10) {
+                Button("Show in Finder") { m.revealResult() }.buttonStyle(KeyButtonStyle(size: 13))
+                Button("Re-export…") { m.reexportMessage = nil; m.reexportFolder = r.folder }
+                    .help("Make other formats from the raw take of this capture without a new recording")
+                Note("\(r.fileCount) IR files, README.txt and report.json in \(r.folder.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))")
+                    .lineLimit(2)
+            }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .onPanel()
     }
 }
 
@@ -466,22 +575,31 @@ struct ReexportSheet: View {
     @EnvironmentObject var m: AppModel
     var processing: String? { if case .processing(let t) = m.busy { return t } else { return nil } }
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("Re-export \(m.reexportFolder?.lastPathComponent ?? "")").font(.title2.weight(.semibold))
-            Note("The files are rebuilt from the raw take of this capture with the settings below. No new recording is made. Previously generated files are moved to the Trash. The raw take and report history are kept.")
-            TargetsPicker()
-            AdvancedOutput()
-            if let msg = m.reexportMessage { ErrorNote(msg) }
-            if let t = processing { HStack { ProgressView().controlSize(.small); Text(t + "…").foregroundStyle(.secondary) } }
-            HStack {
-                Spacer()
-                Button("Cancel") { m.reexportFolder = nil }.keyboardShortcut(.cancelAction)
-                Button("Re-export") { if let f = m.reexportFolder { m.reexport(f) } }
-                    .keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent).tint(lamp)
-                    .disabled(m.busy != nil || m.outputProblem != nil)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(spacing: 10) {
+                    Engraved("Re-export", size: 17)
+                    GlassWindow(size: 14) { Text(m.reexportFolder?.lastPathComponent ?? "") }
+                }
+                Note("The files are rebuilt from the raw take of this capture with the settings below. No new recording is made. Previously generated files are moved to the Trash. The raw take and report history are kept.")
+                TargetsPicker()
+                AdvancedOutput()
+                if let msg = m.reexportMessage { ErrorNote(msg) }
+                if let t = processing { StatusLine(text: t + "…", color: warnColor) }
+                HStack {
+                    Spacer()
+                    Button("Cancel") { m.reexportFolder = nil }.keyboardShortcut(.cancelAction)
+                    Button("Re-export") { if let f = m.reexportFolder { m.reexport(f) } }
+                        .keyboardShortcut(.defaultAction).buttonStyle(KeyButtonStyle(lit: processing != nil, size: 13))
+                        .disabled(m.busy != nil || m.outputProblem != nil)
+                }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .onPanel()
         }
-        .padding(24).frame(width: 600)
+        .padding(12)
+        .frame(width: 640, height: 620)
+        .background(WorkshopWall())
     }
 }
 
@@ -490,8 +608,8 @@ struct DiagnosticsTable: View {
     var body: some View {
         Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 8) {
             GridRow {
-                ForEach(["CHANNEL", "RECORDED PEAK", "NOISE FLOOR", "USABLE TAIL", "DISTORTION", "ARRIVAL"], id: \.self) {
-                    Text($0).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                ForEach(["Channel", "Recorded peak", "Noise floor", "Usable tail", "Distortion", "Arrival"], id: \.self) {
+                    Engraved($0, size: 10, dim: true)
                 }
             }
             Divider().gridCellUnsizedAxes(.horizontal)
@@ -499,17 +617,17 @@ struct DiagnosticsTable: View {
                 let d = item.diag, isRef = item.label == "reference"
                 GridRow {
                     HStack(spacing: 6) {
-                        if !isRef { RoundedRectangle(cornerRadius: 2).fill(micColors[(r.names.firstIndex(of: item.label) ?? i) % micColors.count]).frame(width: 10, height: 10) }
-                        Text(isRef ? "Reference" : item.label)
+                        if !isRef { RoundedRectangle(cornerRadius: 2).fill(screenColor(r.names.firstIndex(of: item.label) ?? i)).frame(width: 10, height: 10) }
+                        Engraved(isRef ? "Reference" : item.label, size: 12)
                     }
                     Pill(text: String(format: "%.1f dBFS", d.recordingPeakDBFS),
                          color: d.recordingPeakDBFS > -0.3 ? badColor : d.recordingPeakDBFS < -30 ? warnColor : goodColor)
-                    Text(d.noiseFloorDB.map { String(format: "%.0f dB", $0) } ?? "—").monospacedDigit()
-                    Text(d.tailAboveNoiseMs.map { String(format: "%.0f ms", $0) } ?? "—").monospacedDigit()
+                    Text(d.noiseFloorDB.map { String(format: "%.0f dB", $0) } ?? "—").font(.swellMono(12))
+                    Text(d.tailAboveNoiseMs.map { String(format: "%.0f ms", $0) } ?? "—").font(.swellMono(12))
                     if isRef { Text("—") } else if let w = d.worstHarmonic {
                         Pill(text: "H\(w.n) \(Int(w.db.rounded())) dB", color: w.db > -30 ? badColor : w.db > -40 ? warnColor : goodColor)
                     } else { Pill(text: "below noise", color: goodColor) }
-                    Text(isRef ? "—" : (d.arrivalMs.map { String(format: "%.2f ms", $0) } ?? "—") + (r.referenced || isRef ? "" : " (relative)")).monospacedDigit()
+                    Text(isRef ? "—" : (d.arrivalMs.map { String(format: "%.2f ms", $0) } ?? "—") + (r.referenced || isRef ? "" : " (relative)")).font(.swellMono(12))
                 }
             }
         }
@@ -519,30 +637,33 @@ struct DiagnosticsTable: View {
 struct ResponsePlot: View {
     let fc: [Double]
     let curves: [[Double]]
+    /// Drawn on the instrument's dark screen (dim phosphor grid, lifted mic colours).
+    var onScreen = false
     var body: some View {
         Canvas { ctx, size in
             let L = 44.0, R = 10.0, T = 8.0, B = 24.0
             let W = size.width, H = size.height
+            let ink: Color = onScreen ? Color(swellHex: 0xA9C9B6) : .secondary
             var mx = -Double.infinity
             for c in curves { for (i, v) in c.enumerated() where fc[i] >= 40 && fc[i] <= 12000 { mx = max(mx, v) } }
             if !mx.isFinite { mx = 0 }
             let top = (mx / 10).rounded(.up) * 10 + 5, bot = top - 60
             func X(_ f: Double) -> Double { L + log10(f / 20) / log10(1000) * (W - L - R) }
             func Y(_ v: Double) -> Double { T + (top - max(bot, min(top, v))) / (top - bot) * (H - T - B) }
-            ctx.fill(Path(CGRect(x: L, y: T, width: W - L - R, height: H - T - B)), with: .color(.secondary.opacity(0.08)))
-            let grid = GraphicsContext.Shading.color(.secondary.opacity(0.25))
+            if !onScreen { ctx.fill(Path(CGRect(x: L, y: T, width: W - L - R, height: H - T - B)), with: .color(.secondary.opacity(0.08))) }
+            let grid = GraphicsContext.Shading.color(onScreen ? Color(swellHex: 0x7FB79A, opacity: 0.16) : .secondary.opacity(0.25))
             for f in [20.0, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000] {
                 var p = Path(); p.move(to: CGPoint(x: X(f), y: T)); p.addLine(to: CGPoint(x: X(f), y: H - B))
                 ctx.stroke(p, with: grid, lineWidth: 1)
                 let label = f >= 1000 ? "\(Int(f / 1000))k" : "\(Int(f))"
-                ctx.draw(Text(label).font(.system(size: 10, design: .monospaced)).foregroundColor(.secondary),
+                ctx.draw(Text(label).font(onScreen ? Font.swellMono(10) : Font.system(size: 10, design: .monospaced)).foregroundColor(ink),
                          at: CGPoint(x: X(f), y: H - B + 12), anchor: f == 20 ? .leading : f == 20000 ? .trailing : .center)
             }
             var v = bot + 5
             while v <= top {
                 var p = Path(); p.move(to: CGPoint(x: L, y: Y(v))); p.addLine(to: CGPoint(x: W - R, y: Y(v)))
                 ctx.stroke(p, with: grid, lineWidth: 1)
-                ctx.draw(Text("\(Int(v - top + 5))").font(.system(size: 10, design: .monospaced)).foregroundColor(.secondary),
+                ctx.draw(Text("\(Int(v - top + 5))").font(onScreen ? Font.swellMono(10) : Font.system(size: 10, design: .monospaced)).foregroundColor(ink),
                          at: CGPoint(x: L - 6, y: Y(v)), anchor: .trailing)
                 v += 10
             }
@@ -552,9 +673,11 @@ struct ResponsePlot: View {
                     let pt = CGPoint(x: X(f), y: Y(c[i]))
                     if i == 0 { p.move(to: pt) } else { p.addLine(to: pt) }
                 }
-                ctx.stroke(p, with: .color(micColors[k % micColors.count]), style: StrokeStyle(lineWidth: 2, lineJoin: .round))
+                let col = onScreen ? screenColor(k) : micColors[k % micColors.count]
+                if onScreen { ctx.stroke(p, with: .color(col.opacity(0.35)), style: StrokeStyle(lineWidth: 5, lineJoin: .round)) }
+                ctx.stroke(p, with: .color(col), style: StrokeStyle(lineWidth: 2, lineJoin: .round))
             }
-            ctx.draw(Text("dB").font(.system(size: 10, design: .monospaced)).foregroundColor(.secondary), at: CGPoint(x: 4, y: T + 6), anchor: .leading)
+            ctx.draw(Text("dB").font(onScreen ? Font.swellMono(10) : Font.system(size: 10, design: .monospaced)).foregroundColor(ink), at: CGPoint(x: 4, y: T + 6), anchor: .leading)
         }
     }
 }

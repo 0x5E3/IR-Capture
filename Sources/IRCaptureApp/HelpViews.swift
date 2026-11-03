@@ -74,7 +74,11 @@ enum Wiring: String, CaseIterable {
 struct WiringDiagram: View {
     let wiring: Wiring
     var compact = false
+    @Environment(\.swellSurface) private var surface
+    /// On paper the diagram is a draftsman's line drawing in ink; elsewhere (the exported PNGs) it keeps its colours.
+    var ink: Bool { surface == .paper }
     func color(_ k: DiagramNode.Kind) -> Color {
+        if ink { return Swell.tagInk }
         switch k {
         case .interface: return lamp
         case .gear: return Color(red: 0.45, green: 0.5, blue: 0.58)
@@ -90,25 +94,44 @@ struct WiringDiagram: View {
                     ForEach(Array(row.enumerated()), id: \.offset) { i, n in
                         if i > 0 {
                             VStack(spacing: 1) {
-                                Text(n.via ?? "").font(.system(size: 9)).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.8)
-                                Image(systemName: "arrow.right").font(.system(size: 13, weight: .semibold)).foregroundStyle(.secondary)
+                                Text(n.via ?? "").font(ink ? Font.swellBody(10) : Font.system(size: 9)).foregroundStyle(ink ? Swell.tagInk.opacity(0.8) : Color.secondary).lineLimit(1).minimumScaleFactor(0.8)
+                                if ink { InkArrow() } else {
+                                    Image(systemName: "arrow.right").font(.system(size: 13, weight: .semibold)).foregroundStyle(.secondary)
+                                }
                             }.frame(width: compact ? 60 : 78)
                         }
                         VStack(spacing: 2) {
-                            Text(n.title).font(.system(size: compact ? 11 : 12, weight: .semibold)).multilineTextAlignment(.center)
-                            if !n.sub.isEmpty { Text(n.sub).font(.system(size: compact ? 9 : 10)).foregroundStyle(.secondary).multilineTextAlignment(.center) }
+                            Text(n.title).font(ink ? Font.swellLegend(compact ? 11 : 12) : Font.system(size: compact ? 11 : 12, weight: .semibold))
+                                .textCase(ink ? Text.Case.uppercase : nil).multilineTextAlignment(.center)
+                            if !n.sub.isEmpty {
+                                Text(n.sub).font(ink ? Font.swellBody(compact ? 10 : 11) : Font.system(size: compact ? 9 : 10))
+                                    .foregroundStyle(ink ? Swell.tagInk.opacity(0.8) : Color.secondary).multilineTextAlignment(.center)
+                            }
                         }
                         .padding(.horizontal, 6).padding(.vertical, compact ? 5 : 8)
                         .frame(width: compact ? 120 : 140)
-                        .background(RoundedRectangle(cornerRadius: 7).fill(color(n.kind).opacity(0.16)))
-                        .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(color(n.kind), lineWidth: 1.5))
+                        .background(RoundedRectangle(cornerRadius: ink ? 2 : 7).fill(ink ? Color.clear : color(n.kind).opacity(0.16)))
+                        .overlay(RoundedRectangle(cornerRadius: ink ? 2 : 7).strokeBorder(color(n.kind), lineWidth: ink ? 1.2 : 1.5))
                     }
                 }
             }
-            Text(wiring.footnote).font(.caption).foregroundStyle(.secondary)
+            Text(wiring.footnote).font(ink ? Font.swellBody(11) : Font.caption).foregroundStyle(ink ? Swell.tagInk.opacity(0.8) : Color.secondary)
         }
-        .padding(compact ? 8 : 12)
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.05)))
+        .padding(ink ? 0 : (compact ? 8 : 12))
+        .background(RoundedRectangle(cornerRadius: 8).fill(ink ? Color.clear : Color.secondary.opacity(0.05)))
+    }
+}
+
+/// An arrow drawn in ink, for the line drawings.
+struct InkArrow: View {
+    var body: some View {
+        Path { p in
+            p.move(to: CGPoint(x: 2, y: 5)); p.addLine(to: CGPoint(x: 30, y: 5))
+            p.move(to: CGPoint(x: 24, y: 1)); p.addLine(to: CGPoint(x: 30, y: 5)); p.addLine(to: CGPoint(x: 24, y: 9))
+        }
+        .stroke(Swell.tagInk, style: StrokeStyle(lineWidth: 1.3, lineCap: .round, lineJoin: .round))
+        .frame(width: 32, height: 10)
+        .accessibilityHidden(true)
     }
 }
 
@@ -140,44 +163,46 @@ struct WelcomeSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text(["Welcome to \(Product.name)", "Wiring", "Output files"][page]).font(.title.weight(.semibold))
+                Engraved(["Welcome to \(Product.name)", "Wiring", "Output files"][page], size: 20)
                 Spacer()
-                HStack(spacing: 6) { ForEach(0..<3) { i in Circle().fill(i == page ? lamp : Color.secondary.opacity(0.3)).frame(width: 8, height: 8) } }
+                HStack(spacing: 6) { ForEach(0..<3) { i in JewelLamp(colour: "amber", on: i == page, diameter: 14) } }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("Page \(page + 1) of 3")
             }
             Group {
                 if page == 0 { needs } else if page == 1 { wiring } else { gets }
             }
             .frame(maxWidth: .infinity, minHeight: 360, alignment: .topLeading)
             HStack {
-                if page > 0 { Button("Back") { page -= 1 } }
+                if page > 0 { Button("Back") { page -= 1 }.buttonStyle(KeyButtonStyle(size: 13)) }
                 Spacer()
-                if page < 2 { Button("Next") { page += 1 }.keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent).tint(lamp) }
-                else { Button("Start") { m.finishWelcome() }.keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent).tint(lamp) }
+                if page < 2 { Button("Next") { page += 1 }.keyboardShortcut(.defaultAction).buttonStyle(KeyButtonStyle(lit: true, size: 13)) }
+                else { Button("Start") { m.finishWelcome() }.keyboardShortcut(.defaultAction).buttonStyle(KeyButtonStyle(lit: true, size: 13)) }
             }
         }
-        .padding(28).frame(width: 720)
+        .onCrinkle(padding: 30)
+        .frame(width: 740)
     }
 
     var needs: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("WHAT YOU NEED").font(.caption.weight(.semibold)).kerning(0.8).foregroundStyle(.secondary)
+            Engraved("What you need")
             Checklist(items: [
                 "A Mac with macOS 13 or later.",
                 "An audio interface with at least 1 output and 1 input. With two or more inputs, several mics can be recorded at once.",
                 "Your mic(s), amp, cab and cables.",
                 "Optional: a reference (a load box with a line out, or a reference tap). For NAM captures: a reamp box, and a load box for amp-only models.",
             ])
-            Divider()
-            Text("MICROPHONE ACCESS").font(.caption.weight(.semibold)).kerning(0.8).foregroundStyle(.secondary)
+            Engraved("Microphone access").padding(.top, 6)
             Note("macOS requires permission before any app can record from an interface, including an interface with no microphones connected. \(Product.name) records the mic and reference inputs only while the test sweeps are played.", color: .primary)
             HStack {
                 switch m.micStatus {
                 case .authorized:
-                    Label("Allowed", systemImage: "checkmark.circle.fill").foregroundStyle(goodColor)
+                    StatusLine(text: "Allowed", color: goodColor)
                 case .notDetermined:
-                    Button("Allow recording…") { m.requestMicrophone() }.buttonStyle(.borderedProminent).tint(lamp)
+                    Button("Allow recording…") { m.requestMicrophone() }.buttonStyle(KeyButtonStyle(size: 13))
                 default:
-                    Note("Recording is turned off for \(Product.name).", color: badColor)
+                    StatusLine(text: "Recording is turned off for \(Product.name).", color: badColor)
                     Button("Open Privacy & Security") { m.openPrivacySettings() }
                 }
             }
@@ -188,8 +213,11 @@ struct WelcomeSheet: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 ForEach(Wiring.hookups, id: \.self) { w in
-                    Text(w.title).font(.headline)
-                    WiringDiagram(wiring: w, compact: true)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Engraved(w.title, size: 12)
+                        WiringDiagram(wiring: w, compact: true)
+                    }
+                    .onPaper()
                 }
             }
         }
@@ -216,43 +244,45 @@ struct HelpSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Picker("", selection: $page) { ForEach(HelpPage.allCases) { Text($0.title).tag($0) } }
-                    .pickerStyle(.segmented).labelsHidden().frame(maxWidth: 520)
+                KeyChoice(selection: $page, options: HelpPage.allCases.map { ($0, $0.title) }, size: 11)
                 Spacer()
-                Button("Done") { dismiss() }.keyboardShortcut(.defaultAction)
-            }.padding(16)
-            Divider()
+                Button("Done") { dismiss() }.keyboardShortcut(.defaultAction).buttonStyle(KeyButtonStyle(size: 12))
+            }.padding(.bottom, 14)
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     switch page {
                     case .quickStart: QuickStartPage()
-                    case .wiring: ForEach(Wiring.hookups, id: \.self) { w in Text(w.title).font(.headline); WiringDiagram(wiring: w) }
+                    case .wiring: ForEach(Wiring.hookups, id: \.self) { w in Text(w.title).font(.swellBody(17, semibold: true)); WiringDiagram(wiring: w) }
                     case .reference: ReferencePage()
                     case .troubleshooting: TroubleshootingPage()
                     }
-                }.padding(22).frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .font(.swellBody(14))
+                .padding(26).onPaper(padding: 0)
+                .padding(4)
             }
             HStack {
                 Button("Contact Support…") { m.contactSupport() }
                 Button("Show Log File") { Log.reveal() }
                 Spacer()
-                Text("\(Product.name) \(Product.fullVersion)").font(.caption).foregroundStyle(.secondary)
-            }.padding(12)
+                Engraved("\(Product.name) \(Product.fullVersion)", size: 10, dim: true)
+            }.padding(.top, 14)
         }
-        .frame(width: 760, height: 640)
+        .onCrinkle(padding: 22)
+        .frame(width: 780, height: 660)
     }
 }
 
 struct QuickStartPage: View {
     var body: some View {
-        Text("Your first cab IR").font(.title2.weight(.semibold))
+        Text("Your first cab IR").font(.swellBody(20, semibold: true))
         Checklist(items: [
             "Connect. Interface output → amp FX return or clean power amp → cab. Connect the mics on the cab to the interface. Set the amp master low. Mute the studio monitors.",
             "Set levels. Click Check levels. Room noise is measured for 2 seconds, a clean sweep level is set, and short sweeps are looped. Adjust each preamp until the meter shows OK.",
             "Capture. Enter a name (e.g. 412_V30_PosA) and click Capture. Duration: about 45 seconds.",
             "Results. Load the file at the top of the capture folder (one per mic) into your IR loader, DAW plug-in or modeler.",
         ])
-        Text("A NAM amp model").font(.title2.weight(.semibold)).padding(.top, 8)
+        Text("A NAM amp model").font(.swellBody(20, semibold: true)).padding(.top, 8)
         Checklist(items: [
             "Download T3K-sweep-v3.wav from tone3000.com/capture, then click Find it in Downloads in the Amp (NAM) tab.",
             "Interface output → reamp box → amp input. Amp → load box. Load box line out → interface input.",
@@ -264,16 +294,16 @@ struct QuickStartPage: View {
 
 struct ReferencePage: View {
     var body: some View {
-        Text("What the reference does").font(.title2.weight(.semibold))
+        Text("What the reference does").font(.swellBody(20, semibold: true))
         Note("A reference is a copy of the voltage across the speaker terminals. It is recorded on a separate line input during the sweep. Each mic recording is divided by the reference. The resulting IR contains the speaker, mic and room only, independent of the amp. Without a reference, the IR also contains the power amp response. With a tube amp, this adds about 5 dB of the speaker impedance peak around resonance. Most commercial IRs are made this way. The IR then includes the response of that amp.", color: .primary)
         Note("NAM: an amp-only model already contains the impedance peak, because the load box line out includes it. Use such a model with IRs made with a reference. Otherwise the peak is applied twice.", color: .primary)
-        Text("Three ways to get one").font(.title3.weight(.semibold)).padding(.top, 4)
+        Text("Three ways to get one").font(.swellBody(16, semibold: true)).padding(.top, 4)
         Checklist(items: [
             "None. Acceptable for a first capture.",
             "A load box or attenuator with a speaker-through and a line out, connected between the amp and the cab. The line out is a tap of the amp output voltage. Connect it to a line input with one cable. Turn off any cab simulation or EQ on that output. Set any attenuation to bypass for the capture.",
             "A reference tap or a home-made pad across the speaker terminals (below).",
         ])
-        Text("Build a 20 dB pad").font(.title3.weight(.semibold)).padding(.top, 4)
+        Text("Build a 20 dB pad").font(.swellBody(16, semibold: true)).padding(.top, 4)
         WiringDiagram(wiring: .pad, compact: true)
         Checklist(items: [
             "Parts: one 10 kΩ resistor (½ W, metal film), one 1.1 kΩ resistor (¼ W or more), a ¼\" jack, two clips or a speaker-cable splitter, and a small box.",
@@ -300,11 +330,11 @@ struct TroubleshootingPage: View {
         ("Microphone permission", "System Settings › Privacy & Security › Microphone: turn on \(Product.name), then quit and reopen the app."),
     ]
     var body: some View {
-        Text("Troubleshooting").font(.title2.weight(.semibold))
+        Text("Troubleshooting").font(.swellBody(20, semibold: true))
         ForEach(items.indices, id: \.self) { i in
             let t = items[i]
             VStack(alignment: .leading, spacing: 3) {
-                Text(t.0).bold()
+                Text(t.0).font(.swellBody(14, semibold: true))
                 Note(t.1, color: .primary)
                 if t.1.contains("Audio MIDI Setup") { Button("Open Audio MIDI Setup") { CoreAudioHelper.openAudioMIDISetup() }.controlSize(.small) }
             }

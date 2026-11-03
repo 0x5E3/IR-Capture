@@ -2,7 +2,7 @@ name: Build and test
 
 on:
   push:
-    branches: [main]
+    branches: [main, "preview/**"]
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
@@ -254,6 +254,19 @@ jobs:
           gh release create latest dist/IR-Capture.dmg dist/IR-Capture.zip dist/Quick-start.pdf $(ls dist/screenshot-*.png 2>/dev/null) \
             --title "IR Capture — latest build (#${{ github.run_number }})" \
             --notes "Version $(tr -d '[:space:]' < VERSION), build ${{ github.run_number }}, from ${GITHUB_SHA::7}. Download IR-Capture.dmg below, open it, and drag IR Capture to Applications. $SIGNED" \
+            --prerelease --target "$GITHUB_SHA"
+
+      - name: Publish a preview release (preview/* branches; "latest" is left alone)
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/preview/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="preview-${GITHUB_REF_NAME#preview/}"
+          cp "dist/Quick start.pdf" dist/Quick-start.pdf
+          gh release delete "$TAG" --yes --cleanup-tag || true
+          gh release create "$TAG" dist/IR-Capture.dmg dist/IR-Capture.zip dist/Quick-start.pdf $(ls dist/screenshot-*.png 2>/dev/null) \
+            --title "IR Capture — preview ${GITHUB_REF_NAME#preview/} (#${{ github.run_number }})" \
+            --notes "Preview build from branch $GITHUB_REF_NAME, ${GITHUB_SHA::7}. Not the main download: the latest release is unchanged." \
             --prerelease --target "$GITHUB_SHA"
 
       - name: Publish a versioned release (tags only)
