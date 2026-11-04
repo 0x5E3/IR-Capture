@@ -497,6 +497,9 @@ def cart_label_tex(w, h, ppcm, prog=None):
     return np.asarray(im, np.float32) / 255.0
 
 
+PAPER_LIFT = float(os.environ.get('PAPER_LIFT', '0.4'))
+
+
 def to_linear(arr):
     """sRGB-coded pixels (a PIL picture / 255) to the linear values img_tex expects. Passed as they were, a cream
     label rendered washed out and grey (the round 3 proofs, 11-04)."""
@@ -511,7 +514,11 @@ def img_plane(name, arr, w, h, x, y, z, rough=0.7):
     m = mat(name, srgb('#e8dec4'), rough=rough); nt = m.node_tree
     t = SG.img_tex(nt, name + 'tx', to_linear(arr), True, 'CLIP')
     uv = nt.nodes.new('ShaderNodeTexCoord'); nt.links.new(uv.outputs['UV'], t.inputs['Vector'])
-    nt.links.new(t.outputs['Color'], nt.nodes['Principled BSDF'].inputs['Base Color'])
+    bs = nt.nodes['Principled BSDF']
+    nt.links.new(t.outputs['Color'], bs.inputs['Base Color'])
+    # Paper under the studio light rendered as khaki (AgX and a 0.45 key on a near-white albedo); a faint self-lit
+    # share of the label's own colour brings it to the cream it is in hand. Not visible as a glow.
+    nt.links.new(t.outputs['Color'], bs.inputs['Emission Color']); bs.inputs['Emission Strength'].default_value = PAPER_LIFT
     co = obj_coords(nt); add_bump(m, noise(nt, co, 40.0, 3.0, 0.6), 0.08, 0.002)
     o.data.materials.append(m)
     return o

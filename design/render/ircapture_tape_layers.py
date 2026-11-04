@@ -350,7 +350,7 @@ def job_cart():
             gr = rbox('grip', 0.06, ch_ - 0.7, 0.05, 1.4, 0.02); gr.location = (sx0 + gx * (cw_ / 2 - 0.45 - i * 0.16), sy0 - 0.15, 0)
             gr.data.materials.append(shm)
     lw, lh = 12.6, 1.9
-    blank = np.ones((int(lh * 110), int(lw * 110), 3), np.float32) * (np.array([233, 224, 199], np.float32) / 255.0)
+    blank = np.ones((int(lh * 110), int(lw * 110), 3), np.float32) * (np.array([250, 230, 180], np.float32) / 255.0)
     T.img_plane('cartlabel', blank, lw, lh, sx0, sy0 - 0.15, 1.402)
     Dc = '#cfc9bd'
     T.ink('PLAY / RECORD', sx0 - sw / 2 + 1.6, sy0 + sh / 2 + 0.55, 0.0, 0.26, color=Dc)
@@ -502,7 +502,7 @@ def job_box():
         T.ink(B['band'], 0, H_ / 2 - 1.55, 0.012, 0.62, color='#e8dcc0', track=0.3)
         T.ink(B['sub'], 0, H_ / 2 - 2.35, 0.012, 0.26, color='#d8c8a8', track=0.25, w=W_ - 2)
         lw, lh, lx, ly = B['label']
-        blank = np.ones((int(lh * 60), int(lw * 60), 3), np.float32) * (np.array([252, 238, 200], np.float32) / 255.0)
+        blank = np.ones((int(lh * 60), int(lw * 60), 3), np.float32) * (np.array([250, 230, 180], np.float32) / 255.0)
         lab = T.img_plane('label' + key, blank, lw, lh, lx, ly, 0.004)
         lab.rotation_euler = (0, 0, math.radians(B['tilt']))
         full(s, 'box-' + key)
