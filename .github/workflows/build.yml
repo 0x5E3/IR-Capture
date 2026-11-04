@@ -6,6 +6,10 @@ on:
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
+    inputs:
+      mac_runner:
+        description: "imac (Lowell's iMac in macOS, self-hosted, label ircapture-build) or macos-15 (GitHub's Apple silicon)"
+        default: macos-15
 
 permissions:
   contents: write
@@ -16,7 +20,10 @@ concurrency:
 
 jobs:
   mac:
-    runs-on: macos-15  # the Intel runner has no Metal device, so the smoke test (SwiftUI) aborts there
+    # macos-15: the Intel runner has no Metal device, so the smoke test (SwiftUI) aborts there.
+    # The iMac (self-hosted, macOS) when asked for by hand, or for pushes when the repo variable MAC_RUNNER is imac;
+    # never for pull requests (a self-hosted runner must not run code from someone else's pull request).
+    runs-on: ${{ github.event_name != 'pull_request' && (inputs.mac_runner == 'imac' || (github.event_name == 'push' && vars.MAC_RUNNER == 'imac')) && fromJSON('["self-hosted", "macOS", "ircapture-build"]') || 'macos-15' }}
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
