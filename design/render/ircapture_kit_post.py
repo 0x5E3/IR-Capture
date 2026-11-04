@@ -305,8 +305,34 @@ def trim(which):
                               'shadow_outset_pt': {'top': 0, 'leading': x0, 'bottom': 0, 'trailing': r2(W1 / 2.4 - x1)}}
 
 
-panel('panel-fine', 'rkit-panel-fine')
-panel('panel-nam', 'rkit-panel-nam')
+for _pn in ('panel-fine', 'panel-fine-b', 'panel-nam', 'panel-nam-b'): panel(_pn, 'rkit-' + _pn)
+
+
+# (11-04) the six worn keys: key-<state>-<v>.png from ircapture_kit.py's key-<v> pieces, cropped as toolkit_post.py's
+# keys (the outline plus 0.12 cm, the camera's shortening undone), 24 and 48 px a cm: rkit-key-<state>-<v>.webp and
+# @2x, the same size and slices as rkit-key-<state> (13 px a side at 1x; the app's insets 5.42 pt)
+KLAY = {}
+for f in glob.glob(os.path.join(R, 'toolkit-keys-*.json')):
+    KLAY.update(json.load(open(f))['out'])
+
+
+def key(name):
+    L = KLAY[name]; w, h = L['cm']; (x0, y0), (x1, y1) = L['tl'], L['br']; M = 0.12
+    px = (x1 - x0) / w; mx = M * px; my = M * (y1 - y0) / h
+    W1, H1 = int(round((w + 2 * M) * OUTS[0])), int(round((h + 2 * M) * OUTS[0]))
+    for k, OUT in enumerate(OUTS):
+        a = resample(name, (x0 - mx, y0 - my, x1 + mx, y1 + my), (W1 * (k + 1), H1 * (k + 1)))
+        save(a, 'rkit-' + name + ('' if k == 0 else '@2x'))
+    META['rkit-' + name] = {'file': 'rkit-%s.webp' % name, 'x2': 'rkit-%s@2x.webp' % name, 'px': [W1, H1], 'px_per_pt': 2.4,
+                            'kind': 'nine', 'capInsets': {'top': 5.42, 'leading': 5.42, 'bottom': 5.42, 'trailing': 5.42},
+                            'resizingMode': 'stretch', 'like': 'rkit-' + name.rsplit('-', 1)[0]}
+
+
+for _k in sorted(KLAY): key(_k)
+if KLAY:
+    META['key-variants'] = {'variants': sorted({k.rsplit('-', 1)[1] for k in KLAY}),
+                            'how': 'rkit-key-<state>-<v>: one of six keys, each its own wear; pick one per button by a '
+                                   'stable hash of its label (so a button keeps its key); without them rkit-key-<state>'}
 plank()
 for b in ('bronze', 'oxblood'): box(b)
 trim('h'); trim('v')
@@ -320,7 +346,7 @@ if 'irc-plank' in META:
             META[k]['plank_overlap_pt'] = ft
             META[k]['place_on_plank'] = ('box.maxY = plank.minY + %.2f pt (the plank strip\'s front top edge): the box '
                                          'picture overlaps the strip\'s top %.2f pt; draw the box over the plank' % (ft, ft))
-for k in ('rkit-panel-fine', 'rkit-panel-nam'):
+for k in ('rkit-panel-fine', 'rkit-panel-fine-b', 'rkit-panel-nam', 'rkit-panel-nam-b'):
     if k in META:
         mean = META[k].pop('_mean')
         META[k]['contrast_on_mean'] = {'#E6E1D4': r2(contrast('#E6E1D4', mean)), '#D9D2C2': r2(contrast('#D9D2C2', mean))}

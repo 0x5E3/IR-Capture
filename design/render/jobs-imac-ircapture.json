@@ -1,8 +1,18 @@
 {
  "runner": "imac",
- "note": "IR Capture's own pieces (11-03) at full quality (48 px/cm, 192 samples; the pictures in Resources/SwellKit/pictures came from a 48 px/cm, 16-20 sample proof in the container). ircapture_kit.py and ircapture_kit_post.py sit beside the bench's scripts in design/render/ (they import toolkit, shelf_gear, shelf_wood, gear_kit, parts, instrument, metal_kit). After: python3 design/render/ircapture_kit_post.py <out>/panels Resources/SwellKit, then the same for <out>/shelf (the post reads every irc-render-*.json in the folder it's given and merges into irc-pieces.json). No fonts needed. Estimate on the iMac's 8 cores (about 8 x the container's 2 cores per sample): panels 2 x 3 min, plank 5 min, boxes 2 x 4 min, trims 2 x 1.5 min.",
+ "note": "IR Capture's own pieces with shop wear (11-04; after the bench's shelf_wear.py, 128th chat): each piece its own seed; six worn blank keys (key-a..f, 4 states each), two panels of each stock (panel-fine, -b; panel-nam, -b), the shelf boxes with four screws in the face's corners and chipped ends, the plank with straighter piths, maps at 2 map px a picture px, dents, scratches and a water mark, the mouldings with dings. 48 px/cm, 192 samples. ircapture_kit.py and ircapture_kit_post.py sit beside the bench's scripts in design/render/ (they import toolkit, shelf_gear, shelf_wood, gear_kit, parts, instrument, metal_kit). No fonts needed. Estimate on the iMac: keys 6 x 1 to 2 min, panels 4 x 3 min, plank 5 to 7 min (its maps 1 to 2 min of numpy), boxes 2 x 4 min, trims 2 x 1.5 min: about 40 min (could be 25 to 70). Post (in the IR Capture repo): python3 design/render/ircapture_kit_post.py <render-out>/keys Resources/SwellKit, then the same for <render-out>/panels and <render-out>/shelf.",
  "jobs": [
-  {"id": "panels", "cmd": "design/render/ircapture_kit.py OUT panel-fine,panel-nam 48 192"},
-  {"id": "shelf", "cmd": "design/render/ircapture_kit.py OUT plank,box-bronze,box-oxblood,trim-h,trim-v 48 192"}
+  {
+   "id": "keys",
+   "cmd": "design/render/ircapture_kit.py OUT key-a,key-b,key-c,key-d,key-e,key-f 48 192"
+  },
+  {
+   "id": "panels",
+   "cmd": "design/render/ircapture_kit.py OUT panel-fine,panel-fine-b,panel-nam,panel-nam-b 48 192"
+  },
+  {
+   "id": "shelf",
+   "cmd": "design/render/ircapture_kit.py OUT plank,box-bronze,box-oxblood,trim-h,trim-v 48 192"
+  }
  ]
 }

@@ -40,21 +40,156 @@ sys.argv = [_argv[0], OUT, OUT]          # parts.py and toolkit.py read sys.argv
 import bpy
 import numpy as np
 import parts as P
-from parts import mat, srgb, lathe
+from parts import mat, srgb, lathe, _rring
 from gear_kit import rbox, cut, chamfer, surface_wear, screw, node, obj_coords, add_bump, mix_into, edge_mask, noise, mul, scratches
-from instrument import grimy
+from instrument import grimy, prism
 import toolkit as TK
 import shelf_gear as SG
 import shelf_wood as SW
 sys.argv = _argv
 TK.OUT, TK.PXCM, TK.SAMPLES = OUT, PXCM, SAMPLES
+
+# ---------------------------------------------------------------------------------------------------------------------
+# shop wear (11-04), after the bench's shelf_wear.py (desktop-bench look, 128th chat; Lowell on the bench, 11-03: "each
+# device and switch looks practically identical. everything up there is too perfect and uniform ... a little shop wear
+# and texture so it looks real. some slight staining and discoloration of some switches")
+#
+# A seed per piece: every material samples its noise in object coordinates (gear_kit.obj_coords), so offsetting those
+# coordinates per piece gives each piece its own stipple, rub, smudges and chips with the same materials. The bench's
+# scripts are not changed: their modules' obj_coords is swapped here, at run time, for a seeded one. With the seed at
+# zero it is exactly gear_kit's.
+import hashlib
+from PIL import Image, ImageFilter
+import gear_kit as GK
+SEED = [0.0, 0.0, 0.0]
+_obj_coords0 = GK.obj_coords
+
+
+def seeded_coords(nt, scale=1.0):
+    if not any(SEED): return _obj_coords0(nt, scale)
+    tc = nt.nodes.new('ShaderNodeTexCoord')
+    mp = node(nt, 'ShaderNodeMapping'); mp.inputs['Scale'].default_value = (scale, scale, scale)
+    mp.inputs['Location'].default_value = tuple(SEED)
+    nt.links.new(tc.outputs['Object'], mp.inputs[0]); return mp.outputs[0]
+
+
+for _m in list(sys.modules.values()):
+    try:
+        if getattr(_m, 'obj_coords', None) is _obj_coords0: _m.obj_coords = seeded_coords
+    except Exception: pass
+obj_coords = seeded_coords
+
+
+def seed_of(name): return int(hashlib.md5(name.encode()).hexdigest()[:8], 16)
+
+
+def set_seed(name):
+    """Every material made after this samples its noise at this piece's own offset; returns the piece's rng."""
+    r = np.random.default_rng(seed_of('irc-' + name))
+    SEED[:] = [float(v) for v in r.uniform(-60, 60, 3)]
+    return r
+
+
+def ss(e0, e1, x):
+    t = np.clip((x - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t)
+
+
+def _box(a, r, axis):
+    if r < 1: return a
+    pad = [(0, 0)] * a.ndim; pad[axis] = (r + 1, r)
+    c = np.cumsum(np.pad(a, pad, mode='wrap' if axis == 1 else 'edge'), axis)
+    n = a.shape[axis]
+    return (np.take(c, np.arange(2 * r + 1, n + 2 * r + 1), axis) - np.take(c, np.arange(0, n), axis)) / (2 * r + 1)
+
+
+def blur(a, px):
+    """About a Gaussian of sigma px (three box passes each way); columns wrap (the maps are periodic along x)."""
+    a = np.asarray(a, np.float32); r = max(0, int(round(px * 0.93)))
+    for _ in range(3): a = _box(_box(a, r, 0), r, 1)
+    return a
+
+
+def _max(nt, a, b):
+    n = node(nt, 'ShaderNodeMath', operation='MAXIMUM'); nt.links.new(a, n.inputs[0]); nt.links.new(b, n.inputs[1]); return n.outputs[0]
+
+
+def screw_ring(m, pts):
+    """shelf_wear.py's: the paint scuffed round each screw (object coordinates), ragged, to primer then steel, with
+    screwdriver slips."""
+    nt = m.node_tree; tc = nt.nodes.new('ShaderNodeTexCoord'); co = obj_coords(nt)
+    acc = None
+    for i, p in enumerate(pts):
+        d = node(nt, 'ShaderNodeVectorMath', operation='DISTANCE'); nt.links.new(tc.outputs['Object'], d.inputs[0])
+        d.inputs[1].default_value = p
+        mr = node(nt, 'ShaderNodeMapRange', **{'From Min': 0.62 + 0.08 * (i % 3), 'From Max': 0.3}); mr.clamp = True
+        mr.interpolation_type = 'SMOOTHSTEP'; nt.links.new(d.outputs['Value'], mr.inputs['Value'])
+        acc = mr.outputs['Result'] if acc is None else _max(nt, acc, mr.outputs['Result'])
+    rag = noise(nt, co, 14.0, 6.0, 0.7, lo=0.42, hi=0.62)
+    slip = GK.scratches(nt, co, 22.0, along='X', density=0.8, length=6.0)
+    wear = mul(nt, acc, _max(nt, rag, slip))
+    steel = node(nt, 'ShaderNodeMath', operation='GREATER_THAN'); steel.inputs[1].default_value = 0.6; nt.links.new(wear, steel.inputs[0])
+    mix_into(m, 'Base Color', wear, (*srgb('#6e695f'), 1)); mix_into(m, 'Base Color', steel.outputs[0], (*srgb('#a29d93'), 1))
+    mix_into(m, 'Metallic', steel.outputs[0], 1.0, 'FLOAT'); mix_into(m, 'Roughness', wear, 0.38, 'FLOAT')
+    add_bump(m, wear, -0.3, 0.004)
+    return m
+
+
+def corner_wear(m, half_w, zone=2.2, amount=0.9):
+    """shelf_wear.py's: more chips toward the ends (where a case is picked up and knocked). zone: how far in from each
+    end (cm); kept inside the box pictures' end caps (2.9 cm into the face), so nothing in the repeating middle."""
+    nt = m.node_tree; tc = nt.nodes.new('ShaderNodeTexCoord'); co = obj_coords(nt)
+    sep = node(nt, 'ShaderNodeSeparateXYZ'); nt.links.new(tc.outputs['Object'], sep.inputs[0])
+    ab = node(nt, 'ShaderNodeMath', operation='ABSOLUTE'); nt.links.new(sep.outputs['X'], ab.inputs[0])
+    end = node(nt, 'ShaderNodeMapRange', **{'From Min': half_w - zone, 'From Max': half_w}); end.clamp = True
+    nt.links.new(ab.outputs[0], end.inputs['Value'])
+    em = edge_mask(nt, 0.35, 5.0); chip = noise(nt, co, 3.4, 8.0, 0.78, lo=0.42, hi=0.52)
+    w = mul(nt, mul(nt, em, chip), mul(nt, end.outputs['Result'], amount))
+    steel = node(nt, 'ShaderNodeMath', operation='GREATER_THAN'); steel.inputs[1].default_value = 0.35; nt.links.new(w, steel.inputs[0])
+    mix_into(m, 'Base Color', w, (*srgb('#5d584f'), 1)); mix_into(m, 'Base Color', steel.outputs[0], (*srgb('#9d988e'), 1))
+    mix_into(m, 'Metallic', steel.outputs[0], 1.0, 'FLOAT'); add_bump(m, w, -0.25, 0.006)
+    return m
+
+
+def map_wear(mp, rows_per_cm, K, rng, dents=0, scratch=0, water=None, ding_scale=1.0):
+    """Wear in a periodic wood map (color, rough, height; columns wrap): larger dents (3 to 7 mm, crushed darker, the
+    lacquer cracked round), fine scratches through the lacquer at small angles, and a faint water mark (u, v, r in
+    fractions of the map). Columns wrap, so the strip stays seamless."""
+    col, rough, hgt = mp['color'], mp['rough'], mp['height']
+    H, Wd = rough.shape
+    for _ in range(dents):
+        cx = rng.uniform(0, Wd); cy = rng.uniform(0.15, 0.85) * H
+        r = rng.uniform(0.15, 0.35) * K * ding_scale; ry = max(1.0, r * rows_per_cm / K) * rng.uniform(0.7, 1.3)
+        xs = np.arange(int(cx - 3 * r), int(cx + 3 * r) + 1); ys = np.arange(max(0, int(cy - 3 * ry)), min(H, int(cy + 3 * ry) + 1))
+        gy, gx = np.meshgrid(ys, xs, indexing='ij'); xi = np.mod(gx, Wd)
+        dd = np.sqrt(((gx - cx) / r) ** 2 + ((gy - cy) / ry) ** 2)
+        dn = np.exp(-dd ** 2 * 1.6); crack = np.exp(-((dd - 1.05) / 0.12) ** 2) * 0.5
+        hgt[gy, xi] -= 1.6 * dn; col[gy, xi] *= (1 - (0.3 * dn + 0.12 * crack))[..., None]; rough[gy, xi] += 0.2 * dn + 0.15 * crack
+    for _ in range(scratch):
+        x0 = rng.uniform(0, Wd); y0 = rng.uniform(0.05, 0.95) * H; L = rng.uniform(0.8, 4.0) * K
+        ang = rng.normal(0, 0.12); n = int(L)
+        t = np.arange(n); xs = np.mod((x0 + t * np.cos(ang)).astype(int), Wd)
+        ys = np.clip((y0 + t * np.sin(ang) * rows_per_cm / K).astype(int), 0, H - 1)
+        fade = np.sin(np.pi * (t + 0.5) / n) * rng.uniform(0.4, 1.0)
+        col[ys, xs] *= (1 + 0.1 * fade)[..., None]; rough[ys, xs] += 0.25 * fade; hgt[ys, xs] -= 0.3 * fade
+    if water:
+        u, v, rr = water
+        yy, xx = np.mgrid[0:H, 0:Wd]
+        dx = np.minimum(np.abs(xx - u * Wd), Wd - np.abs(xx - u * Wd)) / (rr * Wd)
+        dy = (yy - v * H) / (rr * Wd * rows_per_cm / K * 0.6)
+        n = blur(rng.random((H, Wd)), 2.0 * K / 24); n = (n - n.mean()) / (n.std() + 1e-6)
+        d = np.sqrt(dx * dx + dy * dy) + 0.08 * n
+        tide = np.exp(-((d - 1.0) / 0.06) ** 2) * 0.35 + ss(1.0, 0.7, d) * 0.12
+        col *= (1 + 0.18 * tide)[..., None] * np.array([1.0, 0.98, 0.94], np.float32)[None, None, :] ** tide[..., None]
+        rough += 0.25 * tide
+    mp['rough'] = np.clip(rough, 0.05, 1); mp['color'] = np.clip(col, 0, 1)
+    return mp
 ELEV = TK.ELEV
 E = math.radians(ELEV)
 CE, SE = math.cos(E), math.sin(E)
 
 # the shelf's measures (cm)
 PL = dict(thick=2.6, depth=12.0, edge=0.28, period=60.0, fade=10.0, pre=3.0)
-BOX = dict(w=36.0, h=7.0, d=10.0, r=0.45, roll=0.25, z_front=11.0, foot_h=0.4, foot_r=0.6, foot_in=1.8, right=12.0, left=1.6, head=3.4)
+BOX = dict(w=36.0, h=7.0, d=10.0, r=0.45, roll=0.25, z_front=11.0, foot_h=0.4, foot_r=0.6, foot_in=1.8, right=12.0, left=1.6, head=3.4, screw_in=1.0)
 TRIM = dict(w=1.6, proud=0.65, period=30.0, fade=6.0, pre=2.0)
 LAY = {'pxcm': PXCM, 'elev': ELEV, 'samples': SAMPLES, 'out': {}}
 
@@ -310,15 +445,25 @@ def oak_material(name, mp, u_axis, u0, P, v_axis, v_lo, v_hi, coat=0.2, tint=(1,
 
 
 def plank_maps(K):
-    """The plank's front-edge and top maps, periodic over PL['period'] cm along x."""
-    save = SW.LEN, SW.DEPTH
+    """The plank's front-edge and top maps, periodic over PL['period'] cm along x.
+    (11-04, after the bench's shop wear) the piths straighter (see below), the maps at twice the picture's px a cm (pores and rays no longer as soft as the
+    maps' interpolation), and wear: larger dents, fine scratches through the lacquer, a faint water mark on the edge.
+    The strip repeats every 60 cm, so the wear repeats with it: it is kept sparse so the repeat doesn't read."""
+    save = SW.LEN, SW.DEPTH, SW.BOARDS
     SW.LEN, SW.DEPTH = 120.0, PL['depth']
+    # the piths bend a quarter as much (the bench's shelf_wear.straighter): long arches on the edge, no tight bullseyes.
+    # (Tried 11-04: piths above the plank for straight lines; the rays then flecked the whole edge. Not kept.)
+    SW.BOARDS = [dict(B, bend=B['bend'] * 0.25) for B in save[2]]
     try:
         front = SW.face(K, 'front')
-        top = _oak_top(K, 16.0)
+        top = _oak_top(K, 24.0)
     finally:
-        SW.LEN, SW.DEPTH = save
+        SW.LEN, SW.DEPTH, SW.BOARDS = save
     (fr, tp), xa = _periodic([front, top], K, -60.0, PL['period'], PL['fade'], -56.0, 56.0)
+    rng = set_seed('plank-maps')
+    rf = fr['rough'].shape[0] / (SW.THICK + SW.EDGE_R)
+    map_wear(fr, rf, K, rng, dents=3, scratch=10, water=(0.62, 0.45, 0.035))
+    map_wear(tp, 24.0, K, rng, dents=5, scratch=24, ding_scale=0.8)
     return fr, tp, xa
 
 
@@ -340,7 +485,9 @@ def trim_maps(K, which):
 # the pieces
 
 def panel_piece(name, finish):
-    """toolkit.piece_panel() with another finish (same size, rolled edges, a screw in each corner)."""
+    """toolkit.piece_panel() with another finish (same size, rolled edges, a screw in each corner). Each name its own
+    seed (11-04): panel-fine-b, panel-nam-b are the same stock with its own stipple, rub and handling marks."""
+    set_seed(name)
     w, h, d = TK.PANEL['w'], TK.PANEL['h'], TK.PANEL['d']
     s, cam = TK.scene(w, h, 0.4)
     TK.catcher(-d)
@@ -362,6 +509,132 @@ def panel_piece(name, finish):
     shoot(s, cam, name, lay)
 
 
+# ---------------------------------------------------------------------------------------------------------------------
+# the keys (11-04): the app draws one blank Tools key (rkit-key-*) under every legend, so every key on the page was the
+# same key. Now six keys, each its own seed and look (after the bench's KEY_LOOK); the app picks one per button by its
+# label, so a button keeps its key. aged: 0 new ivory .. 1 yellowed (deepest at the rim); tone: a greyer cap (a
+# replacement); stain (u, v, r as fractions of the half cap; strength); gloss: coat roughness; use: finger polish in the
+# middle (the stipple flattened, glossier); chip: the bezel's paint chipped at a corner to the bright casting.
+# No cap is turned in its bezel: the app's legends are drawn level, so a turned cap would show.
+KEY_LOOK = {
+    'a': dict(aged=0.35, use=0.85, gloss=0.17),
+    'b': dict(aged=0.75, use=0.5, gloss=0.22),                                     # yellowed
+    'c': dict(aged=0.1, use=0.15, gloss=0.33),                                     # the newest
+    'd': dict(aged=0.45, use=0.55, gloss=0.25, stain=(0.45, -0.35, 0.26, 0.28)),    # a faint stain, lower right
+    'e': dict(aged=0.5, use=0.6, gloss=0.23, tone='#c8bba4'),                      # greyer: a replacement cap
+    'f': dict(aged=0.9, use=0.3, gloss=0.3, chip=(-1, -1)),                        # the most yellowed, its bezel chipped
+}
+
+
+def cap_mat_blank(lit, name, wcm, hcm, look, rng):
+    """shelf_wear.cap_mat_worn() without a legend: this key's own age, stain, gloss and polish; the stipple flattened where
+    fingers have polished it; lit, the grain-of-wheat lamp glows through, a little less and warmer through an aged cap."""
+    aged = look.get('aged', 0.3)
+    new_off, old_off = np.array(srgb('#ddcca2')), np.array(srgb('#cdb072'))
+    base = new_off * (1 - aged) + old_off * aged
+    if look.get('tone'): base = base * 0.6 + np.array(srgb(look['tone'])) * 0.4
+    col = tuple(base) if not lit else srgb('#e8902e')
+    m = mat(name, col, rough=0.36 + 0.1 * (1 - look.get('use', 0.3)), coat=0.2, coat_rough=look.get('gloss', 0.25), spec=0.35)
+    nt = m.node_tree; b = nt.nodes['Principled BSDF']
+    try:
+        b.inputs['Subsurface Weight'].default_value = 0.12; b.inputs['Subsurface Radius'].default_value = (0.25, 0.18, 0.1)
+        b.inputs['Subsurface Scale'].default_value = 0.08
+    except Exception: pass
+    tc = nt.nodes.new('ShaderNodeTexCoord'); sep = node(nt, 'ShaderNodeSeparateXYZ'); nt.links.new(tc.outputs['Object'], sep.inputs[0])
+    u = node(nt, 'ShaderNodeMapRange', **{'From Min': -wcm / 2, 'From Max': wcm / 2}); nt.links.new(sep.outputs['X'], u.inputs['Value'])
+    v = node(nt, 'ShaderNodeMapRange', **{'From Min': -hcm / 2, 'From Max': hcm / 2}); nt.links.new(sep.outputs['Y'], v.inputs['Value'])
+    cv = node(nt, 'ShaderNodeCombineXYZ'); nt.links.new(u.outputs['Result'], cv.inputs['X']); nt.links.new(v.outputs['Result'], cv.inputs['Y'])
+    h, w = int(hcm * 150), int(wcm * 150)
+    yy, xx = np.mgrid[0:h, 0:w]; ux = (xx + 0.5) / w * 2 - 1; vy = 1 - (yy + 0.5) / h * 2
+    rim = ss(0.55, 1.0, np.maximum(np.abs(ux), np.abs(vy)))
+    stain = np.zeros((h, w), np.float32)
+    if look.get('stain'):
+        su, sv, sr, st = look['stain']
+        n = blur(rng.random((h, w)), 9.0); n = (n - n.mean()) / (n.std() + 1e-6)
+        d = np.sqrt(((ux - su) / sr) ** 2 + ((vy - sv) / (sr * 1.3 * wcm / hcm)) ** 2) + 0.18 * n
+        stain = st * ss(1.0, 0.55, d) * 0.55 + st * np.exp(-((d - 0.92) / 0.07) ** 2) * 0.45     # a body and a tide line
+    polish = look.get('use', 0.3) * np.exp(-((ux / 0.5) ** 2 + (vy / 0.6) ** 2))
+    t_rim = SG.img_tex(nt, name + 'r', rim.astype(np.float32), False, 'CLIP')
+    t_st = SG.img_tex(nt, name + 's', stain.astype(np.float32), False, 'CLIP')
+    t_po = SG.img_tex(nt, name + 'p', polish.astype(np.float32), False, 'CLIP')
+    for t in (t_rim, t_st, t_po): nt.links.new(cv.outputs['Vector'], t.inputs['Vector'])
+    co = obj_coords(nt)
+    stip = noise(nt, co, 180.0, 2.0, 0.5)
+    inv_po = node(nt, 'ShaderNodeMath', operation='SUBTRACT'); inv_po.inputs[0].default_value = 1.0
+    nt.links.new(t_po.outputs['Color'], inv_po.inputs[1])
+    add_bump(m, mul(nt, stip, inv_po.outputs[0]), 0.14, 0.0015)
+    add_bump(m, noise(nt, co, 9.0, 3.0, 0.6), 0.06, 0.004)
+    mix_into(m, 'Roughness', mul(nt, t_po.outputs['Color'], 0.9), 0.16, 'FLOAT')
+    if lit:
+        gr = node(nt, 'ShaderNodeVectorMath', operation='MULTIPLY'); gr.inputs[1].default_value = (2.0 / wcm, 2.6 / hcm, 0)
+        off = node(nt, 'ShaderNodeVectorMath', operation='SUBTRACT'); off.inputs[1].default_value = (0, 0.06, 0)
+        nt.links.new(tc.outputs['Object'], off.inputs[0]); nt.links.new(off.outputs[0], gr.inputs[0])
+        ln = node(nt, 'ShaderNodeVectorMath', operation='LENGTH'); nt.links.new(gr.outputs[0], ln.inputs[0])
+        fall = node(nt, 'ShaderNodeMapRange', **{'From Min': 0.0, 'From Max': 1.3, 'To Min': 1.6, 'To Max': 0.35})
+        fall.interpolation_type = 'SMOOTHSTEP'; nt.links.new(ln.outputs['Value'], fall.inputs['Value'])
+        grain = noise(nt, co, 30.0, 3.0, 0.6, lo=0.3, hi=0.7)
+        e = node(nt, 'ShaderNodeMath', operation='MULTIPLY_ADD'); e.inputs[1].default_value = 0.25
+        nt.links.new(grain, e.inputs[0]); nt.links.new(fall.outputs['Result'], e.inputs[2])
+        inv = node(nt, 'ShaderNodeMath', operation='SUBTRACT'); inv.inputs[0].default_value = 1.0; inv.use_clamp = True
+        nt.links.new(mul(nt, t_st.outputs['Color'], 0.8), inv.inputs[1])
+        e2 = node(nt, 'ShaderNodeMath', operation='MULTIPLY'); nt.links.new(e.outputs[0], e2.inputs[0]); nt.links.new(inv.outputs[0], e2.inputs[1])
+        e3 = mul(nt, e2.outputs[0], 1.0 - 0.18 * aged)
+        hot = np.array(srgb('#ff8c26')) * (1 - aged * 0.5) + np.array(srgb('#ff7414')) * aged * 0.5
+        b.inputs['Emission Color'].default_value = (*hot, 1)
+        nt.links.new(e3, b.inputs['Emission Strength'])
+    else:
+        mix_into(m, 'Base Color', mul(nt, noise(nt, co, 2.0, 4.0, 0.6, lo=0.4, hi=0.75), 0.35), (*srgb('#c4b48a'), 1))
+        mix_into(m, 'Base Color', mul(nt, t_rim.outputs['Color'], 0.35 * aged + 0.08), (*srgb('#b8995a'), 1))
+    mix_into(m, 'Base Color', t_st.outputs['Color'], (*srgb('#8e6a3c' if not lit else '#9a4a14'), 1))
+    mix_into(m, 'Roughness', t_st.outputs['Color'], 0.55, 'FLOAT')
+    surface_wear(m, smudge=0.4 + 0.3 * look.get('use', 0.3), scuff=0.25)
+    return grimy(m, dirt='#3a3122', amount=0.3 + 0.15 * aged, dist=0.06)
+
+
+def bezel_mat_chip(name, at):
+    """The bezel's black casting with its paint chipped at a corner (at: object coordinates) to the bright metal."""
+    m = SG.black_cast(name)
+    nt = m.node_tree; tc = nt.nodes.new('ShaderNodeTexCoord')
+    d = node(nt, 'ShaderNodeVectorMath', operation='DISTANCE'); nt.links.new(tc.outputs['Object'], d.inputs[0])
+    d.inputs[1].default_value = at
+    mr = node(nt, 'ShaderNodeMapRange', **{'From Min': 0.16, 'From Max': 0.11}); mr.clamp = True
+    nt.links.new(d.outputs['Value'], mr.inputs['Value'])
+    ragged = mul(nt, mr.outputs['Result'], noise(nt, obj_coords(nt), 40.0, 4.0, 0.7, lo=0.35, hi=0.55))
+    mix_into(m, 'Base Color', ragged, (*srgb('#8a867e'), 1)); mix_into(m, 'Metallic', ragged, 1.0, 'FLOAT')
+    mix_into(m, 'Roughness', ragged, 0.3, 'FLOAT'); add_bump(m, ragged, -0.4, 0.01)
+    return m
+
+
+def piece_key(v, states=('off', 'lit', 'down', 'litdown')):
+    """toolkit.piece_key() with this key's own seed and look; writes key-<state>-<v>.png (and toolkit_post's layout)."""
+    look = KEY_LOOK[v]
+    w, h, bz = TK.KEY['w'], TK.KEY['h'], TK.KEY['bezel']
+    for state in states:
+        rng = set_seed('key-' + v)                  # the same key in every state
+        s, cam = TK.scene(w + 2 * bz, h + 2 * bz, 0.3)
+        TK.catcher(0.0)
+        bez = rbox('kbezel', w + 2 * bz, h + 2 * bz, 0.25, 0.0, TK.KEY['r'] + bz * 0.6, roll=0.06)
+        cut(bez, prism('khole', _rring((w + 0.06) / 2, (h + 0.06) / 2, TK.KEY['r'], 0.0, 0, n_arc=8), -2, 2))
+        chamfer(bez, 0.02, 2)
+        if look.get('chip'):
+            cx, cy = look['chip']
+            bez.data.materials.append(bezel_mat_chip('kbez-' + v, (cx * (w / 2 + bz - 0.07), cy * (h / 2 + bz - 0.07), 0.125)))
+        else:
+            bez.data.materials.append(SG.black_cast('kbez'))
+        well = rbox('kwell', w + 0.1, h + 0.1, 0.3, -0.3, 0.05); well.data.materials.append(mat('kwell', (0.01, 0.009, 0.008), rough=0.8))
+        lit = state in ('lit', 'litdown'); down = state in ('down', 'litdown')
+        zc = 0.03 if down else 0.15
+        cap = rbox('cap', w, h, 0.3, zc, TK.KEY['r'], roll=0.07, seg=4)
+        TK.flat_faces(cap)
+        cap.data.materials.append(cap_mat_blank(lit, 'cap-%s-%s' % (v, state), w, h, look, rng))
+        if lit:
+            L = bpy.data.lights.new('kglow', 'POINT'); L.energy = 0.3 * (1 - 0.15 * look.get('aged', 0.3))
+            L.color = srgb('#ffa040'); L.shadow_soft_size = 0.6
+            g = bpy.data.objects.new('kglow', L); s.collection.objects.link(g); g.location = (0, 0, zc + 0.9)
+        TK.shoot(s, cam, 'key-%s-%s' % (state, v), w + 2 * bz, h + 2 * bz,
+                 lambda s, cam: {'cap_tl': proj(s, cam, (-w / 2, h / 2, zc + 0.3)), 'cap_br': proj(s, cam, (w / 2, -h / 2, zc + 0.3))})
+
+
 def piece_panel_fine(): panel_piece('panel-fine', 'fine')
 def piece_panel_nam(): panel_piece('panel-nam', 'nam')
 
@@ -377,7 +650,8 @@ def plank_obj(L, x0=0.0):
 
 def piece_plank():
     K = PXCM
-    fr, tp, xa = plank_maps(K)
+    fr, tp, xa = plank_maps(2 * K)
+    set_seed('plank')
     Pp, pre = PL['period'], PL['pre']
     X0 = -Pp / 2                                           # the picture's tile: x from X0 to X0 + P
     s, cam = TK.scene(20, 10, 0.5)
@@ -408,10 +682,22 @@ def piece_box(name):
     s, cam = TK.scene(20, 10, 0.5)
     TK.catcher(0.0)                                        # the wall
     pc = plank_obj(w + 60); pc.is_shadow_catcher = True    # the plank, as a shadow catcher only
+    set_seed('box-' + finish)
     m = hammertone_fine(base='#1a1610', hi='#3d3224', name='hbox') if finish == 'bronze' else SG.crackle(base='#2e0d09')
     calm_up(m)
+    # (11-04, after the bench's shop wear) four slotted screws in the face's corners, the paint scuffed round each by a
+    # screwdriver, and more chips toward the ends; all inside the end caps the app keeps whole (2.9 cm into the face)
+    sx_, sy_ = BOX['w'] / 2 - BOX['screw_in'], BOX['h'] / 2 - BOX['screw_in']
+    pts = [(sx * sx_, sy * sy_, zf) for sx in (-1, 1) for sy in (-1, 1)]        # the box's object coordinates (its origin
+    screw_ring(m, pts); corner_wear(m, w / 2)                                    # at x 0, y its middle, z 0; face at zf)
     o = rbox('box', w, h, d, zf - d, BOX['r'], roll=BOX['roll'])
     o.location = (0, fh + h / 2, 0); o.data.materials.append(m); TK.flat_faces(o)
+    nk = SG.nickel('boxscrew', seed=seed_of(name) % 97)
+    for (px_, py_, _) in pts:
+        before = set(ob.name for ob in bpy.data.objects)
+        screw(px_, py_ + fh + h / 2, nk)
+        for ob in bpy.data.objects:
+            if ob.name not in before: ob.location.z += zf
     rm = SG.rubber()
     for fx in (-(w / 2 - BOX['foot_in']), w / 2 - BOX['foot_in']):
         bpy.ops.mesh.primitive_cylinder_add(radius=BOX['foot_r'], depth=fh + 0.05, vertices=40, location=(fx, fh / 2, zf - 1.3))
@@ -467,6 +753,8 @@ def moulding(name, L, vertical):
 def piece_trim(which):
     K = PXCM
     mp, xa = trim_maps(K, which)
+    rng = set_seed('trim-' + which)           # (11-04) each run its own board's wear: dings, a few scratches
+    map_wear(mp, mp['rough'].shape[0] / 2.95, K, rng, dents=2, scratch=6, ding_scale=0.6)
     Pt, pre, hw = TRIM['period'], TRIM['pre'], TRIM['w'] / 2
     s, cam = TK.scene(20, 10, 0.5)
     TK.catcher(0.0)
@@ -506,6 +794,12 @@ def main():
         t = time.time()
         if pc.startswith('box-'): piece_box(pc)
         elif pc.startswith('trim-'): piece_trim(pc[5:])
+        elif pc.startswith('panel-'): panel_piece(pc, 'nam' if pc.startswith('panel-nam') else 'fine')
+        elif pc.startswith('key-'):
+            v = pc[4:]; piece_key(v)
+            json.dump({'pxcm': PXCM, 'samples': SAMPLES, 'out': {k: x for k, x in TK.LAY['out'].items() if k.endswith('-' + v)}},
+                      open(os.path.join(OUT, 'toolkit-keys-%s.json' % v), 'w'), indent=1)
+            print('piece', pc, '%.1fs' % (time.time() - t), flush=True); continue
         else: globals()['piece_' + pc.replace('-', '_')]()
         print('piece', pc, '%.1fs' % (time.time() - t), flush=True)
         path = os.path.join(OUT, 'irc-render-%s.json' % pc)
