@@ -218,7 +218,7 @@ enum GearPreview {
             }
             JobStepper(steps: [("Connect", true), ("Set levels", true), ("Capture", false), ("Results", false)])
             HStack(alignment: .top, spacing: 16) {
-                Checklist(items: ["A manila card, taped on.", "Its second line, for the look of it."], style: PaperStyle(stock: .manila, tape: true, tilt: 0.25, ring: true))
+                Checklist(items: ["A manila card.", "Its second line, for the look of it."], style: PaperStyle(stock: .manila, ring: true))
                     .frame(width: 250)
                 PreflightList(items: [PreflightItem(level: .ok, text: "2 mics (SM57, R121)"), PreflightItem(level: .warn, text: "Room is noisy"),
                                       PreflightItem(level: .block, text: "Choose a capture name")])

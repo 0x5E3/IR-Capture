@@ -25,7 +25,7 @@ struct CabJob: View {
                     // come first, the guidance beside the deck, the meters under it.
                     CabFilesStep()
                     HStack(alignment: .top, spacing: 16) {
-                        Checklist(items: levelSteps, style: PaperStyle(stock: .manila, tape: true, tilt: 0.25, ring: true))
+                        Checklist(items: levelSteps, style: PaperStyle(stock: .manila, ring: true))
                             .frame(maxWidth: .infinity, alignment: .leading)
                         PreflightList(items: m.preflight).frame(width: 300)
                     }
@@ -286,7 +286,7 @@ struct CabLevelStep: View {
                 m.levelChoice == 0 ? "Wait for “Sweep level set”. Then adjust each preamp until its row shows OK. No row may show CLIP."
                                    : "Adjust each preamp until its row shows OK (sweep peak near −6 dBFS). No row may show CLIP.",
                 "If distortion is orange or red, lower the amp volume. An IR is linear. Higher speaker drive does not improve it.",
-            ], style: PaperStyle(stock: .manila, tape: true, tilt: 0.25, ring: true))
+            ], style: PaperStyle(stock: .manila, ring: true))
             HStack(spacing: 12) {
                 Button(m.levelRunning ? "Stop" : "Check levels") { m.toggleLevelCheck() }
                     .buttonStyle(KeyButtonStyle(key: "Check levels", lit: m.levelRunning, size: 14, big: true))

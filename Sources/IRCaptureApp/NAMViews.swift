@@ -123,7 +123,7 @@ struct NAMDirectSteps: View {
                         "Adjust each input gain until its meter shows OK (peaks near −8 dBFS). No meter may show CLIP.",
                         "Click Stop. Do not adjust any controls after this point.",
                         "Click Record. The full training signal (3 minutes 10 seconds) is played and all inputs are recorded.",
-                    ], style: PaperStyle(stock: .manila, tape: true, tilt: 0.25, ring: true))
+                    ], style: PaperStyle(stock: .manila, ring: true))
                 }
                 .id("machine")
                 CartMachine(c: c).padding(.top, 4)

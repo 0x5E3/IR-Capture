@@ -641,7 +641,7 @@ struct TapeBox: View {
                         .foregroundColor(stamp.1.opacity(0.85))
                         .padding(.horizontal, small ? 4 : 6).padding(.vertical, small ? 1 : 2)
                         .overlay(RoundedRectangle(cornerRadius: 2).stroke(stamp.1.opacity(0.75), lineWidth: small ? 1.1 : 1.4))
-                        .rotationEffect(.degrees(-4))
+                        .rotationEffect(.degrees(0))  // level (11-04)
                 }
             }
             .foregroundColor(Color(swellHex: 0x231A12))

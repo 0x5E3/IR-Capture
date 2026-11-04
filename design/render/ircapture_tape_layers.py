@@ -481,9 +481,9 @@ def kraft(name, base='#a47a4c'):
     return grimy(m, dirt='#4a3a28', amount=0.5, dist=0.15)
 
 
-BOXES = {'reel': dict(w=18.6, h=18.6, d=2.2, label=(15.2, 11.4, 0.0, -2.3), tilt=-0.7,
+BOXES = {'reel': dict(w=18.6, h=18.6, d=2.2, label=(15.2, 11.4, 0.0, -2.3), tilt=0.0,
                       band='CAB IR', sub='ONE CAPTURE  .  EVERY RATE'),
-         'cart': dict(w=16.4, h=11.0, d=3.0, label=(13.6, 7.0, 0.0, -1.35), tilt=0.5,
+         'cart': dict(w=16.4, h=11.0, d=3.0, label=(13.6, 7.0, 0.0, -1.35), tilt=0.0,
                       band='AMP CAPTURE', sub='NAM TRAINING TAKE')}
 
 

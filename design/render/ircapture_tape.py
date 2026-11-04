@@ -411,7 +411,7 @@ def piece_cassette(prog):
     shell.data.materials.append(mat('shell', srgb('#1c1b1a'), rough=0.35, coat=0.3))
     lab = rbox('label', 9.2, 2.1, 0.01, cz, 0.12); lab.location = (dx, dy + 2.4, 0)
     lm = mat('label', srgb('#e8dec4'), rough=0.7); nt = lm.node_tree
-    tex = SG.img_tex(nt, 'labtex', label_tex(9.2, 2.1, 100), True, 'CLIP')
+    tex = SG.img_tex(nt, 'labtex', to_linear(label_tex(9.2, 2.1, 100)), True, 'CLIP')
     tc = nt.nodes.new('ShaderNodeTexCoord'); sep = node(nt, 'ShaderNodeSeparateXYZ'); nt.links.new(tc.outputs['Object'], sep.inputs[0])
     u = node(nt, 'ShaderNodeMapRange', **{'From Min': -4.6, 'From Max': 4.6}); nt.links.new(sep.outputs['X'], u.inputs['Value'])
     v = node(nt, 'ShaderNodeMapRange', **{'From Min': -1.05, 'From Max': 1.05}); nt.links.new(sep.outputs['Y'], v.inputs['Value'])
@@ -497,11 +497,19 @@ def cart_label_tex(w, h, ppcm, prog=None):
     return np.asarray(im, np.float32) / 255.0
 
 
+def to_linear(arr):
+    """sRGB-coded pixels (a PIL picture / 255) to the linear values img_tex expects. Passed as they were, a cream
+    label rendered washed out and grey (the round 3 proofs, 11-04)."""
+    a = np.clip(np.asarray(arr, np.float32), 0.0, 1.0)
+    return np.where(a <= 0.04045, a / 12.92, ((a + 0.055) / 1.055) ** 2.4).astype(np.float32)
+
+
 def img_plane(name, arr, w, h, x, y, z, rough=0.7):
+    """A paper label: arr is the label's picture, sRGB-coded (0..1)."""
     bpy.ops.mesh.primitive_plane_add(size=1, location=(x, y, z)); o = bpy.context.active_object; o.name = name
     o.scale = (w, h, 1)
     m = mat(name, srgb('#e8dec4'), rough=rough); nt = m.node_tree
-    t = SG.img_tex(nt, name + 'tx', arr, True, 'CLIP')
+    t = SG.img_tex(nt, name + 'tx', to_linear(arr), True, 'CLIP')
     uv = nt.nodes.new('ShaderNodeTexCoord'); nt.links.new(uv.outputs['UV'], t.inputs['Vector'])
     nt.links.new(t.outputs['Color'], nt.nodes['Principled BSDF'].inputs['Base Color'])
     co = obj_coords(nt); add_bump(m, noise(nt, co, 40.0, 3.0, 0.6), 0.08, 0.002)

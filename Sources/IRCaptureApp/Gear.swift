@@ -85,17 +85,18 @@ enum PaperStock {
     case index       // a cream index card, blue rules and a red head rule
 }
 
-/// How a card sits on the panel: its stock, masking tape on its top corners (the bench's tape-1..3 renders), a tilt of
-/// a fraction of a degree (cards are stuck on by hand), and an optional coffee ring (the bench's paper-ring).
+/// How a card sits on the panel: its stock and an optional coffee ring (the bench's paper-ring). Cards sit square and
+/// untaped (Lowell, 2026-11-04: the masking tape read as fake and cards and labels should be level); `tape` and `tilt`
+/// stay for the gear sheet and are off by default.
 struct PaperStyle {
     var stock: PaperStock = .manila
     var tape = false
     var tilt: Double = 0
     var ring = false
     static let tag = PaperStyle()
-    static let card = PaperStyle(stock: .manila, tape: true, tilt: -0.3)
-    static let drawing = PaperStyle(stock: .bond, tape: true, tilt: 0.2)
-    static let index = PaperStyle(stock: .index, tape: false, tilt: 0.35)
+    static let card = PaperStyle(stock: .manila)
+    static let drawing = PaperStyle(stock: .bond)
+    static let index = PaperStyle(stock: .index)
 }
 
 /// Card stock: the paper picture over its tint, the bench's faint stains on manila, rules or a grid where the stock has them.
