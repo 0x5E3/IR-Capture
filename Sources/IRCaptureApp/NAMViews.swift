@@ -111,6 +111,37 @@ struct NAMDirectSteps: View {
                 }
             }
 
+            if let c = TapePieces.cart {
+                // Phase 7: the cart machine replaces the Set levels and Record panels.
+                Step(title: "Capture name", subtitle: "Name the capture after the amp and its settings.", done: !m.namName.isEmpty) {
+                    NAMNameRow()
+                }
+                HStack(alignment: .top, spacing: 16) {
+                    Checklist(items: [
+                        "Warm the amp up for about 20 minutes. Wear ear protection for full chain captures.",
+                        "Click Check. The loudest 6 seconds of the training signal are looped. Set the reamp level to about the level of a guitar.",
+                        "Adjust each input gain until its meter shows OK (peaks near −8 dBFS). No meter may show CLIP.",
+                        "Click Stop. Do not adjust any controls after this point.",
+                        "Click Record. The full training signal (3 minutes 10 seconds) is played and all inputs are recorded.",
+                    ], style: PaperStyle(stock: .manila, tape: true, tilt: 0.25, ring: true))
+                }
+                .id("machine")
+                CartMachine(c: c).padding(.top, 4)
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 12) {
+                        if m.namLevelRunning { StatusLine(text: "Looping the loudest 6 seconds…", color: warnColor) }
+                        if let b = m.busy {
+                            StatusLine(text: b.text, color: warnColor)
+                            if b.progress == nil { ProgressView().controlSize(.small) }
+                        }
+                        if !m.namLevelRunning && m.busy == nil, let p = m.namDirectProblem { WarningTag(text: p) }
+                    }
+                    if let e = m.namLevelError { ErrorNote(e) }
+                    if let e = m.namError { ErrorNote(e) }
+                }
+                if !m.namMeters.isEmpty { NAMMeterTable(meters: m.namMeters) }
+                Note("After recording, the files are aligned, verified and saved in a folder for upload to TONE3000. The unprocessed recording is kept in a “raw recording” subfolder.")
+            } else {
             Step(n: 3, title: "Set levels", subtitle: "The loudest 6 seconds of the training signal are looped for setting each input.") {
                 Checklist(items: [
                     "Warm the amp up for about 20 minutes. Wear ear protection for full chain captures.",
@@ -139,6 +170,7 @@ struct NAMDirectSteps: View {
                 BusyLine()
                 if m.busy?.progress != nil && !m.namMeters.isEmpty { NAMMeterTable(meters: m.namMeters) }
                 Note("After recording, the files are aligned, verified and saved in a folder for upload to TONE3000. The unprocessed recording is kept in a “raw recording” subfolder.")
+            }
             }
         }
     }
@@ -275,6 +307,16 @@ struct NAMResultsView: View {
     let r: NAMSummary
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
+                if let b = TapePieces.box("cart") {
+                    HStack(alignment: .top, spacing: 20) {
+                        TapeBox(kind: "cart", box: b, title: r.title,
+                                lines: [(r.kind == .amp ? "Amp only" : "Full chain", r.names.joined(separator: ", ")),
+                                        ("Files", "\(r.files.count) WAVs, UPLOAD-STEPS.txt")],
+                                stamp: r.droppedOut ? ("Record again", badColor) : r.warnings.isEmpty ? ("Ready to upload", goodColor) : ("Check", warnColor))
+                        Note("The take is aligned, cut to length and checked. Each WAV is one model. Upload them at TONE3000 as listed below.")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
                 HStack(spacing: 12) {
                     Engraved("Upload for training", size: 17)
                     GlassWindow(size: 14) { Text(r.title) }

@@ -20,8 +20,23 @@ struct CabJob: View {
             } else {
                 JobStepper(steps: [("Connect", connected), ("Set levels", levelsDone), ("Capture", m.result != nil), ("Results", m.result != nil)])
                 CabConnectStep(done: connected)
-                CabLevelStep(done: levelsDone)
-                CabCaptureStep()
+                if let d = TapePieces.deck {
+                    // Phase 7: the reel deck replaces the Set levels and Capture panels. The capture's name and files
+                    // come first, the guidance beside the deck, the meters under it.
+                    CabFilesStep()
+                    HStack(alignment: .top, spacing: 16) {
+                        Checklist(items: levelSteps, style: PaperStyle(stock: .manila, tape: true, tilt: 0.25, ring: true))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        PreflightList(items: m.preflight).frame(width: 300)
+                    }
+                    .id("machine")
+                    ReelDeck(d: d).padding(.top, 4)
+                    CabDeckStatus()
+                    if !m.levelReadings.isEmpty { LevelTable(readings: m.levelReadings) }
+                } else {
+                    CabLevelStep(done: levelsDone)
+                    CabCaptureStep()
+                }
                 HStack(alignment: .center, spacing: 10) {
                     VStack(alignment: .leading, spacing: 4) {
                         Engraved("Recorded in a DAW instead?", size: 12)
@@ -33,6 +48,56 @@ struct CabJob: View {
                 }
                 .onPanel(padding: 16)
             }
+        }
+    }
+}
+
+extension CabJob {
+    var levelSteps: [String] {
+        [
+            "Wear ear protection. The sweeps are played at full amp volume.",
+            "Click Check levels. Keep the room quiet for the first 2 seconds during the noise measurement.",
+            m.levelChoice == 0 ? "Wait for “Sweep level set”. Then adjust each preamp until its meter shows OK. No meter may show CLIP."
+                               : "Adjust each preamp until its meter shows OK (sweep peak near −6 dBFS). No meter may show CLIP.",
+            "If distortion is orange or red, lower the amp volume. An IR is linear. Higher speaker drive does not improve it.",
+            "Click Capture. The level check is stopped automatically.",
+        ]
+    }
+}
+
+/// The capture's name and the files to make (was part of the Capture panel; the deck has the Capture key).
+struct CabFilesStep: View {
+    @EnvironmentObject var m: AppModel
+    var body: some View {
+        Step(title: "Capture name and files", subtitle: "Name the capture and choose the formats. The IRs are saved in a folder with this name.",
+             done: !m.captureName.isEmpty) {
+            CaptureNameFields()
+            TargetsPicker()
+            AdvancedOutput()
+        }
+    }
+}
+
+/// Under the deck: what the level check or the capture is doing, the sweep level, and any problem.
+struct CabDeckStatus: View {
+    @EnvironmentObject var m: AppModel
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                if m.levelRunning { StatusLine(text: m.levelPhase ?? "Looping…", color: warnColor) }
+                if let b = m.busy {
+                    StatusLine(text: b.text, color: warnColor)
+                    if b.progress == nil { ProgressView().controlSize(.small) }
+                }
+                if !m.levelRunning && m.busy == nil, let p = m.captureProblem { WarningTag(text: p) }
+                Spacer(minLength: 0)
+                if m.levelChoice == 0 && (m.levelRunning || !m.levelReadings.isEmpty) {
+                    Pill(text: m.autoLevelSettled ? "Sweep level set (\(Int(m.autoLevel)) dBFS)" : "Setting sweep level (\(Int(m.autoLevel)) dBFS)",
+                         color: m.autoLevelSettled ? goodColor : warnColor)
+                }
+            }
+            if let e = m.levelError { ErrorNote(e) }
+            if let e = m.errorText { ErrorNote(e) }
         }
     }
 }

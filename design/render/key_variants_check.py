@@ -12,8 +12,9 @@ VARIANTS = 'abcdef'
 GROUPS = [
     ('shelf', ['Cab IR', 'Amp NAM', 'Help']),
     ('cab routes', ['‹ Record here', 'Import DAW recordings…', 'Re-export a past capture…']),
-    ('cab transport', ['Check levels', 'Capture']),
+    ('cab deck', ['Check levels', 'Capture', 'Stop']),
     ('cab results', ['Show in Finder', 'Re-export…', 'Record again']),
+    ('cab box', ['Show in Finder', 'Re-export…']),
     ('re-export sheet', ['Cancel', 'Re-export']),
     ('mic role', ['Mic', 'Off']),
     ('daw roles', ['Mic', 'Ref', 'Skip', 'Remove']),
@@ -25,11 +26,12 @@ GROUPS = [
     ('help support', ['Contact Support…', 'Show Log File']),
     ('nam kind', ['Amp only', 'Full chain']),
     ('nam signal', ['Open tone3000.com/capture', 'Find it in Downloads', 'Choose sweep file']),
-    ('nam transport', ['Check levels', 'Record', 'Stop']),
+    ('nam transport', ['Check levels', 'Record', 'Stop']),           # the fallback panels (the cart has its own keys)
     ('nam inputs', ['Use', 'Off']),
     ('nam daw', ['Use', 'Skip', 'Remove', 'Prepare files']),
     ('nam results', ['Show in Finder', 'Open tone3000.com/capture', 'Record again']),
     ('gear preview', ['Capture', 'Check levels', 'Mic', 'Off']),
+    ('gear deck', ['Check levels', 'Capture', 'Stop']),
 ]
 
 

@@ -1,0 +1,9 @@
+{
+ "runner": "imac",
+ "note": "IR Capture's tape machines in layers, full quality (11-04, Phase 7): the Cab IR reel deck (deck without reels and keys; per reel the rear and front flanges as solid lit discs, their shadows with the windows at angle 0, a full pack, 24 prong frames; the counter wheel's ten digits), the Amp NAM cart machine (face with a blank label; CHECK, RECORD, STOP in four states; READY, CUE 1, CUE 2 lit; the timer's digits; the colon), and the results' tape boxes (reel box, cart carton, blank track sheets). Render density is @2x of the app's scale: deck and boxes 55.2 px/cm (11.5 pt a cm), cart 81.2 px/cm (16.9 pt a cm). 160 samples. ircapture_tape_layers.py imports ircapture_tape.py and ircapture_kit.py (all three in design/render/ beside the bench's scripts). Fonts: yes (legends). Estimate on the iMac: reel 40 to 70 min (the deck about 15, the eight reel layers about 2 to 4 each, the 48 prong frames and 10 wheel digits under a minute each), cart 25 to 40 min (the face about 10, 47 small crops), boxes about 6 min. Post (in the IR Capture repo): python3 design/render/ircapture_tape_post.py <render-out>/<job> Resources/SwellKit for reel, cart and box (it merges into tape-pieces.json).",
+ "jobs": [
+  {"id": "box", "fonts": true, "cmd": "design/render/ircapture_tape_layers.py OUT box 55.2 160"},
+  {"id": "cart", "fonts": true, "cmd": "design/render/ircapture_tape_layers.py OUT cart 81.2 160"},
+  {"id": "reel", "fonts": true, "cmd": "design/render/ircapture_tape_layers.py OUT reel 55.2 160"}
+ ]
+}

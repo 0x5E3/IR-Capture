@@ -484,7 +484,8 @@ struct MeterModule<Extra: View>: View {
     var eye: (closure: Double?, lit: Bool)? = nil
     var compact = false
     @ViewBuilder var extra: Extra
-    var width: CGFloat { compact ? 100 : 150 }
+    /// (11-03, round 3b: Lowell wanted the meters bigger) Four full-size modules fill the 828 pt stage: 174 pt faces.
+    var width: CGFloat { compact ? 100 : 174 }
     var body: some View {
         VStack(alignment: .leading, spacing: compact ? 6 : 8) {
             HStack(spacing: 4) {
@@ -517,15 +518,14 @@ struct MeterModule<Extra: View>: View {
     }
 }
 
-/// Meter modules side by side, wrapping onto more rows for more inputs. Up to four inputs use the full-size face;
-/// five or more use the compact one (`MeterBridge.compact(count)`), so six inputs fit across a 920 pt window.
+/// Meter modules side by side, four to a row at full size (the layout is made for four inputs or fewer: Lowell,
+/// 11-03); more inputs stack in rows below and the page scrolls. The compact face is kept for the gear preview only.
 struct MeterBridge<Content: View>: View {
     var count = 0
     @ViewBuilder let content: Content
-    static func compact(_ n: Int) -> Bool { n > 4 }
+    static func compact(_ n: Int) -> Bool { false }
     var body: some View {
-        let c = MeterBridge.compact(count)
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: c ? 120 : 174, maximum: c ? 126 : 190), spacing: c ? 8 : 12, alignment: .top)],
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 198), spacing: 12, alignment: .topLeading), count: 4),
                   alignment: .leading, spacing: 12) {
             content
         }

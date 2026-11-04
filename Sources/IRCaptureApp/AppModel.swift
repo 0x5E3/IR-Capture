@@ -147,6 +147,21 @@ enum Busy: Equatable {
     }
 }
 
+/// The tape machines' clock (Phase 7): what is playing, since when, and its sweep schedule. Set just before each
+/// playback starts and cleared when it ends. Only the deck and the cart read it, to turn the reels and move the
+/// playhead; nothing in the audio path reads it.
+struct TapeRun: Equatable {
+    enum Kind { case noise, levelSweep, capture, namLevel, namRecord }
+    let kind: Kind
+    let start: Date
+    /// Silence before the first sweep, sweep length, gap after each sweep (s), and the sweep count.
+    var lead = 0.0, sweep = 0.0, gap = 0.0, count = 0
+    /// The whole playback, s.
+    let total: Double
+    /// Where in the training signal the playback starts (NAM level check: its loudest 6 s), s.
+    var offset = 0.0
+}
+
 /// Holds a value set from a callback that runs off the main actor.
 final class Box<T> { var value: T?; init() {} }
 
@@ -215,6 +230,7 @@ final class AppModel: ObservableObject {
     @Published var noise: [Int: Double] = [:]
     @Published var levelError: String?
     @Published var busy: Busy?
+    @Published var tapeRun: TapeRun?
     @Published var errorText: String?
     @Published var result: ResultSummary?
     @Published var reexportFolder: URL?
@@ -595,7 +611,7 @@ final class AppModel: ObservableObject {
         Log.write("level check start: \(dev.name) at \(fs) Hz, output \(out + 1), sweep \(auto ? "auto" : "\(levelChoice) dBFS")")
         let t = Task {
             defer {
-                if gen == levelGen { levelRunning = false; levelPhase = nil; levelTask = nil }
+                if gen == levelGen { levelRunning = false; levelPhase = nil; levelTask = nil; tapeRun = nil }
                 jobEnded()
             }
             await wait?.value
@@ -607,6 +623,7 @@ final class AppModel: ObservableObject {
                 // Noise check: 2 s with the output silent, every input.
                 levelPhase = "Measuring room noise for 2 seconds. Keep the room quiet."
                 let silence = [Float](repeating: 0, count: 2 * fs)
+                tapeRun = TapeRun(kind: .noise, start: Date(), total: 2.1)
                 let nrec = try await DuplexIO.run(device: dev, fs: fs, outChannel: out, inputs: all, signal: silence,
                                                   extraSeconds: 0.1, cancelled: { Task.isCancelled })
                 var nz: [Int: Double] = [:]
@@ -619,6 +636,8 @@ final class AppModel: ObservableObject {
                 while !Task.isCancelled {
                     if cabLevel != lvl { lvl = cabLevel; let l = lvl; check = try await Task.detached { try LevelCheck(fs: fs, levelDBFS: l) }.value }
                     levelPhase = auto && !autoLevelSettled ? "Setting sweep level…" : "Playing short sweeps…"
+                    tapeRun = TapeRun(kind: .levelSweep, start: Date(), lead: check.spec.lead, sweep: check.spec.duration, gap: check.spec.gap,
+                                      count: check.spec.nSweeps, total: Double(check.signal.count) / Double(fs) + 0.4)
                     let rec = try await DuplexIO.run(device: dev, fs: fs, outChannel: out, inputs: all,
                                                      signal: check.signal, extraSeconds: 0.4, cancelled: { Task.isCancelled })
                     let rows = inputs
@@ -684,7 +703,7 @@ final class AppModel: ObservableObject {
         busy = .preparing("Getting ready")
         let wait = audioChain
         let t = Task {
-            defer { busy = nil; captureTask = nil; jobEnded() }
+            defer { busy = nil; tapeRun = nil; captureTask = nil; jobEnded() }
             await wait?.value
             if Task.isCancelled { errorText = "Capture stopped. Nothing was saved."; return }
             takeRate(dev)
@@ -696,11 +715,14 @@ final class AppModel: ObservableObject {
                 try await Task.detached { try CoreAudioHelper.setNominalRate(dev.id, fs) }.value
                 let signal = await Task.detached { makeTestSignal(spec) }.value
                 busy = .recording(0)
+                tapeRun = TapeRun(kind: .capture, start: Date(), lead: spec.lead, sweep: spec.duration, gap: spec.gap,
+                                  count: spec.nSweeps, total: Double(signal.count) / Double(fs))
                 let io = Box<DuplexIO.Report>()
                 let rec = try await DuplexIO.run(device: dev, fs: fs, outChannel: out, inputs: channelList, signal: signal,
                                                  extraSeconds: 1.0, cancelled: { Task.isCancelled },
                                                  progress: { p in Task { @MainActor in if case .recording = self.busy { self.busy = .recording(p) } } },
                                                  report: { io.value = $0 })
+                tapeRun = nil
                 Log.write(String(format: "recorded %.1f s in %.1f s", Double(rec.first?.count ?? 0) / Double(fs), Date().timeIntervalSince(t0)))
                 busy = .processing("Saving the raw recording")
                 let dropWarning = io.value?.dropoutWarning
@@ -1125,7 +1147,7 @@ final class AppModel: ObservableObject {
         Log.write("NAM level check start: \(dev.name), output \(out + 1)")
         let t = Task {
             defer {
-                if gen == namGen { namLevelRunning = false; namLevelTask = nil }
+                if gen == namGen { namLevelRunning = false; namLevelTask = nil; tapeRun = nil }
                 jobEnded()
             }
             await wait?.value
@@ -1137,6 +1159,8 @@ final class AppModel: ObservableObject {
                 while !Task.isCancelled {
                     let rows = namRows.filter(\.use)
                     if rows.isEmpty { namLevelError = "Choose Use for at least one input."; return }
+                    tapeRun = TapeRun(kind: .namLevel, start: Date(), total: Double(section.count) / Double(NAMPrep.fs) + 0.2,
+                                      offset: Double(a) / Double(NAMPrep.fs))
                     _ = try await DuplexIO.run(device: dev, fs: NAMPrep.fs, outChannel: out, inputs: rows.map(\.id), signal: section,
                                                extraSeconds: 0.2, cancelled: { Task.isCancelled },
                                                meter: { p in Task { @MainActor in if self.namLevelRunning { self.pushNAMMeters(rows, p) } } })
@@ -1178,7 +1202,7 @@ final class AppModel: ObservableObject {
         busy = .preparing("Getting ready")
         let wait = audioChain
         let t = Task {
-            defer { busy = nil; captureTask = nil; jobEnded() }
+            defer { busy = nil; tapeRun = nil; captureTask = nil; jobEnded() }
             await wait?.value
             if Task.isCancelled { namError = "Recording stopped. Nothing was saved."; return }
             if let dev, !sim { takeRate(dev) }
@@ -1196,12 +1220,14 @@ final class AppModel: ObservableObject {
                     busy = .preparing("Setting the interface to 48 kHz")
                     try await Task.detached { try CoreAudioHelper.setNominalRate(dev.id, NAMPrep.fs) }.value
                     busy = .namRecording(0)
+                    tapeRun = TapeRun(kind: .namRecord, start: Date(), total: Double(sig.count) / Double(NAMPrep.fs))
                     rec = try await DuplexIO.run(device: dev, fs: NAMPrep.fs, outChannel: out, inputs: rows.map(\.id), signal: sig,
                                                  extraSeconds: 2.0, cancelled: { Task.isCancelled },
                                                  progress: { p in Task { @MainActor in if case .namRecording = self.busy { self.busy = .namRecording(p) } } },
                                                  meter: { p in Task { @MainActor in self.pushNAMMeters(rows, p) } },
                                                  report: { io.value = $0 })
                 }
+                tapeRun = nil
                 busy = .processing("Saving the raw recording")
                 try await Task.detached {
                     try FileManager.default.createDirectory(at: rawDir, withIntermediateDirectories: true)

@@ -53,10 +53,6 @@ struct ContentView: View {
                 ScrollViewReader { proxy in
                     ScrollView {
                         VStack(alignment: .leading, spacing: 18) {
-                            Text(m.job == .cab ? "Record the speaker cab's impulse response." : "Record the amp for a NAM model, trained at TONE3000.")
-                                .font(.swellBody(14, semibold: true))
-                                .onPaper(padding: 9, fill: false, style: PaperStyle(stock: .manila, tape: true, tilt: -0.6))
-                                .padding(.top, 6).padding(.leading, 8)
                             if m.job == .nam {
                                 NAMJob()
                                 if let r = m.namResult { NAMResultsView(r: r).id("namresults") }
@@ -69,6 +65,12 @@ struct ContentView: View {
                         .environment(\.swellTheme, m.job == .nam ? .nam : .cab)
                     }
                     .onChange(of: m.result?.folder) { _ in withAnimation { proxy.scrollTo("results", anchor: .top) } }
+                    .task {
+                        // CI hook: open scrolled to the tape machine (screenshot-deck.png, screenshot-cart.png).
+                        guard ProcessInfo.processInfo.arguments.contains("--scroll-to-machine") else { return }
+                        try? await Task.sleep(nanoseconds: 1_500_000_000)
+                        proxy.scrollTo("machine", anchor: .top)
+                    }
                     .onChange(of: m.namResult?.folder) { _ in withAnimation { proxy.scrollTo("namresults", anchor: .top) } }
                 }
             }
@@ -153,13 +155,44 @@ enum GearPreview {
                 MeterModule(label: "Room", vu: 4, dbfs: "−0.1 dBFS", clipped: true, advice: ("CLIP: turn down", badColor), eye: (0.2, true)) { EmptyView() }
                 MeterModule(label: "Reference", vu: nil, dbfs: "−72.0 dBFS", clipped: false, advice: ("No signal: check cable", badColor), eye: (nil, false)) { EmptyView() }
             }
-            Engraved("Cab IR: six mics and a reference, compact meters", size: 12)
+            if let d = TapePieces.deck {
+                Engraved("Cab IR: the reel deck, 37 % into a capture (reels turned, packs sized, counter, REC lit)", size: 12)
+                ScaledMachine(size: d.size, outline: d.outline) {
+                    ReelDeckFace(d: d, state: DeckState(phiS: 23, phiT: 71, p: 0.37, seconds: 27, recording: true)) {
+                        HStack(spacing: 8) {
+                            HStack(spacing: 14) {
+                                Button("Check levels") {}.buttonStyle(KeyButtonStyle(key: "Check levels", size: 12))
+                                Button("Capture") {}.buttonStyle(KeyButtonStyle(key: "Capture", lit: true, size: 13))
+                            }
+                            JewelLamp(colour: "red", on: true, diameter: d.jewel.d * 0.82).frame(width: d.jewel.d, height: d.jewel.d)
+                                .alignmentGuide(.deckJewel) { $0[HorizontalAlignment.center] }
+                            Button("Stop") {}.buttonStyle(KeyButtonStyle(key: "Stop", size: 12))
+                        }
+                    }
+                }
+                Engraved("The same deck idle: tape on the supply reel", size: 12)
+                ScaledMachine(size: d.size, outline: d.outline) {
+                    ReelDeckFace(d: d, state: DeckState(phiS: 0, phiT: 0, p: 0, seconds: 43, recording: false)) { EmptyView() }
+                }
+            }
+            if let b = TapePieces.box("reel") {
+                HStack(alignment: .top, spacing: 20) {
+                    TapeBox(kind: "reel", box: b, title: "Mesa_4x12_V30",
+                            lines: [("Mics", "SM57, R121, Room"), ("Load", "Mesa_4x12_V30_SM57.wav"), ("Files", "86 IRs, README.txt"), ("Ref", "Reference used")],
+                            stamp: ("Excellent", goodColor))
+                    if let c = TapePieces.box("cart") {
+                        TapeBox(kind: "cart", box: c, title: "JCM800_Gain6_Bass5", lines: [("Amp only", "Suhr"), ("Files", "1 WAV, UPLOAD-STEPS.txt")],
+                                stamp: ("Ready to upload", goodColor))
+                    }
+                }
+            }
+            Engraved("Cab IR: six mics and a reference, four to a row", size: 12)
             MeterBridge(count: 7) {
                 ForEach(0..<7, id: \.self) { i in
                     MeterModule(label: micNames[i], vu: vus[i],
                                 dbfs: String(format: "%.1f dBFS", -6 + vus[i]), clipped: false,
                                 advice: i == 4 ? ("Turn up 7 dB", warnColor) : ("OK", goodColor),
-                                eye: (closure: eyes[i], lit: true), compact: true) {
+                                eye: (closure: eyes[i], lit: true)) {
                         if i < 6 {
                             ViewThatFits(in: .horizontal) {
                                 HStack(spacing: 6) { Pill(text: "H2 −51", color: goodColor); Pill(text: "H3 −48", color: goodColor) }
@@ -199,6 +232,18 @@ enum GearPreview {
         let nam = VStack(alignment: .leading, spacing: 18) {
             Engraved("Amp (NAM): graphite panel, LED lamps, LED-ladder meters", size: 12)
             JobStepper(steps: [("Signal", true), ("Connect", true), ("Set levels", false), ("Record", false), ("Upload", false)])
+            if let c = TapePieces.cart {
+                Engraved("Amp NAM: the cart machine, 74 s into the take (playhead, timer, READY and CUE lamps, RECORD lit)", size: 12)
+                ScaledMachine(size: c.size, outline: c.outline) {
+                    CartFace(c: c, state: CartState(playhead: 74, secondsLeft: 116, ready: true, cues: true)) {
+                        ForEach(["check", "record", "stop"], id: \.self) { k in
+                            let r = c.keys[k] ?? [0, 0, 1, 1]
+                            Button(k) {}.buttonStyle(CartKeyStyle(key: k, rect: CGRect(x: 0, y: 0, width: r[2], height: r[3]), lit: k == "record"))
+                                .offset(x: r[0], y: r[1])
+                        }
+                    }
+                }
+            }
             NAMMeterTable(meters: [NAMMeter(id: 0, label: "Suhr", peakDB: -8.2, clipped: false), NAMMeter(id: 1, label: "SM57", peakDB: -19.5, clipped: false),
                                    NAMMeter(id: 2, label: "R121", peakDB: -0.2, clipped: true)])
             WiringDiagram(wiring: .namAmp).onPaper(padding: 14, style: .drawing)
@@ -341,7 +386,8 @@ struct ShelfGeometry: Decodable {
 // ------------------------------------------------------------------ building blocks
 /// One step: a hammertone panel, its title engraved, a jewel for its state (amber: to do; green: done).
 struct Step<Content: View>: View {
-    let n: Int
+    /// nil: a panel without a step number (Capture name and files).
+    var n: Int? = nil
     let title: String
     var subtitle: String? = nil
     var done = false
@@ -354,7 +400,7 @@ struct Step<Content: View>: View {
                     .accessibilityLabel(done ? "Done" : "To do")
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Engraved("Step \(n)", size: 10, dim: true)
+                        if let n { Engraved("Step \(n)", size: 10, dim: true) }
                         Engraved(title, size: 17)
                     }
                     if let s = subtitle { Text(s).font(.swellBody(13)).fixedSize(horizontal: false, vertical: true) }
@@ -363,7 +409,7 @@ struct Step<Content: View>: View {
             content
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .onPanel(seed: n)
+        .onPanel(seed: n ?? 5)
     }
 }
 
@@ -680,31 +726,41 @@ struct ResultsView: View {
     }
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
+            if let b = TapePieces.box("reel") {
+                // Phase 7: the capture goes back in its box; the track sheet lists what is on it.
+                HStack(alignment: .top, spacing: 20) {
+                    VStack(spacing: 12) {
+                        TapeBox(kind: "reel", box: b, title: r.title,
+                                lines: [("Mics", r.names.joined(separator: ", ")), ("Load", r.topFiles.first ?? "Universal file"),
+                                        ("Files", "\(r.fileCount) IRs, README.txt"), ("Ref", r.referenced ? "Reference used" : "None")],
+                                stamp: quality)
+                        HStack(spacing: 10) {
+                            Button("Finder") { m.revealResult() }.buttonStyle(KeyButtonStyle(key: "Show in Finder", size: 12))
+                                .help("Show the capture folder in the Finder")
+                            Button("Re-export") { m.reexportMessage = nil; m.reexportFolder = r.folder }.buttonStyle(KeyButtonStyle(key: "Re-export…", size: 12))
+                                .help("Make other formats from the raw take of this capture without a new recording")
+                        }
+                    }
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(spacing: 12) {
+                            Engraved("Results", size: 17)
+                            Spacer()
+                            StatusLine(text: quality.0, color: quality.1, diameter: 20).font(.swellLegend(14))
+                        }
+                        ResultsNotes(r: r)
+                    }
+                }
+            } else {
             HStack(spacing: 12) {
                 Engraved("Results", size: 17)
                 GlassWindow(size: 14) { Text(r.title) }
                 Spacer()
                 StatusLine(text: quality.0, color: quality.1, diameter: 20).font(.swellLegend(14))
             }
-            ForEach(r.warnings, id: \.self) { w in WarningTag(text: w, severe: r.droppedOut && w == r.warnings.first) }
-            if r.droppedOut {
-                HStack {
-                    Button("Record again") { m.startCapture() }.buttonStyle(KeyButtonStyle(key: "Record again", size: 13))
-                        .disabled(m.busy != nil || m.captureProblem != nil)
-                    Note("Quit other apps first (browsers, video calls, other audio software).")
-                }
+            ResultsNotes(r: r)
             }
-            if !r.referenced { Note("No reference tap was used. These IRs include the power amp response.") }
-            ForEach(r.polarityNotes, id: \.self) { n in Note("Polarity: " + n, color: .primary) }
-            ForEach(r.exportNotes, id: \.self) { n in Note(n, color: .primary) }
-            if !r.topFiles.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
-                    Engraved("Load these")
-                    ForEach(r.topFiles, id: \.self) { f in GlassWindow(size: 12) { Text(f).font(.swellMono(12)) } }
-                    Note("48 kHz, 24-bit, 500 ms. Compatible with IR loaders, DAW plug-ins and modelers. Other formats are in More formats.")
-                }
-            }
-            DiagnosticsTable(r: r)
+            if TapePieces.box("reel") != nil { DiagnosticsTable(r: r) }
+            if TapePieces.box("reel") == nil { DiagnosticsTable(r: r) }
             Engraved("Frequency response, 1/6 octave")
             FaceplateScreen {
                 VStack(alignment: .leading, spacing: 8) {
@@ -730,6 +786,34 @@ struct ResultsView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .onPanel()
+    }
+}
+
+/// The results' warnings, notes and the files to load.
+struct ResultsNotes: View {
+    @EnvironmentObject var m: AppModel
+    let r: ResultSummary
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(r.warnings, id: \.self) { w in WarningTag(text: w, severe: r.droppedOut && w == r.warnings.first) }
+            if r.droppedOut {
+                HStack {
+                    Button("Record again") { m.startCapture() }.buttonStyle(KeyButtonStyle(key: "Record again", size: 13))
+                        .disabled(m.busy != nil || m.captureProblem != nil)
+                    Note("Quit other apps first (browsers, video calls, other audio software).")
+                }
+            }
+            if !r.referenced { Note("No reference tap was used. These IRs include the power amp response.") }
+            ForEach(r.polarityNotes, id: \.self) { n in Note("Polarity: " + n, color: .primary) }
+            ForEach(r.exportNotes, id: \.self) { n in Note(n, color: .primary) }
+            if !r.topFiles.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    Engraved("Load these")
+                    ForEach(r.topFiles, id: \.self) { f in GlassWindow(size: 12) { Text(f).font(.swellMono(12)) } }
+                    Note("48 kHz, 24-bit, 500 ms. Compatible with IR loaders, DAW plug-ins and modelers. Other formats are in More formats.")
+                }
+            }
+        }
     }
 }
 
