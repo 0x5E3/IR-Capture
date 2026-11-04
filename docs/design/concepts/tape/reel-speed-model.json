@@ -1,0 +1,19 @@
+{
+ "note": "Tape speed at the heads, tied to the sweep. See design/render/ircapture_tape_speed.py.",
+ "v_lo_cm_s": 9.525,
+ "v_hi_cm_s": 38.1,
+ "coast_tau_s": 0.35,
+ "schedule_s": {
+  "noise": 2.0,
+  "lead": 1.0,
+  "sweep": 6.0,
+  "gap": 2.0,
+  "sweeps": 5
+ },
+ "tape_total_cm": 867.1,
+ "pack_cm": {
+  "hub": 3.0,
+  "full": 8.3
+ },
+ "max_reel_rpm": 109.7
+}

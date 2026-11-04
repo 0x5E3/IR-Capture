@@ -1,0 +1,47 @@
+{
+ "file": "ircapture-keys.webp",
+ "names": [
+  "CAB IR",
+  "AMP NAM",
+  "SIGNAL",
+  "CONNECT",
+  "LEVELS",
+  "CAPTURE",
+  "RECORD",
+  "RESULTS",
+  "UPLOAD",
+  "CHECK",
+  "STOP",
+  "IMPORT",
+  "FINDER",
+  "HELP"
+ ],
+ "rows": [
+  "off",
+  "lit",
+  "down",
+  "litdown"
+ ],
+ "cell": [
+  371,
+  192
+ ],
+ "px": [
+  5194,
+  768
+ ],
+ "k": 3.1983,
+ "rect": [
+  -58.0,
+  -30.0,
+  58.0,
+  30.0
+ ],
+ "cap": [
+  88.0,
+  32
+ ],
+ "bezel": 4,
+ "samples": 192,
+ "rendered_k": 3.2
+}
