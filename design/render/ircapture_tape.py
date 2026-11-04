@@ -144,15 +144,20 @@ def brushed_alu(name='deckbrush', base='#bdae90'):
     nt = m.node_tree; b = nt.nodes['Principled BSDF']; co = obj_coords(nt)
     tg = node(nt, 'ShaderNodeTangent'); tg.direction_type = 'RADIAL'; tg.axis = 'Y'   # radial round y: the tangent runs along x
     nt.links.new(tg.outputs['Tangent'], b.inputs['Tangent'])
-    # the grain: noise stretched 200:1 along x, two scales (the brush's long strokes and the fine hairlines)
-    st = node(nt, 'ShaderNodeMapping'); st.inputs['Scale'].default_value = (0.005, 1.0, 1.0); nt.links.new(co, st.inputs[0])
-    hair = noise(nt, st.outputs[0], 90.0, 4.0, 0.65, lo=0.25, hi=0.75)
-    st2 = node(nt, 'ShaderNodeMapping'); st2.inputs['Scale'].default_value = (0.02, 1.0, 1.0); nt.links.new(co, st2.inputs[0])
-    stroke = noise(nt, st2.outputs[0], 6.0, 3.0, 0.55, lo=0.3, hi=0.7)
-    add_bump(m, hair, 0.12, 0.0015)
-    mix_into(m, 'Roughness', mul(nt, hair, 0.6), 0.44, 'FLOAT')
-    mix_into(m, 'Base Color', mul(nt, stroke, 0.35), (*srgb('#a89a7e'), 1))
-    mix_into(m, 'Base Color', mul(nt, hair, 0.25), (*srgb('#cbbfa6'), 1))
+    # the grain: noise stretched 200:1 along x. Three scales: the brush's long strokes, hairlines coarse enough to
+    # survive at app size (about 22 px a cm at 2x; round 3b's 90-a-cm hairlines averaged out to nothing), and a fine set
+    # for the full-quality pass (Lowell, 11-03: more grain).
+    def streak(sx, sc, lo, hi):
+        mp = node(nt, 'ShaderNodeMapping'); mp.inputs['Scale'].default_value = (sx, 1.0, 1.0); nt.links.new(co, mp.inputs[0])
+        return noise(nt, mp.outputs[0], sc, 5.0, 0.7, lo=lo, hi=hi)
+    stroke = streak(0.02, 2.5, 0.3, 0.7)
+    hair = streak(0.006, 12.0, 0.35, 0.65)
+    fine = streak(0.004, 60.0, 0.3, 0.7)
+    add_bump(m, hair, 0.35, 0.003); add_bump(m, fine, 0.2, 0.0015)
+    mix_into(m, 'Roughness', mul(nt, hair, 0.8), 0.48, 'FLOAT')
+    mix_into(m, 'Base Color', mul(nt, stroke, 0.4), (*srgb('#a4967a'), 1))
+    mix_into(m, 'Base Color', mul(nt, hair, 0.5), (*srgb('#d2c6ac'), 1))
+    mix_into(m, 'Base Color', mul(nt, fine, 0.25), (*srgb('#a99c82'), 1))
     # age: a soft warm cloud, darker toward the edges
     mix_into(m, 'Base Color', mul(nt, noise(nt, co, 0.3, 3.0, 0.55, lo=0.35, hi=0.75), 0.45), (*srgb('#968a72'), 1))
     surface_wear(m, dust=0.3, smudge=0.5, scuff=0.35)

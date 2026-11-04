@@ -4,9 +4,8 @@
 # screenshot-gear.png at 2x) and the new proofs. The deck takes the place of the Set levels and Capture panels; the
 # stepper lamps and the pre-flight card share one row above it; the meter bridge stays under it.
 #
-# CAB IR, worst case: six mics and a reference. The compact modules shrink about 8 % (0.46 of the 2x screenshot instead of
-# 0.5) so all seven fit in one row; otherwise the reference wraps to a second row and the page needs about 60 pt more
-# than the window has.
+# CAB IR: four inputs (SM57, R121, Room, Reference), full-size modules enlarged to fill the opening. More than four
+# stack in rows below and the page scrolls (round 3b's seven-in-a-row compact bridge was dropped: Lowell, 11-03).
 #
 #   ~/bvenv/bin/python design/render/ircapture_tape_mock2.py <shots dir> <proof dir> <out dir>
 import sys, os
@@ -61,14 +60,18 @@ def cab():
     dk = deck('tape-reel-40.png', IN_X1 - IN_X0 - 20)
     shadowed(im, dk, IN_X0 + 10, y, r=8, dy=8, a=0.55)
     y += dk.height + 6
-    s = 0.46
-    mods = [gear((138 + i * 268, 794, 378 + i * 268, 1229), s) for i in range(6)] + [gear((138, 1252, 378, 1581), s)]
-    gap = 8; tw = sum(m.width for m in mods) + gap * (len(mods) - 1)
-    x = (WW - tw) // 2
+    # Lowell, 11-03: the layout is for four inputs or fewer (three mics and a reference, or two mics, a room mic and a
+    # reference); the modules get bigger, not smaller. Four full-size modules fill the opening, about 17 % larger than
+    # round 2 drew them. More inputs stack below in further rows, and the page scrolls.
+    gap = 12; mw = (IN_X1 - IN_X0 - 24 - 3 * gap)
+    s = mw / 4 / 348
+    mods = [gear((148, 198, 496, 678), s)] + [gear((148 + i * 404, 198, 496 + i * 404, 614), s) for i in (1, 2, 3)]
+    x = IN_X0 + 12
     for m in mods:
-        shadowed(im, m, x, y, r=4, dy=3, a=0.45); x += m.width + gap
-    y += mods[0].height
-    print('cab: content ends at %d pt of %d (bottom moulding from %d)' % (y, WH, WH - 26))
+        shadowed(im, m, x, y, r=5, dy=4, a=0.45); x += m.width + gap
+    y += max(m.height for m in mods)
+    print('cab: four full-size modules at %.2f of 2x (%.0f%% of round 2), content ends at %d pt of %d (bottom moulding from %d)'
+          % (s, s / 0.5 * 100, y, WH, WH - 14))
     im.convert('RGB').save(os.path.join(OUT, 'mock-cab-920x960.png'))
     return y
 
