@@ -622,30 +622,32 @@ struct TapeBox: View {
     let stamp: (String, Color)
     var body: some View {
         let lab = R(box.label)
+        let small = lab.height < 100           // the cart carton's short label: one line each, a smaller stamp
         ZStack(alignment: .topLeading) {
             TapeImage(name: "tape-box-\(kind)", rect: CGRect(x: 0, y: 0, width: box.size[0], height: box.size[1]))
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title).font(.swellMono(12, bold: true)).lineLimit(1).truncationMode(.middle)
+            VStack(alignment: .leading, spacing: small ? 2 : 4) {
+                Text(title).font(.swellMono(small ? 11 : 12, bold: true)).lineLimit(1).minimumScaleFactor(0.6)
                 Rectangle().fill(Color(swellHex: 0xAA3C32, opacity: 0.8)).frame(height: 0.8)
                 ForEach(Array(lines.enumerated()), id: \.offset) { _, l in
                     HStack(alignment: .firstTextBaseline, spacing: 5) {
-                        Text(l.0).font(.swellLegend(8.5)).foregroundColor(Color(swellHex: 0x5A4A3A)).frame(width: 40, alignment: .leading)
-                        Text(l.1).font(.swellMono(9)).lineLimit(2).truncationMode(.middle).fixedSize(horizontal: false, vertical: true)
+                        Text(l.0).font(.swellLegend(8.5)).foregroundColor(Color(swellHex: 0x5A4A3A)).frame(width: small ? 48 : 40, alignment: .leading)
+                        Text(l.1).font(.swellMono(9)).lineLimit(small ? 1 : 2).truncationMode(.middle).fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 Spacer(minLength: 0)
                 HStack {
                     Spacer()
-                    Text(stamp.0).font(.swellLegend(11, bold: true)).textCase(.uppercase).tracking(1.2)
+                    Text(stamp.0).font(.swellLegend(small ? 8.5 : 11, bold: true)).textCase(.uppercase).tracking(small ? 0.8 : 1.2)
                         .foregroundColor(stamp.1.opacity(0.85))
-                        .padding(.horizontal, 6).padding(.vertical, 2)
-                        .overlay(RoundedRectangle(cornerRadius: 2).stroke(stamp.1.opacity(0.75), lineWidth: 1.4))
+                        .padding(.horizontal, small ? 4 : 6).padding(.vertical, small ? 1 : 2)
+                        .overlay(RoundedRectangle(cornerRadius: 2).stroke(stamp.1.opacity(0.75), lineWidth: small ? 1.1 : 1.4))
                         .rotationEffect(.degrees(-4))
                 }
             }
             .foregroundColor(Color(swellHex: 0x231A12))
-            .padding(.horizontal, 9).padding(.vertical, 7)
+            .padding(.horizontal, 9).padding(.vertical, small ? 5 : 7)
             .frame(width: lab.width, height: lab.height, alignment: .topLeading)
+            .clipped()
             .rotationEffect(.degrees(-Double(box.tilt_deg)))
             .offset(x: lab.minX, y: lab.minY)
         }
