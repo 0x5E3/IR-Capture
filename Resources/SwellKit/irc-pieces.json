@@ -3,38 +3,48 @@
  "renders": {
   "panel-fine": {
    "pxcm": 48.0,
-   "samples": 20,
-   "s": 88.5
+   "samples": 192,
+   "s": 136.0
   },
   "box-oxblood": {
    "pxcm": 48.0,
-   "samples": 16,
-   "s": 194.4
+   "samples": 192,
+   "s": 429.7
   },
   "box-bronze": {
    "pxcm": 48.0,
-   "samples": 16,
-   "s": 151.1
+   "samples": 192,
+   "s": 398.2
   },
   "trim-v": {
    "pxcm": 48.0,
-   "samples": 16,
-   "s": 22.9
+   "samples": 192,
+   "s": 42.9
   },
   "plank": {
    "pxcm": 48.0,
-   "samples": 16,
-   "s": 229.9
+   "samples": 192,
+   "s": 424.7
   },
   "panel-nam": {
    "pxcm": 48.0,
-   "samples": 20,
-   "s": 84.6
+   "samples": 192,
+   "s": 135.4
   },
   "trim-h": {
    "pxcm": 48.0,
-   "samples": 16,
-   "s": 22.9
+   "samples": 192,
+   "s": 42.4
+  },
+  "panel-fine-b": {
+   "pxcm": 48.0,
+   "samples": 192,
+   "s": 137.0
+  },
+  "panel-nam-b": {
+   "pxcm": 48.0,
+   "samples": 192,
+   "s": 135.2
   }
  },
  "pieces": {
@@ -65,10 +75,10 @@
     "trailing": 2.0
    },
    "content_padding_pt": 12.5,
-   "mean_tile_srgb": "#35322F",
+   "mean_tile_srgb": "#34312F",
    "contrast_on_mean": {
-    "#E6E1D4": 9.77,
-    "#D9D2C2": 8.47
+    "#E6E1D4": 9.85,
+    "#D9D2C2": 8.54
    }
   },
   "rkit-panel-nam": {
@@ -100,8 +110,8 @@
    "content_padding_pt": 12.5,
    "mean_tile_srgb": "#2D2D2E",
    "contrast_on_mean": {
-    "#E6E1D4": 10.5,
-    "#D9D2C2": 9.1
+    "#E6E1D4": 10.53,
+    "#D9D2C2": 9.13
    }
   },
   "irc-plank": {
@@ -109,12 +119,12 @@
    "x2": "irc-plank@2x.webp",
    "px": [
     1440,
-    378
+    379
    ],
    "px_per_pt": 2.4,
    "pt": [
     600.0,
-    157.5
+    157.92
    ],
    "kind": "strip-h",
    "capInsets": {
@@ -136,7 +146,7 @@
    "shadow_outset_pt": {
     "top": 10.0,
     "leading": 0,
-    "bottom": 100.34,
+    "bottom": 100.76,
     "trailing": 0
    },
    "measures_cm": {
@@ -149,12 +159,12 @@
    "file": "irc-box-bronze.webp",
    "x2": "irc-box-bronze@2x.webp",
    "px": [
-    1126,
+    1128,
     296
    ],
    "px_per_pt": 2.4,
    "pt": [
-    469.17,
+    470.0,
     123.33
    ],
    "kind": "three-h",
@@ -162,7 +172,7 @@
     "top": 0,
     "leading": 42.92,
     "bottom": 0,
-    "trailing": 125.0
+    "trailing": 125.83
    },
    "resizingMode": "tile",
    "how": "resize along x only (the middle repeats); draw at the picture's own height",
@@ -171,7 +181,7 @@
     "y": 47.57,
     "w": 360.0,
     "h": 70.0,
-    "trailing_from_right": 95.17
+    "trailing_from_right": 96.0
    },
    "face_flat_inset_pt": 7.0,
    "lid_pt": {
@@ -187,7 +197,7 @@
     "top": 29.94,
     "leading": 14.0,
     "bottom": 5.76,
-    "trailing": 95.17
+    "trailing": 96.0
    },
    "plank_overlap_pt": 31.16,
    "measures_cm": {
@@ -204,12 +214,12 @@
    "file": "irc-box-oxblood.webp",
    "x2": "irc-box-oxblood@2x.webp",
    "px": [
-    1126,
+    1128,
     296
    ],
    "px_per_pt": 2.4,
    "pt": [
-    469.17,
+    470.0,
     123.33
    ],
    "kind": "three-h",
@@ -217,7 +227,7 @@
     "top": 0,
     "leading": 42.92,
     "bottom": 0,
-    "trailing": 125.0
+    "trailing": 125.83
    },
    "resizingMode": "tile",
    "how": "resize along x only (the middle repeats); draw at the picture's own height",
@@ -226,7 +236,7 @@
     "y": 47.57,
     "w": 360.0,
     "h": 70.0,
-    "trailing_from_right": 95.17
+    "trailing_from_right": 96.0
    },
    "face_flat_inset_pt": 7.0,
    "lid_pt": {
@@ -242,7 +252,7 @@
     "top": 29.94,
     "leading": 14.0,
     "bottom": 5.76,
-    "trailing": 95.17
+    "trailing": 96.0
    },
    "plank_overlap_pt": 31.16,
    "measures_cm": {
@@ -319,6 +329,515 @@
     "leading": 6.0,
     "bottom": 0,
     "trailing": 3.83
+   }
+  },
+  "rkit-key-down-a": {
+   "file": "rkit-key-down-a.webp",
+   "x2": "rkit-key-down-a@2x.webp",
+   "px": [
+    122,
+    60
+   ],
+   "px_per_pt": 2.4,
+   "kind": "nine",
+   "capInsets": {
+    "top": 5.42,
+    "leading": 5.42,
+    "bottom": 5.42,
+    "trailing": 5.42
+   },
+   "resizingMode": "stretch",
+   "like": "rkit-key-down"
+  },
+  "rkit-key-down-b": {
+   "file": "rkit-key-down-b.webp",
+   "x2": "rkit-key-down-b@2x.webp",
+   "px": [
+    122,
+    60
+   ],
+   "px_per_pt": 2.4,
+   "kind": "nine",
+   "capInsets": {
+    "top": 5.42,
+    "leading": 5.42,
+    "bottom": 5.42,
+    "trailing": 5.42
+   },
+   "resizingMode": "stretch",
+   "like": "rkit-key-down"
+  },
+  "rkit-key-down-c": {
+   "file": "rkit-key-down-c.webp",
+   "x2": "rkit-key-down-c@2x.webp",
+   "px": [
+    122,
+    60
+   ],
+   "px_per_pt": 2.4,
+   "kind": "nine",
+   "capInsets": {
+    "top": 5.42,
+    "leading": 5.42,
+    "bottom": 5.42,
+    "trailing": 5.42
+   },
+   "resizingMode": "stretch",
+   "like": "rkit-key-down"
+  },
+  "rkit-key-down-d": {
+   "file": "rkit-key-down-d.webp",
+   "x2": "rkit-key-down-d@2x.webp",
+   "px": [
+    122,
+    60
+   ],
+   "px_per_pt": 2.4,
+   "kind": "nine",
+   "capInsets": {
+    "top": 5.42,
+    "leading": 5.42,
+    "bottom": 5.42,
+    "trailing": 5.42
+   },
+   "resizingMode": "stretch",
+   "like": "rkit-key-down"
+  },
+  "rkit-key-down-e": {
+   "file": "rkit-key-down-e.webp",
+   "x2": "rkit-key-down-e@2x.webp",
+   "px": [
+    122,
+    60
+   ],
+   "px_per_pt": 2.4,
+   "kind": "nine",
+   "capInsets": {
+    "top": 5.42,
+    "leading": 5.42,
+    "bottom": 5.42,
+    "trailing": 5.42
+   },
+   "resizingMode": "stretch",
+   "like": "rkit-key-down"
+  },
+  "rkit-key-down-f": {
+   "file": "rkit-key-down-f.webp",
+   "x2": "rkit-key-down-f@2x.webp",
+   "px": [
+    122,
+    60
+   ],
+   "px_per_pt": 2.4,
+   "kind": "nine",
+   "capInsets": {
+    "top": 5.42,
+    "leading": 5.42,
+    "bottom": 5.42,
+    "trailing": 5.42
+   },
+   "resizingMode": "stretch",
+   "like": "rkit-key-down"
+  },
+  "rkit-key-lit-a": {
+   "file": "rkit-key-lit-a.webp",
+   "x2": "rkit-key-lit-a@2x.webp",
+   "px": [
+    122,
+    60
+   ],
+   "px_per_pt": 2.4,
+   "kind": "nine",
+   "capInsets": {
+    "top": 5.42,
+    "leading": 5.42,
+    "bottom": 5.42,
+    "trailing": 5.42
+   },
+   "resizingMode": "stretch",
+   "like": "rkit-key-lit"
+  },
+  "rkit-key-lit-b": {
+   "file": "rkit-key-lit-b.webp",
+   "x2": "rkit-key-lit-b@2x.webp",
+   "px": [
+    122,
+    60
+   ],
+   "px_per_pt": 2.4,
+   "kind": "nine",
+   "capInsets": {
+    "top": 5.42,
+    "leading": 5.42,
+    "bottom": 5.42,
+    "trailing": 5.42
+   },
+   "resizingMode": "stretch",
+   "like": "rkit-key-lit"
+  },
+  "rkit-key-lit-c": {
+   "file": "rkit-key-lit-c.webp",
+   "x2": "rkit-key-lit-c@2x.webp",
+   "px": [
+    122,
+    60
+   ],
+   "px_per_pt": 2.4,
+   "kind": "nine",
+   "capInsets": {
+    "top": 5.42,
+    "leading": 5.42,
+    "bottom": 5.42,
+    "trailing": 5.42
+   },
+   "resizingMode": "stretch",
+   "like": "rkit-key-lit"
+  },
+  "rkit-key-lit-d": {
+   "file": "rkit-key-lit-d.webp",
+   "x2": "rkit-key-lit-d@2x.webp",
+   "px": [
+    122,
+    60
+   ],
+   "px_per_pt": 2.4,
+   "kind": "nine",
+   "capInsets": {
+    "top": 5.42,
+    "leading": 5.42,
+    "bottom": 5.42,
+    "trailing": 5.42
+   },
+   "resizingMode": "stretch",
+   "like": "rkit-key-lit"
+  },
+  "rkit-key-lit-e": {
+   "file": "rkit-key-lit-e.webp",
+   "x2": "rkit-key-lit-e@2x.webp",
+   "px": [
+    122,
+    60
+   ],
+   "px_per_pt": 2.4,
+   "kind": "nine",
+   "capInsets": {
+    "top": 5.42,
+    "leading": 5.42,
+    "bottom": 5.42,
+    "trailing": 5.42
+   },
+   "resizingMode": "stretch",
+   "like": "rkit-key-lit"
+  },
+  "rkit-key-lit-f": {
+   "file": "rkit-key-lit-f.webp",
+   "x2": "rkit-key-lit-f@2x.webp",
+   "px": [
+    122,
+    60
+   ],
+   "px_per_pt": 2.4,
+   "kind": "nine",
+   "capInsets": {
+    "top": 5.42,
+    "leading": 5.42,
+    "bottom": 5.42,
+    "trailing": 5.42
+   },
+   "resizingMode": "stretch",
+   "like": "rkit-key-lit"
+  },
+  "rkit-key-litdown-a": {
+   "file": "rkit-key-litdown-a.webp",
+   "x2": "rkit-key-litdown-a@2x.webp",
+   "px": [
+    122,
+    60
+   ],
+   "px_per_pt": 2.4,
+   "kind": "nine",
+   "capInsets": {
+    "top": 5.42,
+    "leading": 5.42,
+    "bottom": 5.42,
+    "trailing": 5.42
+   },
+   "resizingMode": "stretch",
+   "like": "rkit-key-litdown"
+  },
+  "rkit-key-litdown-b": {
+   "file": "rkit-key-litdown-b.webp",
+   "x2": "rkit-key-litdown-b@2x.webp",
+   "px": [
+    122,
+    60
+   ],
+   "px_per_pt": 2.4,
+   "kind": "nine",
+   "capInsets": {
+    "top": 5.42,
+    "leading": 5.42,
+    "bottom": 5.42,
+    "trailing": 5.42
+   },
+   "resizingMode": "stretch",
+   "like": "rkit-key-litdown"
+  },
+  "rkit-key-litdown-c": {
+   "file": "rkit-key-litdown-c.webp",
+   "x2": "rkit-key-litdown-c@2x.webp",
+   "px": [
+    122,
+    60
+   ],
+   "px_per_pt": 2.4,
+   "kind": "nine",
+   "capInsets": {
+    "top": 5.42,
+    "leading": 5.42,
+    "bottom": 5.42,
+    "trailing": 5.42
+   },
+   "resizingMode": "stretch",
+   "like": "rkit-key-litdown"
+  },
+  "rkit-key-litdown-d": {
+   "file": "rkit-key-litdown-d.webp",
+   "x2": "rkit-key-litdown-d@2x.webp",
+   "px": [
+    122,
+    60
+   ],
+   "px_per_pt": 2.4,
+   "kind": "nine",
+   "capInsets": {
+    "top": 5.42,
+    "leading": 5.42,
+    "bottom": 5.42,
+    "trailing": 5.42
+   },
+   "resizingMode": "stretch",
+   "like": "rkit-key-litdown"
+  },
+  "rkit-key-litdown-e": {
+   "file": "rkit-key-litdown-e.webp",
+   "x2": "rkit-key-litdown-e@2x.webp",
+   "px": [
+    122,
+    60
+   ],
+   "px_per_pt": 2.4,
+   "kind": "nine",
+   "capInsets": {
+    "top": 5.42,
+    "leading": 5.42,
+    "bottom": 5.42,
+    "trailing": 5.42
+   },
+   "resizingMode": "stretch",
+   "like": "rkit-key-litdown"
+  },
+  "rkit-key-litdown-f": {
+   "file": "rkit-key-litdown-f.webp",
+   "x2": "rkit-key-litdown-f@2x.webp",
+   "px": [
+    122,
+    60
+   ],
+   "px_per_pt": 2.4,
+   "kind": "nine",
+   "capInsets": {
+    "top": 5.42,
+    "leading": 5.42,
+    "bottom": 5.42,
+    "trailing": 5.42
+   },
+   "resizingMode": "stretch",
+   "like": "rkit-key-litdown"
+  },
+  "rkit-key-off-a": {
+   "file": "rkit-key-off-a.webp",
+   "x2": "rkit-key-off-a@2x.webp",
+   "px": [
+    122,
+    60
+   ],
+   "px_per_pt": 2.4,
+   "kind": "nine",
+   "capInsets": {
+    "top": 5.42,
+    "leading": 5.42,
+    "bottom": 5.42,
+    "trailing": 5.42
+   },
+   "resizingMode": "stretch",
+   "like": "rkit-key-off"
+  },
+  "rkit-key-off-b": {
+   "file": "rkit-key-off-b.webp",
+   "x2": "rkit-key-off-b@2x.webp",
+   "px": [
+    122,
+    60
+   ],
+   "px_per_pt": 2.4,
+   "kind": "nine",
+   "capInsets": {
+    "top": 5.42,
+    "leading": 5.42,
+    "bottom": 5.42,
+    "trailing": 5.42
+   },
+   "resizingMode": "stretch",
+   "like": "rkit-key-off"
+  },
+  "rkit-key-off-c": {
+   "file": "rkit-key-off-c.webp",
+   "x2": "rkit-key-off-c@2x.webp",
+   "px": [
+    122,
+    60
+   ],
+   "px_per_pt": 2.4,
+   "kind": "nine",
+   "capInsets": {
+    "top": 5.42,
+    "leading": 5.42,
+    "bottom": 5.42,
+    "trailing": 5.42
+   },
+   "resizingMode": "stretch",
+   "like": "rkit-key-off"
+  },
+  "rkit-key-off-d": {
+   "file": "rkit-key-off-d.webp",
+   "x2": "rkit-key-off-d@2x.webp",
+   "px": [
+    122,
+    60
+   ],
+   "px_per_pt": 2.4,
+   "kind": "nine",
+   "capInsets": {
+    "top": 5.42,
+    "leading": 5.42,
+    "bottom": 5.42,
+    "trailing": 5.42
+   },
+   "resizingMode": "stretch",
+   "like": "rkit-key-off"
+  },
+  "rkit-key-off-e": {
+   "file": "rkit-key-off-e.webp",
+   "x2": "rkit-key-off-e@2x.webp",
+   "px": [
+    122,
+    60
+   ],
+   "px_per_pt": 2.4,
+   "kind": "nine",
+   "capInsets": {
+    "top": 5.42,
+    "leading": 5.42,
+    "bottom": 5.42,
+    "trailing": 5.42
+   },
+   "resizingMode": "stretch",
+   "like": "rkit-key-off"
+  },
+  "rkit-key-off-f": {
+   "file": "rkit-key-off-f.webp",
+   "x2": "rkit-key-off-f@2x.webp",
+   "px": [
+    122,
+    60
+   ],
+   "px_per_pt": 2.4,
+   "kind": "nine",
+   "capInsets": {
+    "top": 5.42,
+    "leading": 5.42,
+    "bottom": 5.42,
+    "trailing": 5.42
+   },
+   "resizingMode": "stretch",
+   "like": "rkit-key-off"
+  },
+  "key-variants": {
+   "variants": [
+    "a",
+    "b",
+    "c",
+    "d",
+    "e",
+    "f"
+   ],
+   "how": "rkit-key-<state>-<v>: one of six keys, each its own wear; pick one per button by a stable hash of its label (so a button keeps its key); without them rkit-key-<state>"
+  },
+  "rkit-panel-fine-b": {
+   "file": "rkit-panel-fine-b.webp",
+   "x2": "rkit-panel-fine-b@2x.webp",
+   "px": [
+    394,
+    394
+   ],
+   "px_per_pt": 2.4,
+   "pt": [
+    164.17,
+    164.17
+   ],
+   "kind": "nine",
+   "capInsets": {
+    "top": 17.08,
+    "leading": 17.08,
+    "bottom": 17.08,
+    "trailing": 17.08
+   },
+   "resizingMode": "tile",
+   "shadow_outset_pt": {
+    "top": 2.0,
+    "leading": 2.0,
+    "bottom": 2.0,
+    "trailing": 2.0
+   },
+   "content_padding_pt": 12.5,
+   "mean_tile_srgb": "#34322F",
+   "contrast_on_mean": {
+    "#E6E1D4": 9.83,
+    "#D9D2C2": 8.52
+   }
+  },
+  "rkit-panel-nam-b": {
+   "file": "rkit-panel-nam-b.webp",
+   "x2": "rkit-panel-nam-b@2x.webp",
+   "px": [
+    394,
+    394
+   ],
+   "px_per_pt": 2.4,
+   "pt": [
+    164.17,
+    164.17
+   ],
+   "kind": "nine",
+   "capInsets": {
+    "top": 17.08,
+    "leading": 17.08,
+    "bottom": 17.08,
+    "trailing": 17.08
+   },
+   "resizingMode": "tile",
+   "shadow_outset_pt": {
+    "top": 2.0,
+    "leading": 2.0,
+    "bottom": 2.0,
+    "trailing": 2.0
+   },
+   "content_padding_pt": 12.5,
+   "mean_tile_srgb": "#2D2D2E",
+   "contrast_on_mean": {
+    "#E6E1D4": 10.53,
+    "#D9D2C2": 9.13
    }
   }
  }

@@ -158,10 +158,29 @@ final class SwellPictures {
 enum SwellNine {
     struct Piece { let name: String; let pxPerPoint: CGFloat; let insets: EdgeInsets; let mode: Image.ResizingMode; let outset: CGFloat }
     // rkit (toolkit.py): 13 / 12 / 41 px slices at 2.4 px a point; the picture's margin (its shadow) lies outside the box
-    static func key(_ state: String) -> Piece {
-        Piece(name: "rkit-key-\(state)", pxPerPoint: 2.4, insets: EdgeInsets(top: 5.42, leading: 5.42, bottom: 5.42, trailing: 5.42),
-              mode: .stretch, outset: 1.2)
+    static func key(_ state: String, variant: String? = nil) -> Piece {
+        Piece(name: "rkit-key-\(state)" + (variant.map { "-" + $0 } ?? ""), pxPerPoint: 2.4,
+              insets: EdgeInsets(top: 5.42, leading: 5.42, bottom: 5.42, trailing: 5.42), mode: .stretch, outset: 1.2)
     }
+    /// The six worn keys (rkit-key-<state>-a … -f, irc-pieces.json "key-variants"): each its own ivory age, gloss and
+    /// marks, the same size and slices as rkit-key-<state>. Only the variants whose four states are all in the kit.
+    static let keyVariants: [String] = ["a", "b", "c", "d", "e", "f"].filter { v in
+        ["off", "lit", "down", "litdown"].allSatisfy { SwellPictures.shared.cgImage("rkit-key-\($0)-\(v).webp") != nil }
+    }
+    /// The worn key for a button: chosen by a stable hash of its name (FNV-1a, not Swift's per-launch hashValue), so a
+    /// button keeps its key across launches and states. Case, a trailing "…" and a leading "‹ " are ignored. Without
+    /// a name, or without the variants in the kit, nil (rkit-key-<state>, as before).
+    static func keyVariant(for name: String?) -> String? {
+        guard let name, !keyVariants.isEmpty else { return nil }
+        var t = name.lowercased().trimmingCharacters(in: .whitespaces)
+        if t.hasPrefix("‹ ") { t.removeFirst(2) }
+        while t.hasSuffix("…") || t.hasSuffix(".") { t.removeLast() }
+        var h: UInt32 = 2166136261 ^ keySalt
+        for b in t.utf8 { h = (h ^ UInt32(b)) &* 16777619 }
+        return keyVariants[Int(h % UInt32(keyVariants.count))]
+    }
+    /// Chosen (design/render/key_variants_check.py) so that keys standing side by side get different keys.
+    static let keySalt: UInt32 = 14007
     static let window = Piece(name: "rkit-win", pxPerPoint: 2.4, insets: EdgeInsets(top: 5, leading: 5, bottom: 5, trailing: 5),
                               mode: .stretch, outset: 1.2)
     // Drawn at 1.5 times the kit's density (screws two thirds the size): at the kit's own scale the corner screws
@@ -171,8 +190,11 @@ enum SwellNine {
     /// The step panels' stock for a job: rkit-panel-fine (Cab IR) and rkit-panel-nam (Amp NAM) are IR Capture's own
     /// renders (design/render/ircapture_kit.py, the Tools studio), the same size and slices as rkit-panel. A job whose
     /// picture is missing uses rkit-panel.
-    static func stepPanel(for theme: SwellTheme) -> Piece {
-        let name = theme == .nam ? "rkit-panel-nam" : "rkit-panel-fine"
+    /// (11-04) Each stock has a second panel (-b: its own stipple, rub and handling marks); `alternate` picks it when
+    /// it is in the kit (steps 2 and 4), so neighbouring steps aren't the same picture.
+    static func stepPanel(for theme: SwellTheme, alternate: Bool = false) -> Piece {
+        let base = theme == .nam ? "rkit-panel-nam" : "rkit-panel-fine"
+        let name = alternate && SwellPictures.shared.cgImage(base + "-b.webp") != nil ? base + "-b" : base
         guard SwellPictures.shared.cgImage(name + ".webp") != nil else { return panel }
         return Piece(name: name, pxPerPoint: panel.pxPerPoint, insets: panel.insets, mode: .tile, outset: panel.outset)
     }
@@ -217,17 +239,20 @@ extension View {
 // ------------------------------------------------------------------ the illuminated key
 /// The shelf's pushbutton: ivory resin cap in a black cast bezel, the lamp behind it lit when `lit` (a selected step,
 /// a mode that's on, a running check). Pressed, the cap sits down in its bezel. The legend is the button's own label.
-///   Button("Capture") { ... }.buttonStyle(KeyButtonStyle(lit: m.busy != nil))
+///   Button("Capture") { ... }.buttonStyle(KeyButtonStyle(key: "Capture", lit: m.busy != nil))
 struct KeyButtonStyle: ButtonStyle {
+    /// The button's name (its label, or what it stays called while its label changes): picks its worn key.
+    var key: String? = nil
     var lit = false
     var size: CGFloat = 12
     /// A large key (Capture, Record): more cap round the legend.
     var big = false
     func makeBody(configuration: Configuration) -> some View {
-        KeyFace(configuration: configuration, lit: lit, size: big ? max(size, 15) : size, big: big)
+        KeyFace(configuration: configuration, variant: SwellNine.keyVariant(for: key), lit: lit, size: big ? max(size, 15) : size, big: big)
     }
     private struct KeyFace: View {
         let configuration: ButtonStyleConfiguration
+        let variant: String?
         let lit: Bool
         let size: CGFloat
         let big: Bool
@@ -248,7 +273,7 @@ struct KeyButtonStyle: ButtonStyle {
                 .padding(.vertical, big ? 11 : 6)
                 .frame(minWidth: big ? 120 : 44, minHeight: big ? 40 : 26)
                 .offset(y: down ? 1 : 0)
-                .background(Panel9Slice(piece: SwellNine.key(state)))
+                .background(Panel9Slice(piece: SwellNine.key(state, variant: variant)))
                 .brightness(hover && isEnabled && !down ? 0.04 : 0)
                 .opacity(isEnabled ? 1 : 0.5)
                 .saturation(isEnabled ? 1 : 0.6)

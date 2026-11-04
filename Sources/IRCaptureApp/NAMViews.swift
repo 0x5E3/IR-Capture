@@ -9,7 +9,7 @@ struct NAMJob: View {
         VStack(alignment: .leading, spacing: 18) {
             if m.namMode == "logic" {
                 HStack(spacing: 12) {
-                    Button("‹ Record here") { m.namMode = "app" }
+                    Button("‹ Record here") { m.namMode = "app" }.buttonStyle(KeyButtonStyle(key: "‹ Record here"))
                     Engraved("Import DAW recordings", size: 15)
                 }
                 NAMLogicSteps()
@@ -24,7 +24,7 @@ struct NAMJob: View {
                         Note("Record the TONE3000 sweep through the amp in Logic, Reaper or any other DAW. Prepare the files here.")
                     }
                     Spacer()
-                    Button("Import DAW recordings…") { m.namMode = "logic" }
+                    Button("Import DAW recordings…") { m.namMode = "logic" }.buttonStyle(KeyButtonStyle(key: "Import DAW recordings…"))
                 }
                 .onPanel(padding: 16)
             }
@@ -39,11 +39,11 @@ struct NAMModelChoice: View {
             Engraved("Capture type")
             HStack(alignment: .top, spacing: 14) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Button("Amp only") { m.namKind = .amp }.buttonStyle(KeyButtonStyle(lit: m.namKind == .amp, size: 12))
+                    Button("Amp only") { m.namKind = .amp }.buttonStyle(KeyButtonStyle(key: "Amp only", lit: m.namKind == .amp, size: 12))
                     Note("Load box line out. For use with any cab IR. Recommended.")
                 }.frame(maxWidth: .infinity, alignment: .topLeading)
                 VStack(alignment: .leading, spacing: 6) {
-                    Button("Full chain") { m.namKind = .full }.buttonStyle(KeyButtonStyle(lit: m.namKind == .full, size: 12))
+                    Button("Full chain") { m.namKind = .full }.buttonStyle(KeyButtonStyle(key: "Full chain", lit: m.namKind == .full, size: 12))
                     Note("Mics on the cab. Amp, cab and mic in one model.")
                 }.frame(maxWidth: .infinity, alignment: .topLeading)
             }
@@ -78,9 +78,9 @@ struct NAMDirectSteps: View {
                     ])
                 }
                 HStack(spacing: 12) {
-                    Button("Open tone3000.com/capture") { m.openTONE3000() }
-                    if m.namSignal == nil { Button("Find it in Downloads") { m.findNAMSignal(inDownloads: true) }.buttonStyle(KeyButtonStyle(size: 13)) }
-                    Button(m.namSignal == nil ? "Choose sweep file…" : "Choose a different file…") { m.chooseNAMSignal() }
+                    Button("Open tone3000.com/capture") { m.openTONE3000() }.buttonStyle(KeyButtonStyle(key: "Open tone3000.com/capture"))
+                    if m.namSignal == nil { Button("Find it in Downloads") { m.findNAMSignal(inDownloads: true) }.buttonStyle(KeyButtonStyle(key: "Find it in Downloads", size: 13)) }
+                    Button(m.namSignal == nil ? "Choose sweep file…" : "Choose a different file…") { m.chooseNAMSignal() }.buttonStyle(KeyButtonStyle(key: "Choose sweep file"))
                 }
                 if m.namSignal != nil {
                     HStack(spacing: 8) {
@@ -120,7 +120,7 @@ struct NAMDirectSteps: View {
                 ])
                 HStack(spacing: 12) {
                     Button(m.namLevelRunning ? "Stop" : "Check levels") { m.toggleNAMLevelCheck() }
-                        .buttonStyle(KeyButtonStyle(lit: m.namLevelRunning, size: 14, big: true)).disabled(m.busy != nil)
+                        .buttonStyle(KeyButtonStyle(key: "Check levels", lit: m.namLevelRunning, size: 14, big: true)).disabled(m.busy != nil)
                     if m.namLevelRunning { StatusLine(text: "Looping…", color: warnColor) }
                 }
                 if let e = m.namLevelError { ErrorNote(e) }
@@ -131,7 +131,7 @@ struct NAMDirectSteps: View {
                 NAMNameRow()
                 HStack(spacing: 14) {
                     Button("Record (3 min 12 s)") { m.startNAMCapture() }
-                        .buttonStyle(KeyButtonStyle(lit: m.busy?.progress != nil, size: 16, big: true))
+                        .buttonStyle(KeyButtonStyle(key: "Record", lit: m.busy?.progress != nil, size: 16, big: true))
                         .disabled(m.busy != nil || m.namDirectProblem != nil)
                     if let p = m.namDirectProblem, m.busy == nil { WarningTag(text: p) }
                 }
@@ -201,7 +201,7 @@ struct NAMLogicSteps: View {
                     "Log in at tone3000.com. Choose Create Tone, then Capture, and download the sweep file, T3K-sweep-v3.wav (190 seconds, 48 kHz).",
                     "Use the file without modification. Do not trim, normalize or convert it. The file layout is built in. The file is not required here.",
                 ])
-                Button("Open tone3000.com/capture") { m.openTONE3000() }
+                Button("Open tone3000.com/capture") { m.openTONE3000() }.buttonStyle(KeyButtonStyle(key: "Open tone3000.com/capture"))
             }
 
             Step(n: 2, title: "Record in your DAW", subtitle: "The steps apply to any DAW. Menu names below are from Logic.") {
@@ -232,7 +232,7 @@ struct NAMLogicSteps: View {
                 NAMNameRow()
                 HStack(spacing: 14) {
                     Button("Prepare files") { m.prepareNAM() }
-                        .buttonStyle(KeyButtonStyle(lit: m.busy != nil, size: 16, big: true))
+                        .buttonStyle(KeyButtonStyle(key: "Prepare files", lit: m.busy != nil, size: 16, big: true))
                         .disabled(m.busy != nil || m.namProblem != nil)
                     if let p = m.namProblem, m.busy == nil, !m.namInputs.isEmpty { WarningTag(text: p) }
                 }
@@ -262,7 +262,7 @@ struct NAMGrid: View {
                     GlassField(placeholder: "", text: $c.name).frame(width: 180).disabled(!c.use).opacity(c.use ? 1 : 0.5)
                     KeyChoice(selection: $c.use, options: [(true, "Use"), (false, "Skip")], size: 10)
                     if c.channel == 0 {
-                        Button("Remove") { m.removeNAMFile(c.url) }.buttonStyle(KeyButtonStyle(size: 10)).help("Remove this file")
+                        Button("Remove") { m.removeNAMFile(c.url) }.buttonStyle(KeyButtonStyle(key: "Remove", size: 10)).help("Remove this file")
                     } else { Text("") }
                 }
             }
@@ -286,7 +286,7 @@ struct NAMResultsView: View {
                 ForEach(r.warnings, id: \.self) { w in WarningTag(text: w, severe: r.droppedOut && w == r.warnings.first) }
                 if r.droppedOut {
                     HStack {
-                        Button("Record again") { m.startNAMCapture() }.buttonStyle(KeyButtonStyle(size: 13))
+                        Button("Record again") { m.startNAMCapture() }.buttonStyle(KeyButtonStyle(key: "Record again", size: 13))
                             .disabled(m.busy != nil || m.namDirectProblem != nil)
                         Note("Quit other apps first (browsers, video calls, other audio software).")
                     }
@@ -322,8 +322,8 @@ struct NAMResultsView: View {
                 ])
                 Note("“Start vs end” compares the first 9 seconds of the take with the last 9 seconds. Both sections contain the same signal. The value indicates amp drift during the recording. Model accuracy is limited to about this value. Below 0.001: excellent.")
                 HStack(spacing: 10) {
-                    Button("Show in Finder") { m.revealNAM() }.buttonStyle(KeyButtonStyle(size: 13))
-                    Button("Open tone3000.com/capture") { m.openTONE3000() }
+                    Button("Show in Finder") { m.revealNAM() }.buttonStyle(KeyButtonStyle(key: "Show in Finder", size: 13))
+                    Button("Open tone3000.com/capture") { m.openTONE3000() }.buttonStyle(KeyButtonStyle(key: "Open tone3000.com/capture"))
                     Note(r.folder.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")).lineLimit(1).truncationMode(.middle)
                 }
         }

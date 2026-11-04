@@ -171,10 +171,10 @@ enum GearPreview {
             }
             HStack(spacing: 18) {
                 VStack(spacing: 3) { NixieReadout(value: 45); Engraved("Seconds left", size: 9, dim: true) }
-                Button("Capture") {}.buttonStyle(KeyButtonStyle(lit: true, size: 16, big: true))
-                Button("Check levels") {}.buttonStyle(KeyButtonStyle(size: 14, big: true))
-                Button("Mic") {}.buttonStyle(KeyButtonStyle(lit: true, size: 11))
-                Button("Off") {}.buttonStyle(KeyButtonStyle(size: 11))
+                Button("Capture") {}.buttonStyle(KeyButtonStyle(key: "Capture", lit: true, size: 16, big: true))
+                Button("Check levels") {}.buttonStyle(KeyButtonStyle(key: "Check levels", size: 14, big: true))
+                Button("Mic") {}.buttonStyle(KeyButtonStyle(key: "Mic", lit: true, size: 11))
+                Button("Off") {}.buttonStyle(KeyButtonStyle(key: "Off", size: 11))
             }
             HStack(spacing: 18) {
                 StatusLine(text: "Excellent", color: goodColor)
@@ -257,8 +257,8 @@ struct Shelf: View {
             // With the own pieces each box picture carries its right end's shadow (about 76 pt): the boxes overlap there.
             HStack(alignment: .top, spacing: g == nil ? 16 : -36) {
                 ShelfBox(finish: "bronze") {
-                    Button("Cab IR") { m.job = .cab }.buttonStyle(KeyButtonStyle(lit: m.job == .cab, size: 13))
-                    Button("Amp NAM") { m.job = .nam }.buttonStyle(KeyButtonStyle(lit: m.job == .nam, size: 13))
+                    Button("Cab IR") { m.job = .cab }.buttonStyle(KeyButtonStyle(key: "Cab IR", lit: m.job == .cab, size: 13))
+                    Button("Amp NAM") { m.job = .nam }.buttonStyle(KeyButtonStyle(key: "Amp NAM", lit: m.job == .nam, size: 13))
                 }
                 .disabled(m.busy != nil)
                 Spacer(minLength: 0)
@@ -284,7 +284,7 @@ struct Shelf: View {
                 .accessibilityLabel("Status: \(st.1)")
                 Spacer(minLength: 0)
                 ShelfBox(finish: "bronze") {
-                    Button("Help") { m.helpPage = .quickStart }.buttonStyle(KeyButtonStyle(size: 13))
+                    Button("Help") { m.helpPage = .quickStart }.buttonStyle(KeyButtonStyle(key: "Help", size: 13))
                 }
             }
             .padding(.horizontal, 26).offset(y: g?.boxTop ?? 2)
@@ -408,8 +408,8 @@ struct ErrorNote: View {
             }
             Text(text).font(.swellBody(13, semibold: true)).foregroundColor(Swell.tagError).fixedSize(horizontal: false, vertical: true)
             HStack {
-                if text.contains("Audio MIDI Setup") { Button("Open Audio MIDI Setup") { CoreAudioHelper.openAudioMIDISetup() } }
-                if text.contains("Privacy & Security") { Button("Open Privacy & Security") { NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")!) } }
+                if text.contains("Audio MIDI Setup") { Button("Open Audio MIDI Setup") { CoreAudioHelper.openAudioMIDISetup() }.buttonStyle(KeyButtonStyle(key: "Open Audio MIDI Setup")) }
+                if text.contains("Privacy & Security") { Button("Open Privacy & Security") { NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")!) }.buttonStyle(KeyButtonStyle(key: "Open Privacy & Security")) }
             }
         }
         .onPaper(padding: 11)
@@ -479,7 +479,7 @@ struct BusyLine: View {
                     }
                     if let p = b.progress { ProgressView(value: p).tint(Swell.amber) } else { ProgressView().controlSize(.small) }
                 }
-                if b.progress != nil { Button("Stop") { m.cancelCapture() }.buttonStyle(KeyButtonStyle(lit: true, size: 13)) }
+                if b.progress != nil { Button("Stop") { m.cancelCapture() }.buttonStyle(KeyButtonStyle(key: "Stop", lit: true, size: 13)) }
             }
         }
         if let e = m.errorText { ErrorNote(e) }
@@ -597,7 +597,7 @@ struct SaveFolderRow: View {
                 Text(m.outputFolder.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
                     .font(.swellBody(13)).truncationMode(.middle).frame(maxWidth: 420, alignment: .leading)
             }
-            Button("Change…") { m.chooseOutputFolder() }
+            Button("Change…") { m.chooseOutputFolder() }.buttonStyle(KeyButtonStyle(key: "Change…"))
         }
     }
 }
@@ -689,7 +689,7 @@ struct ResultsView: View {
             ForEach(r.warnings, id: \.self) { w in WarningTag(text: w, severe: r.droppedOut && w == r.warnings.first) }
             if r.droppedOut {
                 HStack {
-                    Button("Record again") { m.startCapture() }.buttonStyle(KeyButtonStyle(size: 13))
+                    Button("Record again") { m.startCapture() }.buttonStyle(KeyButtonStyle(key: "Record again", size: 13))
                         .disabled(m.busy != nil || m.captureProblem != nil)
                     Note("Quit other apps first (browsers, video calls, other audio software).")
                 }
@@ -721,8 +721,8 @@ struct ResultsView: View {
                 }
             }
             HStack(spacing: 10) {
-                Button("Show in Finder") { m.revealResult() }.buttonStyle(KeyButtonStyle(size: 13))
-                Button("Re-export…") { m.reexportMessage = nil; m.reexportFolder = r.folder }
+                Button("Show in Finder") { m.revealResult() }.buttonStyle(KeyButtonStyle(key: "Show in Finder", size: 13))
+                Button("Re-export…") { m.reexportMessage = nil; m.reexportFolder = r.folder }.buttonStyle(KeyButtonStyle(key: "Re-export…"))
                     .help("Make other formats from the raw take of this capture without a new recording")
                 Note("\(r.fileCount) IR files, README.txt and report.json in \(r.folder.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))")
                     .lineLimit(2)
@@ -750,9 +750,9 @@ struct ReexportSheet: View {
                 if let t = processing { StatusLine(text: t + "…", color: warnColor) }
                 HStack {
                     Spacer()
-                    Button("Cancel") { m.reexportFolder = nil }.keyboardShortcut(.cancelAction)
+                    Button("Cancel") { m.reexportFolder = nil }.buttonStyle(KeyButtonStyle(key: "Cancel")).keyboardShortcut(.cancelAction)
                     Button("Re-export") { if let f = m.reexportFolder { m.reexport(f) } }
-                        .keyboardShortcut(.defaultAction).buttonStyle(KeyButtonStyle(lit: processing != nil, size: 13))
+                        .keyboardShortcut(.defaultAction).buttonStyle(KeyButtonStyle(key: "Re-export", lit: processing != nil, size: 13))
                         .disabled(m.busy != nil || m.outputProblem != nil)
                 }
             }

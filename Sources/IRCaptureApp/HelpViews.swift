@@ -317,10 +317,10 @@ struct WelcomeSheet: View {
             }
             .frame(maxWidth: .infinity, minHeight: 360, alignment: .topLeading)
             HStack {
-                if page > 0 { Button("Back") { page -= 1 }.buttonStyle(KeyButtonStyle(size: 13)) }
+                if page > 0 { Button("Back") { page -= 1 }.buttonStyle(KeyButtonStyle(key: "Back", size: 13)) }
                 Spacer()
-                if page < 2 { Button("Next") { page += 1 }.keyboardShortcut(.defaultAction).buttonStyle(KeyButtonStyle(lit: true, size: 13)) }
-                else { Button("Start") { m.finishWelcome() }.keyboardShortcut(.defaultAction).buttonStyle(KeyButtonStyle(lit: true, size: 13)) }
+                if page < 2 { Button("Next") { page += 1 }.keyboardShortcut(.defaultAction).buttonStyle(KeyButtonStyle(key: "Next", lit: true, size: 13)) }
+                else { Button("Start") { m.finishWelcome() }.keyboardShortcut(.defaultAction).buttonStyle(KeyButtonStyle(key: "Start", lit: true, size: 13)) }
             }
         }
         .onCrinkle(padding: 30)
@@ -343,10 +343,10 @@ struct WelcomeSheet: View {
                 case .authorized:
                     StatusLine(text: "Allowed", color: goodColor)
                 case .notDetermined:
-                    Button("Allow recording…") { m.requestMicrophone() }.buttonStyle(KeyButtonStyle(size: 13))
+                    Button("Allow recording…") { m.requestMicrophone() }.buttonStyle(KeyButtonStyle(key: "Allow recording…", size: 13))
                 default:
                     StatusLine(text: "Recording is turned off for \(Product.name).", color: badColor)
-                    Button("Open Privacy & Security") { m.openPrivacySettings() }
+                    Button("Open Privacy & Security") { m.openPrivacySettings() }.buttonStyle(KeyButtonStyle(key: "Open Privacy & Security"))
                 }
             }
         }
@@ -389,7 +389,7 @@ struct HelpSheet: View {
             HStack {
                 KeyChoice(selection: $page, options: HelpPage.allCases.map { ($0, $0.title) }, size: 11)
                 Spacer()
-                Button("Done") { dismiss() }.keyboardShortcut(.defaultAction).buttonStyle(KeyButtonStyle(size: 12))
+                Button("Done") { dismiss() }.keyboardShortcut(.defaultAction).buttonStyle(KeyButtonStyle(key: "Done", size: 12))
             }.padding(.bottom, 14)
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
@@ -405,8 +405,8 @@ struct HelpSheet: View {
                 .padding(4)
             }
             HStack {
-                Button("Contact Support…") { m.contactSupport() }
-                Button("Show Log File") { Log.reveal() }
+                Button("Contact Support…") { m.contactSupport() }.buttonStyle(KeyButtonStyle(key: "Contact Support…"))
+                Button("Show Log File") { Log.reveal() }.buttonStyle(KeyButtonStyle(key: "Show Log File"))
                 Spacer()
                 Engraved("\(Product.name) \(Product.fullVersion)", size: 10, dim: true)
             }.padding(.top, 14)
@@ -479,7 +479,7 @@ struct TroubleshootingPage: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(t.0).font(.swellBody(14, semibold: true))
                 Note(t.1, color: .primary)
-                if t.1.contains("Audio MIDI Setup") { Button("Open Audio MIDI Setup") { CoreAudioHelper.openAudioMIDISetup() }.controlSize(.small) }
+                if t.1.contains("Audio MIDI Setup") { Button("Open Audio MIDI Setup") { CoreAudioHelper.openAudioMIDISetup() }.buttonStyle(KeyButtonStyle(key: "Open Audio MIDI Setup")).controlSize(.small) }
             }
         }
     }

@@ -13,7 +13,7 @@ struct CabJob: View {
         VStack(alignment: .leading, spacing: 18) {
             if m.cabImport {
                 HStack(spacing: 12) {
-                    Button("‹ Record here") { m.cabImport = false }
+                    Button("‹ Record here") { m.cabImport = false }.buttonStyle(KeyButtonStyle(key: "‹ Record here"))
                     Engraved("Import DAW recordings", size: 15)
                 }
                 CabImportSteps()
@@ -28,8 +28,8 @@ struct CabJob: View {
                         Note("Play the test signal from Logic, Reaper, Ableton, Pro Tools or GarageBand. Record the mics in the DAW. Import the files here.")
                     }
                     Spacer()
-                    Button("Import DAW recordings…") { m.cabImport = true }
-                    Button("Re-export a past capture…") { m.chooseReexportFolder() }
+                    Button("Import DAW recordings…") { m.cabImport = true }.buttonStyle(KeyButtonStyle(key: "Import DAW recordings…"))
+                    Button("Re-export a past capture…") { m.chooseReexportFolder() }.buttonStyle(KeyButtonStyle(key: "Re-export a past capture…"))
                 }
                 .onPanel(padding: 16)
             }
@@ -69,7 +69,7 @@ struct InterfaceRow: View {
     var body: some View {
         if m.duplexDevices.isEmpty {
             Note("No audio interface with both inputs and outputs is connected. Connect the interface and switch it on. It is listed here automatically.", color: badColor)
-            Button("Open Audio MIDI Setup") { CoreAudioHelper.openAudioMIDISetup() }
+            Button("Open Audio MIDI Setup") { CoreAudioHelper.openAudioMIDISetup() }.buttonStyle(KeyButtonStyle(key: "Open Audio MIDI Setup"))
                 .help("If inputs and outputs are on two devices, combine them into an aggregate device in Audio MIDI Setup")
         }
         HStack(spacing: 16) {
@@ -103,7 +103,7 @@ struct InputsGrid: View {
                         if row.role == .ref {
                             HStack(spacing: 6) {
                                 StatusLine(text: "Reference", color: lamp, diameter: 13)
-                                Button("Off") { m.setRole(.off, for: row.id) }.buttonStyle(KeyButtonStyle(size: 11))
+                                Button("Off") { m.setRole(.off, for: row.id) }.buttonStyle(KeyButtonStyle(key: "Off", size: 11))
                             }
                             .frame(width: 150, alignment: .leading)
                             Text("")
@@ -130,9 +130,9 @@ struct IdleSignalChips: View {
                 JewelLamp(colour: "amber", on: true, diameter: 15)
                 Text("Signal on Input \(r.channel + 1) (\(Int(r.peakDBFS.rounded())) dBFS). Use it?")
                 Spacer(minLength: 0)
-                Button("As a mic") { m.setRole(.mic, for: r.channel) }
+                Button("As a mic") { m.setRole(.mic, for: r.channel) }.buttonStyle(KeyButtonStyle(key: "As a mic"))
                 if m.refCandidate == r.channel || m.refInput == nil {
-                    Button(m.refCandidate == r.channel ? "As the reference (detected)" : "As the reference") { m.setRefInput(r.channel) }
+                    Button(m.refCandidate == r.channel ? "As the reference (detected)" : "As the reference") { m.setRefInput(r.channel) }.buttonStyle(KeyButtonStyle(key: "As the reference"))
                 }
             }
             .onPaper(padding: 9)
@@ -142,7 +142,7 @@ struct IdleSignalChips: View {
                 JewelLamp(colour: "amber", on: true, diameter: 15)
                 Text("Input \(c + 1) is probably a reference tap. Its signal arrives first and contains no cab or room sound.")
                 Spacer(minLength: 0)
-                Button("Use it as the reference") { m.setRefInput(c) }
+                Button("Use it as the reference") { m.setRefInput(c) }.buttonStyle(KeyButtonStyle(key: "Use it as the reference"))
             }
             .onPaper(padding: 9)
         }
@@ -165,7 +165,7 @@ struct ReferenceChooser: View {
             HStack(alignment: .top, spacing: 14) {
                 ForEach(RefSource.allCases) { s in
                     VStack(alignment: .leading, spacing: 8) {
-                        Button(s.title) { m.refSource = s }.buttonStyle(KeyButtonStyle(lit: m.refSource == s, size: 12))
+                        Button(s.title) { m.refSource = s }.buttonStyle(KeyButtonStyle(key: s.title, lit: m.refSource == s, size: 12))
                         Note(blurb(s))
                     }
                     .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -200,7 +200,7 @@ struct CabAdvanced: View {
                                 + m.deviceRates.map { ($0, "\(rateTag($0).dropLast()) kHz") })
                     GlassMenu(title: "Sweep level", selection: $m.levelChoice,
                               options: [(0.0, "Automatic")] + [-6.0, -12, -18, -24].map { ($0, "\(Int($0)) dBFS") })
-                    Button("Open Audio MIDI Setup") { CoreAudioHelper.openAudioMIDISetup() }
+                    Button("Open Audio MIDI Setup") { CoreAudioHelper.openAudioMIDISetup() }.buttonStyle(KeyButtonStyle(key: "Open Audio MIDI Setup"))
                 }
                 Note("Automatic sweep level: starts at −18 dBFS and is raised in steps while speaker distortion stays low. It is reduced if distortion increases.")
                 SweepSettings()
@@ -224,7 +224,7 @@ struct CabLevelStep: View {
             ], style: PaperStyle(stock: .manila, tape: true, tilt: 0.25, ring: true))
             HStack(spacing: 12) {
                 Button(m.levelRunning ? "Stop" : "Check levels") { m.toggleLevelCheck() }
-                    .buttonStyle(KeyButtonStyle(lit: m.levelRunning, size: 14, big: true))
+                    .buttonStyle(KeyButtonStyle(key: "Check levels", lit: m.levelRunning, size: 14, big: true))
                     .disabled(m.busy != nil || m.device == nil)
                 if m.levelRunning { StatusLine(text: m.levelPhase ?? "Looping…", color: warnColor) }
                 Spacer()
@@ -303,7 +303,7 @@ struct CabCaptureStep: View {
             PreflightList(items: m.preflight)
             HStack(spacing: 14) {
                 Button("Capture") { m.startCapture() }
-                    .buttonStyle(KeyButtonStyle(lit: m.busy?.progress != nil, size: 16, big: true))
+                    .buttonStyle(KeyButtonStyle(key: "Capture", lit: m.busy?.progress != nil, size: 16, big: true))
                     .disabled(m.busy != nil || m.captureProblem != nil)
                 if let p = m.captureProblem, m.busy == nil { WarningTag(text: p) }
             }
@@ -340,8 +340,8 @@ struct CabImportSteps: View {
                 }
                 SweepSettings()
                 HStack {
-                    Button("Save test signal…") { m.saveTestSignal() }.buttonStyle(KeyButtonStyle(size: 13))
-                    Button("Load settings from a test signal…") { m.loadSignalSettings() }
+                    Button("Save test signal…") { m.saveTestSignal() }.buttonStyle(KeyButtonStyle(key: "Save test signal…", size: 13))
+                    Button("Load settings from a test signal…") { m.loadSignalSettings() }.buttonStyle(KeyButtonStyle(key: "Load settings from a test signal…"))
                 }
                 Note(m.signalMessage ?? "Use the same settings when the recordings are added in step 3. The settings are saved.")
             }
@@ -375,7 +375,7 @@ struct CabImportSteps: View {
                 AdvancedOutput()
                 HStack(spacing: 14) {
                     Button("Make IRs") { m.processLogic() }
-                        .buttonStyle(KeyButtonStyle(lit: m.busy != nil, size: 16, big: true))
+                        .buttonStyle(KeyButtonStyle(key: "Make IRs", lit: m.busy != nil, size: 16, big: true))
                         .disabled(m.busy != nil || m.logicProblem != nil)
                     if let p = m.logicProblem, m.busy == nil, !m.logicChannels.isEmpty { WarningTag(text: p) }
                 }
@@ -405,7 +405,7 @@ struct LogicGrid: View {
                     KeyChoice(selection: Binding(get: { c.role }, set: { m.setLogicRole($0, for: c.id) }),
                               options: [(Role.mic, "Mic"), (Role.ref, "Ref"), (Role.off, "Skip")], size: 10)
                     if c.channel == 0 {
-                        Button("Remove") { m.removeLogicFile(c.url) }.buttonStyle(KeyButtonStyle(size: 10)).help("Remove this file")
+                        Button("Remove") { m.removeLogicFile(c.url) }.buttonStyle(KeyButtonStyle(key: "Remove", size: 10)).help("Remove this file")
                     } else { Text("") }
                 }
             }
@@ -420,7 +420,7 @@ struct DropPlate: View {
     var body: some View {
         VStack(spacing: 10) {
             Engraved("Drop to load: the exported WAV files", size: 12).onPaper(padding: 8, fill: false)
-            Button("Choose files…") { choose() }
+            Button("Choose files…") { choose() }.buttonStyle(KeyButtonStyle(key: "Choose files…"))
             Note(note)
         }
         .frame(maxWidth: .infinity).padding(.vertical, 20)

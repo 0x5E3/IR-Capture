@@ -191,7 +191,7 @@ struct PanelStock: View {
     @Environment(\.swellTheme) private var theme
     var body: some View {
         let b = Double((seed * 37) % 7 - 3) * 0.007, sat = 1 + Double((seed * 53) % 5 - 2) * 0.025
-        Panel9Slice(piece: SwellNine.stepPanel(for: theme)).brightness(b).saturation(sat)
+        Panel9Slice(piece: SwellNine.stepPanel(for: theme, alternate: seed > 0 && seed % 2 == 0)).brightness(b).saturation(sat)
     }
 }
 
@@ -397,7 +397,7 @@ struct KeyChoice<T: Hashable>: View {
         HStack(spacing: 6) {
             ForEach(options.indices, id: \.self) { i in
                 Button(options[i].1) { selection = options[i].0 }
-                    .buttonStyle(KeyButtonStyle(lit: options[i].0 == selection, size: size))
+                    .buttonStyle(KeyButtonStyle(key: options[i].1, lit: options[i].0 == selection, size: size))
             }
         }
     }
