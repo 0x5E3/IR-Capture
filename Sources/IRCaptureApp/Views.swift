@@ -28,6 +28,9 @@ struct IRCaptureApp: App {
             CommandGroup(replacing: .appInfo) {
                 Button("About \(Product.name)") { Support.showAbout() }
             }
+            CommandGroup(after: .toolbar) {
+                PageSizeMenu()
+            }
             CommandGroup(replacing: .help) {
                 Button("Quick Start") { model.helpPage = .quickStart }
                 Button("Wiring") { model.helpPage = .wiring }
@@ -44,9 +47,68 @@ struct IRCaptureApp: App {
     }
 }
 
+/// View › Page Size: how large the page is drawn. Fit to Window (the default) grows it with the window's width.
+enum PageSize: String, CaseIterable {
+    case fit, actual, large, larger
+    static let key = "pageSize"
+    /// The page's own width at actual size (the 900 pt column, the stage's padding and moulding).
+    static let baseWidth: CGFloat = 960
+    var title: String {
+        switch self {
+        case .fit: return "Fit to Window"
+        case .actual: return "Actual Size"
+        case .large: return "Large (125 %)"
+        case .larger: return "Larger (150 %)"
+        }
+    }
+    static func scale(_ p: PageSize, window: CGSize) -> CGFloat {
+        if let i = ProcessInfo.processInfo.arguments.firstIndex(of: "--page-scale"), i + 1 < ProcessInfo.processInfo.arguments.count,
+           let v = Double(ProcessInfo.processInfo.arguments[i + 1]) { return CGFloat(v) }       // CI hook
+        switch p {
+        case .actual: return 1
+        case .large: return 1.25
+        case .larger: return 1.5
+        case .fit:
+            guard window.width > 0 else { return 1 }
+            // in steps of 1/16, so a window being resized doesn't redraw every picture at every pixel
+            let s = min(1.5, max(1, window.width / baseWidth))
+            return (s * 16).rounded(.down) / 16
+        }
+    }
+}
+
+struct PageSizeMenu: View {
+    @AppStorage(PageSize.key) private var pageSize = PageSize.fit.rawValue
+    var body: some View {
+        Picker("Page Size", selection: $pageSize) {
+            ForEach(PageSize.allCases, id: \.rawValue) { Text($0.title).tag($0.rawValue) }
+        }
+    }
+}
+
 struct ContentView: View {
     @EnvironmentObject var m: AppModel
+    @AppStorage(PageSize.key) private var pageSize = PageSize.fit.rawValue
     var body: some View {
+        // (11-10, Lowell: "scale larger as long as it's still super crisp") The whole page, wall and shelf included,
+        // is laid out at its own size and drawn larger: Fit to Window grows it with a wide window (up to 1.5 times),
+        // or a fixed size from View › Page Size. The pictures carry 3 to 6 px a point, enough for 1.5 times on Retina.
+        GeometryReader { g in
+            let s = PageSize.scale(PageSize(rawValue: pageSize) ?? .fit, window: g.size)
+            page
+                .frame(width: g.size.width / s, height: g.size.height / s)
+                .scaleEffect(s, anchor: .topLeading)
+        }
+        .background(WorkshopWall().ignoresSafeArea())
+        .sheet(isPresented: $m.showWelcome) { WelcomeSheet().environmentObject(m).workshopDefaults(.panel) }
+        .sheet(item: $m.helpPage) { p in HelpSheet(page: p).environmentObject(m).workshopDefaults(.panel) }
+        .sheet(isPresented: Binding(get: { m.reexportFolder != nil }, set: { if !$0 { m.reexportFolder = nil } })) {
+            ReexportSheet().environmentObject(m).workshopDefaults(.panel)
+        }
+        .onAppear { runAutomation() }
+    }
+
+    @ViewBuilder var page: some View {
         VStack(spacing: 0) {
             Shelf()
             StageOpening {
@@ -76,14 +138,8 @@ struct ContentView: View {
             }
             .padding(.horizontal, 24).padding(.bottom, 22)
         }
-        .background(WorkshopWall().ignoresSafeArea())
+        .background(WorkshopWall())
         .workshopDefaults()
-        .sheet(isPresented: $m.showWelcome) { WelcomeSheet().environmentObject(m).workshopDefaults(.panel) }
-        .sheet(item: $m.helpPage) { p in HelpSheet(page: p).environmentObject(m).workshopDefaults(.panel) }
-        .sheet(isPresented: Binding(get: { m.reexportFolder != nil }, set: { if !$0 { m.reexportFolder = nil } })) {
-            ReexportSheet().environmentObject(m).workshopDefaults(.panel)
-        }
-        .onAppear { runAutomation() }
     }
 
     /// CI hooks: process the simulated recordings, render the diagrams, or open a given view.

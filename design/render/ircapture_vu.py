@@ -146,8 +146,16 @@ def card_material(path, w, h, lit):
 
 
 def phenolic(name='vubezel'):
-    """Black phenolic, moulded: a satin skin, a faint orange peel, the edges handled to a dull sheen, dust in the
-    corners."""
+    """(11-10, Lowell: the bezel "a little too clean and smooth digital") Black phenolic on finish_maps' true-scale
+    maps: the moulded skin's fine peel, hairline scratches from years of handling, small chips at the corners and
+    edges showing the brown filler under the skin, dust and grime in the window's corners. VU_BEZEL=plain: the first
+    version below."""
+    if os.environ.get('VU_BEZEL') != 'plain':
+        import finish_maps as FM
+        m = FM.material(name, os.environ.get('VU_BEZEL_KIND', 'powder'), '#0d0c0b', float(os.environ.get('VU_BEZEL_WEAR', '0.45')), 4211, 'irc-vu-bezel',
+                        bare='#3b2c22', dirt='#1e1b17', dirt_k=0.35, coat_rough=0.5)
+        K.calm_up(m, 0.6)
+        return m
     m = mat(name, srgb('#121110'), rough=0.38, coat=0.25, coat_rough=0.25, spec=0.4)
     nt = m.node_tree; co = obj_coords(nt)
     add_bump(m, noise(nt, co, 60.0, 3.0, 0.6), 0.05, 0.002)

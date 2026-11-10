@@ -194,6 +194,12 @@ jobs:
           kill -0 $PID || { echo "::error title=Smoke test::The app quit or crashed scrolling to the cart machine"; exit 1; }
           screencapture -x dist/screenshot-cart.png || echo "screenshot failed"
           kill $PID; sleep 1
+          # (11-10) View › Page Size: the reel deck drawn 1.5 times larger (check the text and pictures stay sharp)
+          "$EXE" --cab-tab --scroll-to-machine --page-scale 1.5 & PID=$!
+          sleep 7
+          kill -0 $PID || { echo "::error title=Smoke test::The app quit or crashed at page scale 1.5"; exit 1; }
+          screencapture -x dist/screenshot-deck-150.png || echo "screenshot failed"
+          kill $PID; sleep 1
           for page in reference troubleshooting; do
             "$EXE" --help-page $page & PID=$!
             sleep 4
