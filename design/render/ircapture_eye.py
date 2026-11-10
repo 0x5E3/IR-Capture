@@ -54,6 +54,12 @@ def scene():
     except Exception: pass
     if os.environ.get('IRC_ROOM', '1') != '0': MK.room_world(s)
     s.render.film_transparent = True
+    # (11-10 proof) the studio's top softbox showed as a hard bright rectangle on the dome and the cap, the flat plugin
+    # look the rules rule out; it still lights the eye, only it is not mirrored (the room in the world still is)
+    for o in s.objects:
+        if o.name.split('.')[0] in ('top', 'topL'):
+            try: o.visible_glossy = False
+            except Exception: pass
     side = int(round(2 * HALF * PXCM / 4)) * 4
     s.render.resolution_x = s.render.resolution_y = side
     cam.data.ortho_scale = side / PXCM
