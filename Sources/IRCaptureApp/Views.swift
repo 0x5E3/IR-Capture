@@ -61,7 +61,15 @@ enum PageSize: String, CaseIterable {
         case .larger: return "Larger (150 %)"
         }
     }
+    /// The page's smallest size (the window's minimum): a scale never lays it out smaller than this, so the
+    /// shelf and the stage never overrun each other in a small window.
+    static let minPage = CGSize(width: 780, height: 640)
     static func scale(_ p: PageSize, window: CGSize) -> CGFloat {
+        let wanted = rawScale(p, window: window)
+        guard window.width > 0, window.height > 0 else { return 1 }
+        return max(1, min(wanted, window.width / minPage.width, window.height / minPage.height))
+    }
+    static func rawScale(_ p: PageSize, window: CGSize) -> CGFloat {
         if let i = ProcessInfo.processInfo.arguments.firstIndex(of: "--page-scale"), i + 1 < ProcessInfo.processInfo.arguments.count,
            let v = Double(ProcessInfo.processInfo.arguments[i + 1]) { return CGFloat(v) }       // CI hook
         switch p {
