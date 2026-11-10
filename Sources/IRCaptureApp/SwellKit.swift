@@ -125,6 +125,14 @@ final class SwellPictures {
         return nil
     }
 
+    /// The picture for a strip and its scale (pixels a point): the @2x file when there is one.
+    func stripImage(_ name: String, pxPerPoint: CGFloat) -> (CGImage, CGFloat)? {
+        if let c2 = cgImage(name + "@2x.webp") { return (c2, pxPerPoint * 2) }
+        if let c1 = cgImage(name + ".webp") { return (c1, pxPerPoint) }
+        NSLog("SwellKit: missing %@.webp", name)
+        return nil
+    }
+
     /// `name` without extension: "frame-win-circ" loads frame-win-circ.webp and, if present, frame-win-circ@2x.webp.
     func image(_ name: String, pxPerPoint: CGFloat) -> NSImage? {
         let key = "\(name)|\(pxPerPoint)"

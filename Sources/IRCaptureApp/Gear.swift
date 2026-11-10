@@ -850,18 +850,42 @@ struct WorkshopWall: View {
 }
 
 /// A strip from the frame (plank, trim) at its rendered height, cropped to length, never stretched.
+/// (11-10) Laid as copies of the picture side by side, clipped, rather than SwiftUI's tiled image: under View › Page
+/// Size's scale the tiled strip drew enlarged and dark over the shelf boxes. The 11-10 strips are long enough that
+/// one copy fills a large screen.
 struct FrameStrip: View {
     let name: String
     let height: CGFloat
     var vertical = false
     var pxPerPoint: CGFloat = 1.6
     var body: some View {
-        if let img = SwellPictures.shared.tileImage(name, pxPerPoint: pxPerPoint) {
-            img.resizable(resizingMode: .tile)
-                .frame(width: vertical ? height : nil, height: vertical ? nil : height)
-                .frame(maxWidth: vertical ? nil : .infinity, maxHeight: vertical ? .infinity : nil, alignment: .topLeading)
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
+        if let st = SwellPictures.shared.stripImage(name, pxPerPoint: pxPerPoint) {
+            let cg = st.0, scale = st.1
+            let len = (vertical ? CGFloat(cg.height) : CGFloat(cg.width)) / scale
+            let thick = (vertical ? CGFloat(cg.width) : CGFloat(cg.height)) / scale
+            let n = max(1, Int((4000 / max(len, 1)).rounded(.up)))
+            Group {
+                if vertical {
+                    VStack(spacing: 0) {
+                        ForEach(0..<n, id: \.self) { _ in
+                            Image(decorative: cg, scale: scale).resizable().interpolation(.high).frame(width: thick, height: len)
+                        }
+                    }
+                    .frame(width: height, alignment: .topLeading)
+                    .frame(maxHeight: .infinity, alignment: .topLeading)
+                } else {
+                    HStack(spacing: 0) {
+                        ForEach(0..<n, id: \.self) { _ in
+                            Image(decorative: cg, scale: scale).resizable().interpolation(.high).frame(width: len, height: thick)
+                        }
+                    }
+                    .frame(height: height, alignment: .topLeading)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                }
+            }
+            .clipped()
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
         }
     }
 }
