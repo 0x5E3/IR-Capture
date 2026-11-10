@@ -1,5 +1,5 @@
 {
- "about": "The bench's rendered pieces for IR Capture (desktop-bench, branch irkit, helper irkit, 2026-11-03). Sizes in px are the file's pixels; points (pt) are SwiftUI points, px_per_pt says how many of the 1x file's pixels make a point (the @2x file has twice). capInsets are SwiftUI EdgeInsets in points for Image(nsImage:).resizable(capInsets:resizingMode:) on an NSImage whose size is set in points (SwellKit.swift's SwellPictures does it). rects are in the named file's pixels, origin top left.",
+ "about": "The bench's rendered pieces for IR Capture (desktop-bench, branch look; first made 2026-11-03 by helper irkit, rebuilt 2026-11-10 from the white-light renders). Sizes in px are the file's pixels; points (pt) are SwiftUI points, px_per_pt says how many of the 1x file's pixels make a point (the @2x file has twice). capInsets are SwiftUI EdgeInsets in points for Image(nsImage:).resizable(capInsets:resizingMode:) on an NSImage whose size is set in points (SwellKit.swift's SwellPictures does it). rects are in the named file's pixels, origin top left.",
  "ref": {
   "window": [
    1440,
@@ -69,9 +69,9 @@
     53.75
    ],
    "ref_rect": [
-    -1100,
+    -1100.0,
     56,
-    1100,
+    1100.0,
     110
    ],
    "kind": "strip",
@@ -90,9 +90,9 @@
     68.12
    ],
    "ref_rect": [
-    -804,
+    -810,
     2,
-    200,
+    194,
     70
    ],
    "kind": "nine",
@@ -109,18 +109,18 @@
    "file": "frame-box-keys.webp",
    "x2": "frame-box-keys@2x.webp",
    "px": [
-    646,
+    624,
     109
    ],
    "px_per_pt": 1.6,
    "pt": [
-    403.75,
+    390.0,
     68.12
    ],
    "ref_rect": [
     66,
     2,
-    470,
+    456,
     70
    ],
    "kind": "nine",
@@ -137,18 +137,18 @@
    "file": "frame-box-pages.webp",
    "x2": "frame-box-pages@2x.webp",
    "px": [
-    685,
+    672,
     109
    ],
    "px_per_pt": 1.6,
    "pt": [
-    428.12,
+    420.0,
     68.12
    ],
    "ref_rect": [
-    412,
+    342,
     2,
-    840,
+    762,
     70
    ],
    "kind": "nine",
@@ -334,10 +334,10 @@
    "file": "frame-backdrop.webp",
    "x2": null,
    "px": [
-    2080,
-    1328
+    5200,
+    3320
    ],
-   "px_per_pt": 1.6,
+   "px_per_pt": 4.0,
    "pt": [
     1300.0,
     830.0
@@ -812,6 +812,296 @@
    },
    "how": "the shelf's jewel pilot: off, amber (busy), red (error); dark while all is well"
   },
+  "frame-box-circ-702": {
+   "file": "frame-box-circ-702.webp",
+   "x2": "frame-box-circ-702@2x.webp",
+   "px": [
+    1210,
+    109
+   ],
+   "px_per_pt": 1.6,
+   "pt": [
+    756.25,
+    68.12
+   ],
+   "ref_rect": [
+    -716,
+    2,
+    40,
+    70
+   ],
+   "kind": "nine",
+   "capInsets": {
+    "top": 10,
+    "leading": 26,
+    "bottom": 8,
+    "trailing": 76
+   },
+   "resizingMode": "tile",
+   "how": "corners whole; edges and middle repeated from the render (the bench crops or repeats, never stretches)"
+  },
+  "frame-box-circ-772": {
+   "file": "frame-box-circ-772.webp",
+   "x2": "frame-box-circ-772@2x.webp",
+   "px": [
+    1322,
+    109
+   ],
+   "px_per_pt": 1.6,
+   "pt": [
+    826.25,
+    68.12
+   ],
+   "ref_rect": [
+    -716,
+    2,
+    110,
+    70
+   ],
+   "kind": "nine",
+   "capInsets": {
+    "top": 10,
+    "leading": 26,
+    "bottom": 8,
+    "trailing": 76
+   },
+   "resizingMode": "tile",
+   "how": "corners whole; edges and middle repeated from the render (the bench crops or repeats, never stretches)"
+  },
+  "frame-box-circ-862": {
+   "file": "frame-box-circ-862.webp",
+   "x2": "frame-box-circ-862@2x.webp",
+   "px": [
+    1466,
+    109
+   ],
+   "px_per_pt": 1.6,
+   "pt": [
+    916.25,
+    68.12
+   ],
+   "ref_rect": [
+    -796,
+    2,
+    120,
+    70
+   ],
+   "kind": "nine",
+   "capInsets": {
+    "top": 10,
+    "leading": 26,
+    "bottom": 8,
+    "trailing": 76
+   },
+   "resizingMode": "tile",
+   "how": "corners whole; edges and middle repeated from the render (the bench crops or repeats, never stretches)"
+  },
+  "frame-box-circ-932": {
+   "file": "frame-box-circ-932.webp",
+   "x2": "frame-box-circ-932@2x.webp",
+   "px": [
+    1578,
+    109
+   ],
+   "px_per_pt": 1.6,
+   "pt": [
+    986.25,
+    68.12
+   ],
+   "ref_rect": [
+    -796,
+    2,
+    190,
+    70
+   ],
+   "kind": "nine",
+   "capInsets": {
+    "top": 10,
+    "leading": 26,
+    "bottom": 8,
+    "trailing": 76
+   },
+   "resizingMode": "tile",
+   "how": "corners whole; edges and middle repeated from the render (the bench crops or repeats, never stretches)"
+  },
+  "frame-box-circ-950": {
+   "file": "frame-box-circ-950.webp",
+   "x2": "frame-box-circ-950@2x.webp",
+   "px": [
+    1606,
+    109
+   ],
+   "px_per_pt": 1.6,
+   "pt": [
+    1003.75,
+    68.12
+   ],
+   "ref_rect": [
+    -810,
+    2,
+    194,
+    70
+   ],
+   "kind": "nine",
+   "capInsets": {
+    "top": 10,
+    "leading": 26,
+    "bottom": 8,
+    "trailing": 76
+   },
+   "resizingMode": "tile",
+   "how": "corners whole; edges and middle repeated from the render (the bench crops or repeats, never stretches)"
+  },
+  "frame-box-keys-336": {
+   "file": "frame-box-keys-336.webp",
+   "x2": "frame-box-keys-336@2x.webp",
+   "px": [
+    624,
+    109
+   ],
+   "px_per_pt": 1.6,
+   "pt": [
+    390.0,
+    68.12
+   ],
+   "ref_rect": [
+    66,
+    2,
+    456,
+    70
+   ],
+   "kind": "nine",
+   "capInsets": {
+    "top": 10,
+    "leading": 26,
+    "bottom": 8,
+    "trailing": 76
+   },
+   "resizingMode": "tile",
+   "how": "corners whole; edges and middle repeated from the render (the bench crops or repeats, never stretches)"
+  },
+  "frame-box-pages-296": {
+   "file": "frame-box-pages-296.webp",
+   "x2": "frame-box-pages-296@2x.webp",
+   "px": [
+    560,
+    109
+   ],
+   "px_per_pt": 1.6,
+   "pt": [
+    350.0,
+    68.12
+   ],
+   "ref_rect": [
+    412,
+    2,
+    762,
+    70
+   ],
+   "kind": "nine",
+   "capInsets": {
+    "top": 10,
+    "leading": 26,
+    "bottom": 8,
+    "trailing": 76
+   },
+   "resizingMode": "tile",
+   "how": "corners whole; edges and middle repeated from the render (the bench crops or repeats, never stretches)"
+  },
+  "frame-box-pages-366": {
+   "file": "frame-box-pages-366.webp",
+   "x2": "frame-box-pages-366@2x.webp",
+   "px": [
+    672,
+    109
+   ],
+   "px_per_pt": 1.6,
+   "pt": [
+    420.0,
+    68.12
+   ],
+   "ref_rect": [
+    342,
+    2,
+    762,
+    70
+   ],
+   "kind": "nine",
+   "capInsets": {
+    "top": 10,
+    "leading": 26,
+    "bottom": 8,
+    "trailing": 76
+   },
+   "resizingMode": "tile",
+   "how": "corners whole; edges and middle repeated from the render (the bench crops or repeats, never stretches)"
+  },
+  "frame-key-load": {
+   "file": "frame-key-load.webp",
+   "x2": "frame-key-load@2x.webp",
+   "px": [
+    138,
+    384
+   ],
+   "px_per_pt": 1.6,
+   "pt": [
+    86.25,
+    240.0
+   ],
+   "ref_rect": [
+    -43.0,
+    7.0,
+    43.0,
+    67.0
+   ]
+  },
+  "frame-roll-wheel": {
+   "file": "frame-roll-wheel.webp",
+   "x2": "frame-roll-wheel@2x.webp",
+   "px": [
+    540,
+    80
+   ],
+   "px_per_pt": 1.6,
+   "pt": [
+    337.5,
+    50.0
+   ],
+   "ref_rect": [
+    -699,
+    12,
+    -671,
+    62
+   ]
+  },
+  "frame-roll-plate": {
+   "file": "frame-roll-plate.webp",
+   "x2": "frame-roll-plate@2x.webp",
+   "px": [
+    1235,
+    106
+   ],
+   "px_per_pt": 1.6,
+   "pt": [
+    771.88,
+    66.25
+   ],
+   "ref_rect": [
+    -670,
+    4,
+    102.0,
+    70
+   ],
+   "kind": "nine",
+   "capInsets": {
+    "top": 0,
+    "leading": 30,
+    "bottom": 0,
+    "trailing": 30
+   },
+   "resizingMode": "tile",
+   "how": "corners whole; edges and middle repeated from the render (the bench crops or repeats, never stretches)"
+  },
   "rkit-key-off": {
    "file": "rkit-key-off.webp",
    "x2": null,
@@ -980,6 +1270,511 @@
    "kind": "whole",
    "how": "a slider's bakelite fader cap (12 x 19 pt in the bench)"
   },
+  "ircapture-keys": {
+   "file": "ircapture-keys.webp",
+   "x2": null,
+   "px": [
+    5194,
+    768
+   ],
+   "kind": "sprite",
+   "names": [
+    "CAB IR",
+    "AMP NAM",
+    "SIGNAL",
+    "CONNECT",
+    "LEVELS",
+    "CAPTURE",
+    "RECORD",
+    "RESULTS",
+    "UPLOAD",
+    "CHECK",
+    "STOP",
+    "IMPORT",
+    "FINDER",
+    "HELP"
+   ],
+   "rows": [
+    "off",
+    "lit",
+    "down",
+    "litdown"
+   ],
+   "cell_px": [
+    371,
+    192
+   ],
+   "ref_px_per_px": 0.31,
+   "rects_px": {
+    "CAB IR/off": [
+     0,
+     0,
+     371,
+     192
+    ],
+    "AMP NAM/off": [
+     371,
+     0,
+     371,
+     192
+    ],
+    "SIGNAL/off": [
+     742,
+     0,
+     371,
+     192
+    ],
+    "CONNECT/off": [
+     1113,
+     0,
+     371,
+     192
+    ],
+    "LEVELS/off": [
+     1484,
+     0,
+     371,
+     192
+    ],
+    "CAPTURE/off": [
+     1855,
+     0,
+     371,
+     192
+    ],
+    "RECORD/off": [
+     2226,
+     0,
+     371,
+     192
+    ],
+    "RESULTS/off": [
+     2597,
+     0,
+     371,
+     192
+    ],
+    "UPLOAD/off": [
+     2968,
+     0,
+     371,
+     192
+    ],
+    "CHECK/off": [
+     3339,
+     0,
+     371,
+     192
+    ],
+    "STOP/off": [
+     3710,
+     0,
+     371,
+     192
+    ],
+    "IMPORT/off": [
+     4081,
+     0,
+     371,
+     192
+    ],
+    "FINDER/off": [
+     4452,
+     0,
+     371,
+     192
+    ],
+    "HELP/off": [
+     4823,
+     0,
+     371,
+     192
+    ],
+    "CAB IR/lit": [
+     0,
+     192,
+     371,
+     192
+    ],
+    "AMP NAM/lit": [
+     371,
+     192,
+     371,
+     192
+    ],
+    "SIGNAL/lit": [
+     742,
+     192,
+     371,
+     192
+    ],
+    "CONNECT/lit": [
+     1113,
+     192,
+     371,
+     192
+    ],
+    "LEVELS/lit": [
+     1484,
+     192,
+     371,
+     192
+    ],
+    "CAPTURE/lit": [
+     1855,
+     192,
+     371,
+     192
+    ],
+    "RECORD/lit": [
+     2226,
+     192,
+     371,
+     192
+    ],
+    "RESULTS/lit": [
+     2597,
+     192,
+     371,
+     192
+    ],
+    "UPLOAD/lit": [
+     2968,
+     192,
+     371,
+     192
+    ],
+    "CHECK/lit": [
+     3339,
+     192,
+     371,
+     192
+    ],
+    "STOP/lit": [
+     3710,
+     192,
+     371,
+     192
+    ],
+    "IMPORT/lit": [
+     4081,
+     192,
+     371,
+     192
+    ],
+    "FINDER/lit": [
+     4452,
+     192,
+     371,
+     192
+    ],
+    "HELP/lit": [
+     4823,
+     192,
+     371,
+     192
+    ],
+    "CAB IR/down": [
+     0,
+     384,
+     371,
+     192
+    ],
+    "AMP NAM/down": [
+     371,
+     384,
+     371,
+     192
+    ],
+    "SIGNAL/down": [
+     742,
+     384,
+     371,
+     192
+    ],
+    "CONNECT/down": [
+     1113,
+     384,
+     371,
+     192
+    ],
+    "LEVELS/down": [
+     1484,
+     384,
+     371,
+     192
+    ],
+    "CAPTURE/down": [
+     1855,
+     384,
+     371,
+     192
+    ],
+    "RECORD/down": [
+     2226,
+     384,
+     371,
+     192
+    ],
+    "RESULTS/down": [
+     2597,
+     384,
+     371,
+     192
+    ],
+    "UPLOAD/down": [
+     2968,
+     384,
+     371,
+     192
+    ],
+    "CHECK/down": [
+     3339,
+     384,
+     371,
+     192
+    ],
+    "STOP/down": [
+     3710,
+     384,
+     371,
+     192
+    ],
+    "IMPORT/down": [
+     4081,
+     384,
+     371,
+     192
+    ],
+    "FINDER/down": [
+     4452,
+     384,
+     371,
+     192
+    ],
+    "HELP/down": [
+     4823,
+     384,
+     371,
+     192
+    ],
+    "CAB IR/litdown": [
+     0,
+     576,
+     371,
+     192
+    ],
+    "AMP NAM/litdown": [
+     371,
+     576,
+     371,
+     192
+    ],
+    "SIGNAL/litdown": [
+     742,
+     576,
+     371,
+     192
+    ],
+    "CONNECT/litdown": [
+     1113,
+     576,
+     371,
+     192
+    ],
+    "LEVELS/litdown": [
+     1484,
+     576,
+     371,
+     192
+    ],
+    "CAPTURE/litdown": [
+     1855,
+     576,
+     371,
+     192
+    ],
+    "RECORD/litdown": [
+     2226,
+     576,
+     371,
+     192
+    ],
+    "RESULTS/litdown": [
+     2597,
+     576,
+     371,
+     192
+    ],
+    "UPLOAD/litdown": [
+     2968,
+     576,
+     371,
+     192
+    ],
+    "CHECK/litdown": [
+     3339,
+     576,
+     371,
+     192
+    ],
+    "STOP/litdown": [
+     3710,
+     576,
+     371,
+     192
+    ],
+    "IMPORT/litdown": [
+     4081,
+     576,
+     371,
+     192
+    ],
+    "FINDER/litdown": [
+     4452,
+     576,
+     371,
+     192
+    ],
+    "HELP/litdown": [
+     4823,
+     576,
+     371,
+     192
+    ]
+   },
+   "how": "the shelf's illuminated key with IR Capture's legends baked in (the Audio page's wide cap, 88 x 32 pt), in the bench's white frame light; ircapture-keys.json is audio_post.py's own layout of the sheet"
+  },
+  "rkit48-key-off": {
+   "file": "rkit48-key-off.webp",
+   "x2": null,
+   "px": [
+    244,
+    119
+   ],
+   "px_per_pt": 4.8,
+   "pt": [
+    50.83,
+    24.79
+   ],
+   "kind": "nine",
+   "capInsets": {
+    "top": 5.42,
+    "leading": 5.42,
+    "bottom": 5.42,
+    "trailing": 5.42
+   },
+   "resizingMode": "stretch",
+   "shadow_margin_pt": 1.2,
+   "how": "the blank key, off, at 48 px a cm; rkit-key-off at twice the density, lossless"
+  },
+  "rkit48-key-lit": {
+   "file": "rkit48-key-lit.webp",
+   "x2": null,
+   "px": [
+    244,
+    119
+   ],
+   "px_per_pt": 4.8,
+   "pt": [
+    50.83,
+    24.79
+   ],
+   "kind": "nine",
+   "capInsets": {
+    "top": 5.42,
+    "leading": 5.42,
+    "bottom": 5.42,
+    "trailing": 5.42
+   },
+   "resizingMode": "stretch",
+   "shadow_margin_pt": 1.2,
+   "how": "lit; rkit-key-lit at twice the density, lossless"
+  },
+  "rkit48-key-down": {
+   "file": "rkit48-key-down.webp",
+   "x2": null,
+   "px": [
+    244,
+    119
+   ],
+   "px_per_pt": 4.8,
+   "pt": [
+    50.83,
+    24.79
+   ],
+   "kind": "nine",
+   "capInsets": {
+    "top": 5.42,
+    "leading": 5.42,
+    "bottom": 5.42,
+    "trailing": 5.42
+   },
+   "resizingMode": "stretch",
+   "shadow_margin_pt": 1.2,
+   "how": "held down; rkit-key-down at twice the density, lossless"
+  },
+  "rkit48-key-litdown": {
+   "file": "rkit48-key-litdown.webp",
+   "x2": null,
+   "px": [
+    244,
+    119
+   ],
+   "px_per_pt": 4.8,
+   "pt": [
+    50.83,
+    24.79
+   ],
+   "kind": "nine",
+   "capInsets": {
+    "top": 5.42,
+    "leading": 5.42,
+    "bottom": 5.42,
+    "trailing": 5.42
+   },
+   "resizingMode": "stretch",
+   "shadow_margin_pt": 1.2,
+   "how": "lit and held down; rkit-key-litdown at twice the density, lossless"
+  },
+  "rkit48-win": {
+   "file": "rkit48-win.webp",
+   "x2": null,
+   "px": [
+    323,
+    111
+   ],
+   "px_per_pt": 4.8,
+   "pt": [
+    67.29,
+    23.12
+   ],
+   "kind": "nine",
+   "capInsets": {
+    "top": 5.0,
+    "leading": 5.0,
+    "bottom": 5.0,
+    "trailing": 5.0
+   },
+   "resizingMode": "stretch",
+   "shadow_margin_pt": 1.2,
+   "how": "the value window's bezel at 48 px a cm; rkit-win at twice the density, lossless"
+  },
+  "rkit48-glass": {
+   "file": "rkit48-glass.webp",
+   "x2": null,
+   "px": [
+    277,
+    65
+   ],
+   "px_per_pt": 4.8,
+   "pt": [
+    57.71,
+    13.54
+   ],
+   "kind": "whole",
+   "how": "the window's glass at 48 px a cm"
+  },
   "faceplate": {
    "file": "faceplate.webp",
    "x2": null,
@@ -1020,8 +1815,8 @@
    "file": "audio-keys.webp",
    "x2": null,
    "px": [
-    2502,
-    576
+    4081,
+    768
    ],
    "kind": "sprite",
    "names": [
@@ -1033,7 +1828,9 @@
     "APPLY",
     "RESTART",
     "STOP",
-    "CLOSE"
+    "CLOSE",
+    "FULL SCREEN",
+    "WINDOW"
    ],
    "rows": [
     "off",
@@ -1042,226 +1839,274 @@
     "litdown"
    ],
    "cell_px": [
-    278,
-    144
+    371,
+    192
    ],
-   "ref_px_per_px": 0.42,
+   "ref_px_per_px": 0.31,
    "rects_px": {
     "CORE AUDIO/off": [
      0,
      0,
-     278,
-     144
+     371,
+     192
     ],
     "WINDOWS/off": [
-     278,
+     371,
      0,
-     278,
-     144
+     371,
+     192
     ],
     "ASIO/off": [
-     556,
+     742,
      0,
-     278,
-     144
+     371,
+     192
     ],
     "EXCLUSIVE/off": [
-     834,
+     1113,
      0,
-     278,
-     144
+     371,
+     192
     ],
     "SHARED/off": [
-     1112,
+     1484,
      0,
-     278,
-     144
+     371,
+     192
     ],
     "APPLY/off": [
-     1390,
+     1855,
      0,
-     278,
-     144
+     371,
+     192
     ],
     "RESTART/off": [
-     1668,
+     2226,
      0,
-     278,
-     144
+     371,
+     192
     ],
     "STOP/off": [
-     1946,
+     2597,
      0,
-     278,
-     144
+     371,
+     192
     ],
     "CLOSE/off": [
-     2224,
+     2968,
      0,
-     278,
-     144
+     371,
+     192
+    ],
+    "FULL SCREEN/off": [
+     3339,
+     0,
+     371,
+     192
+    ],
+    "WINDOW/off": [
+     3710,
+     0,
+     371,
+     192
     ],
     "CORE AUDIO/lit": [
      0,
-     144,
-     278,
-     144
+     192,
+     371,
+     192
     ],
     "WINDOWS/lit": [
-     278,
-     144,
-     278,
-     144
+     371,
+     192,
+     371,
+     192
     ],
     "ASIO/lit": [
-     556,
-     144,
-     278,
-     144
+     742,
+     192,
+     371,
+     192
     ],
     "EXCLUSIVE/lit": [
-     834,
-     144,
-     278,
-     144
+     1113,
+     192,
+     371,
+     192
     ],
     "SHARED/lit": [
-     1112,
-     144,
-     278,
-     144
+     1484,
+     192,
+     371,
+     192
     ],
     "APPLY/lit": [
-     1390,
-     144,
-     278,
-     144
+     1855,
+     192,
+     371,
+     192
     ],
     "RESTART/lit": [
-     1668,
-     144,
-     278,
-     144
+     2226,
+     192,
+     371,
+     192
     ],
     "STOP/lit": [
-     1946,
-     144,
-     278,
-     144
+     2597,
+     192,
+     371,
+     192
     ],
     "CLOSE/lit": [
-     2224,
-     144,
-     278,
-     144
+     2968,
+     192,
+     371,
+     192
+    ],
+    "FULL SCREEN/lit": [
+     3339,
+     192,
+     371,
+     192
+    ],
+    "WINDOW/lit": [
+     3710,
+     192,
+     371,
+     192
     ],
     "CORE AUDIO/down": [
      0,
-     288,
-     278,
-     144
+     384,
+     371,
+     192
     ],
     "WINDOWS/down": [
-     278,
-     288,
-     278,
-     144
+     371,
+     384,
+     371,
+     192
     ],
     "ASIO/down": [
-     556,
-     288,
-     278,
-     144
+     742,
+     384,
+     371,
+     192
     ],
     "EXCLUSIVE/down": [
-     834,
-     288,
-     278,
-     144
+     1113,
+     384,
+     371,
+     192
     ],
     "SHARED/down": [
-     1112,
-     288,
-     278,
-     144
+     1484,
+     384,
+     371,
+     192
     ],
     "APPLY/down": [
-     1390,
-     288,
-     278,
-     144
+     1855,
+     384,
+     371,
+     192
     ],
     "RESTART/down": [
-     1668,
-     288,
-     278,
-     144
+     2226,
+     384,
+     371,
+     192
     ],
     "STOP/down": [
-     1946,
-     288,
-     278,
-     144
+     2597,
+     384,
+     371,
+     192
     ],
     "CLOSE/down": [
-     2224,
-     288,
-     278,
-     144
+     2968,
+     384,
+     371,
+     192
+    ],
+    "FULL SCREEN/down": [
+     3339,
+     384,
+     371,
+     192
+    ],
+    "WINDOW/down": [
+     3710,
+     384,
+     371,
+     192
     ],
     "CORE AUDIO/litdown": [
      0,
-     432,
-     278,
-     144
+     576,
+     371,
+     192
     ],
     "WINDOWS/litdown": [
-     278,
-     432,
-     278,
-     144
+     371,
+     576,
+     371,
+     192
     ],
     "ASIO/litdown": [
-     556,
-     432,
-     278,
-     144
+     742,
+     576,
+     371,
+     192
     ],
     "EXCLUSIVE/litdown": [
-     834,
-     432,
-     278,
-     144
+     1113,
+     576,
+     371,
+     192
     ],
     "SHARED/litdown": [
-     1112,
-     432,
-     278,
-     144
+     1484,
+     576,
+     371,
+     192
     ],
     "APPLY/litdown": [
-     1390,
-     432,
-     278,
-     144
+     1855,
+     576,
+     371,
+     192
     ],
     "RESTART/litdown": [
-     1668,
-     432,
-     278,
-     144
+     2226,
+     576,
+     371,
+     192
     ],
     "STOP/litdown": [
-     1946,
-     432,
-     278,
-     144
+     2597,
+     576,
+     371,
+     192
     ],
     "CLOSE/litdown": [
-     2224,
-     432,
-     278,
-     144
+     2968,
+     576,
+     371,
+     192
+    ],
+    "FULL SCREEN/litdown": [
+     3339,
+     576,
+     371,
+     192
+    ],
+    "WINDOW/litdown": [
+     3710,
+     576,
+     371,
+     192
     ]
    },
    "how": "the shelf's key with the Audio page's legends baked in; STOP and CLOSE fit IR Capture as they are"
@@ -1370,8 +2215,8 @@
    "file": "rack-speaker.webp",
    "x2": null,
    "px": [
-    1128,
-    342
+    1130,
+    441
    ],
    "kind": "unit",
    "pxcm": 22.5,
@@ -1382,8 +2227,8 @@
      20.23
     ],
     "br": [
-     1106.09,
-     318.47
+     1106.08,
+     418.48
     ]
    },
    "els": [
@@ -1391,14 +2236,14 @@
      "id": "irsel",
      "kind": "knob",
      "box": [
-      72.0,
-      78.0,
+      76.5,
+      49.5,
       252.0,
-      252.0
+      220.5
      ],
      "c": [
       158.16,
-      160.35
+      133.86
      ],
      "r": 65.25,
      "rest": "s00",
@@ -1429,8 +2274,8 @@
      ],
      "sheet": "rack-speaker-irsel.webp",
      "frame": [
-      180,
-      174
+      176,
+      171
      ],
      "cols": 12,
      "rows": 2
@@ -1438,21 +2283,40 @@
     {
      "id": "irwin",
      "kind": "window",
+     "disp": "matrix",
+     "n": 22,
+     "cellpx": [
+      4624,
+      632
+     ],
+     "lines": 2,
+     "mtx": [
+      3.5,
+      1.3,
+      136.0,
+      18.6
+     ],
      "win": [
-      258.97,
-      96.49,
+      258.96,
+      74.54,
       798.01,
-      213.28
+      191.33
+     ],
+     "cells": [
+      262.56,
+      96.22,
+      789.67,
+      168.26
      ],
      "box": [
-      246.0,
-      84.0,
-      810.0,
-      222.0
+      252.0,
+      67.5,
+      805.5,
+      198.0
      ],
      "c": [
       528.49,
-      154.88
+      132.93
      ],
      "rest": "",
      "states": []
@@ -1461,14 +2325,14 @@
      "id": "irload",
      "kind": "button",
      "box": [
-      840.0,
-      108.0,
-      948.0,
-      210.0
+      841.5,
+      85.5,
+      945.0,
+      184.5
      ],
      "c": [
       887.16,
-      155.85
+      133.86
      ],
      "rest": "up",
      "states": [
@@ -1476,8 +2340,8 @@
      ],
      "sheet": "rack-speaker-irload.webp",
      "frame": [
-      108,
-      102
+      104,
+      99
      ],
      "cols": 1,
      "rows": 1
@@ -1486,14 +2350,14 @@
      "id": "irremove",
      "kind": "button",
      "box": [
-      948.0,
-      108.0,
-      1062.0,
-      210.0
+      954.0,
+      85.5,
+      1057.5,
+      184.5
      ],
      "c": [
       999.66,
-      155.85
+      133.86
      ],
      "rest": "up",
      "states": [
@@ -1501,11 +2365,177 @@
      ],
      "sheet": "rack-speaker-irremove.webp",
      "frame": [
-      114,
-      102
+      104,
+      99
      ],
      "cols": 1,
      "rows": 1
+    },
+    {
+     "id": "irsel2",
+     "kind": "knob",
+     "box": [
+      76.5,
+      220.5,
+      247.5,
+      387.0
+     ],
+     "c": [
+      158.16,
+      300.36
+     ],
+     "r": 64.12,
+     "rest": "s00",
+     "states": [
+      "s01",
+      "s02",
+      "s03",
+      "s04",
+      "s05",
+      "s06",
+      "s07",
+      "s08",
+      "s09",
+      "s10",
+      "s11",
+      "s12",
+      "s13",
+      "s14",
+      "s15",
+      "s16",
+      "s17",
+      "s18",
+      "s19",
+      "s20",
+      "s21",
+      "s22",
+      "s23"
+     ],
+     "sheet": "rack-speaker-irsel2.webp",
+     "frame": [
+      171,
+      166
+     ],
+     "cols": 12,
+     "rows": 2
+    },
+    {
+     "id": "irwin2",
+     "kind": "window",
+     "disp": "matrix",
+     "n": 18,
+     "cellpx": [
+      3808,
+      632
+     ],
+     "lines": 2,
+     "mtx": [
+      3.5,
+      1.3,
+      112.0,
+      18.6
+     ],
+     "win": [
+      258.96,
+      245.23,
+      699.18,
+      353.04
+     ],
+     "cells": [
+      262.56,
+      262.67,
+      690.98,
+      333.77
+     ],
+     "box": [
+      252.0,
+      238.5,
+      706.5,
+      360.0
+     ],
+     "c": [
+      479.08,
+      299.14
+     ],
+     "rest": "",
+     "states": []
+    },
+    {
+     "id": "mode",
+     "kind": "rotary",
+     "angles": [
+      -55,
+      0,
+      55
+     ],
+     "box": [
+      738.0,
+      225.0,
+      904.5,
+      382.5
+     ],
+     "c": [
+      812.91,
+      300.36
+     ],
+     "r": 58.5,
+     "rest": "p0",
+     "states": [
+      "p1",
+      "p2"
+     ],
+     "sheet": "rack-speaker-mode.webp",
+     "frame": [
+      166,
+      158
+     ],
+     "cols": 2,
+     "rows": 1
+    },
+    {
+     "id": "ratio",
+     "kind": "knob",
+     "box": [
+      900.0,
+      216.0,
+      1080.0,
+      387.0
+     ],
+     "c": [
+      981.66,
+      300.36
+     ],
+     "r": 65.25,
+     "rest": "r10",
+     "states": [
+      "r00",
+      "r01",
+      "r02",
+      "r03",
+      "r04",
+      "r05",
+      "r06",
+      "r07",
+      "r08",
+      "r09",
+      "r11",
+      "r12",
+      "r13",
+      "r14",
+      "r15",
+      "r16",
+      "r17",
+      "r18",
+      "r19",
+      "r20"
+     ],
+     "sheet": "rack-speaker-ratio.webp",
+     "frame": [
+      180,
+      171
+     ],
+     "cols": 12,
+     "rows": 2
     }
    ],
    "how": "a whole rack unit: draw it scaled to fit (no slicing); each element's box is in the picture's px, so scale it with the picture. A sprite element's frame i = states.index(state) at ((i % cols) * frame.w, (i // cols) * frame.h); its rest state is the base picture (draw nothing over it)",
@@ -1515,8 +2545,8 @@
    "file": "rack-capture.webp",
    "x2": null,
    "px": [
-    1128,
-    342
+    1127,
+    340
    ],
    "kind": "unit",
    "pxcm": 22.5,
@@ -1527,23 +2557,58 @@
      20.23
     ],
     "br": [
-     1106.09,
+     1106.08,
      318.47
     ]
    },
    "els": [
     {
+     "id": "capwin",
+     "kind": "seg16",
+     "n": 16,
+     "pitch": 1.24,
+     "slant": 7.0,
+     "cellpx": [
+      1619,
+      160
+     ],
+     "win": [
+      344.31,
+      70.54,
+      865.39,
+      167.12
+     ],
+     "cells": [
+      347.35,
+      91.74,
+      856.38,
+      142.04
+     ],
+     "box": [
+      339.75,
+      67.5,
+      868.5,
+      171.0
+     ],
+     "c": [
+      604.85,
+      118.83
+     ],
+     "rest": "",
+     "states": []
+    },
+    {
      "id": "power",
      "kind": "toggle",
      "box": [
-      72.0,
-      60.0,
-      198.0,
-      270.0
+      141.75,
+      218.25,
+      204.75,
+      283.5
      ],
      "c": [
-      126.66,
-      158.1
+      171.66,
+      249.23
      ],
      "rest": "off",
      "states": [
@@ -1551,8 +2616,8 @@
      ],
      "sheet": "rack-capture-power.webp",
      "frame": [
-      126,
-      210
+      63,
+      65
      ],
      "cols": 1,
      "rows": 1
@@ -1561,14 +2626,14 @@
      "id": "pilot",
      "kind": "lamp",
      "box": [
-      174.0,
-      108.0,
-      276.0,
-      210.0
+      159.75,
+      202.5,
+      186.75,
+      225.0
      ],
      "c": [
-      221.16,
-      158.1
+      171.66,
+      213.23
      ],
      "rest": "off",
      "states": [
@@ -1576,46 +2641,24 @@
      ],
      "sheet": "rack-capture-pilot.webp",
      "frame": [
-      102,
-      102
+      27,
+      22
      ],
      "cols": 1,
      "rows": 1
     },
     {
-     "id": "capwin",
-     "kind": "window",
-     "win": [
-      283.67,
-      95.95,
-      768.81,
-      212.75
-     ],
-     "box": [
-      276.0,
-      84.0,
-      780.0,
-      222.0
-     ],
-     "c": [
-      526.24,
-      154.35
-     ],
-     "rest": "",
-     "states": []
-    },
-    {
      "id": "capload",
      "kind": "button",
      "box": [
-      786.0,
-      114.0,
-      882.0,
-      204.0
+      391.5,
+      225.0,
+      459.0,
+      276.75
      ],
      "c": [
-      830.91,
-      155.85
+      423.66,
+      249.23
      ],
      "rest": "up",
      "states": [
@@ -1623,8 +2666,8 @@
      ],
      "sheet": "rack-capture-capload.webp",
      "frame": [
-      96,
-      90
+      68,
+      52
      ],
      "cols": 1,
      "rows": 1
@@ -1633,14 +2676,14 @@
      "id": "capremove",
      "kind": "button",
      "box": [
-      888.0,
-      114.0,
-      984.0,
-      204.0
+      463.5,
+      225.0,
+      531.0,
+      276.75
      ],
      "c": [
-      929.91,
-      155.85
+      495.66,
+      249.23
      ],
      "rest": "up",
      "states": [
@@ -1648,8 +2691,8 @@
      ],
      "sheet": "rack-capture-capremove.webp",
      "frame": [
-      96,
-      90
+      68,
+      52
      ],
      "cols": 1,
      "rows": 1
@@ -1658,14 +2701,14 @@
      "id": "capmake",
      "kind": "button",
      "box": [
-      984.0,
-      114.0,
-      1080.0,
-      204.0
+      535.5,
+      225.0,
+      603.0,
+      276.75
      ],
      "c": [
-      1028.91,
-      155.85
+      567.66,
+      249.23
      ],
      "rest": "up",
      "states": [
@@ -1673,8 +2716,33 @@
      ],
      "sheet": "rack-capture-capmake.webp",
      "frame": [
-      96,
-      90
+      68,
+      52
+     ],
+     "cols": 1,
+     "rows": 1
+    },
+    {
+     "id": "signal",
+     "kind": "lamp",
+     "box": [
+      942.75,
+      231.75,
+      969.75,
+      258.75
+     ],
+     "c": [
+      954.66,
+      243.6
+     ],
+     "rest": "off",
+     "states": [
+      "on"
+     ],
+     "sheet": "rack-capture-signal.webp",
+     "frame": [
+      27,
+      27
      ],
      "cols": 1,
      "rows": 1
@@ -1687,7 +2755,7 @@
    "file": "rack-monitor.webp",
    "x2": null,
    "px": [
-    1128,
+    1130,
     540
    ],
    "kind": "unit",
@@ -1699,7 +2767,7 @@
      20.23
     ],
     "br": [
-     1106.09,
+     1106.08,
      518.5
     ]
    },
@@ -1708,10 +2776,10 @@
      "id": "input",
      "kind": "knob",
      "box": [
-      72.0,
-      96.0,
-      282.0,
-      300.0
+      76.5,
+      99.0,
+      279.0,
+      301.5
      ],
      "c": [
       171.66,
@@ -1783,8 +2851,8 @@
      ],
      "sheet": "rack-monitor-input.webp",
      "frame": [
-      210,
-      204
+      202,
+      202
      ],
      "cols": 12,
      "rows": 5
@@ -1793,10 +2861,10 @@
      "id": "output",
      "kind": "knob",
      "box": [
-      852.0,
+      850.5,
       90.0,
-      1080.0,
-      312.0
+      1075.5,
+      306.0
      ],
      "c": [
       954.66,
@@ -1868,8 +2936,8 @@
      ],
      "sheet": "rack-monitor-output.webp",
      "frame": [
-      228,
-      222
+      225,
+      216
      ],
      "cols": 12,
      "rows": 5
@@ -1878,10 +2946,10 @@
      "id": "clip",
      "kind": "lamp",
      "box": [
-      66.0,
-      384.0,
-      186.0,
-      498.0
+      67.5,
+      387.0,
+      180.0,
+      495.0
      ],
      "c": [
       122.16,
@@ -1893,8 +2961,8 @@
      ],
      "sheet": "rack-monitor-clip.webp",
      "frame": [
-      120,
-      114
+      112,
+      108
      ],
      "cols": 1,
      "rows": 1
@@ -1903,10 +2971,10 @@
      "id": "setlevel",
      "kind": "button",
      "box": [
-      174.0,
-      378.0,
-      300.0,
-      498.0
+      180.0,
+      382.5,
+      297.0,
+      499.5
      ],
      "c": [
       234.66,
@@ -1918,8 +2986,8 @@
      ],
      "sheet": "rack-monitor-setlevel.webp",
      "frame": [
-      126,
-      120
+      117,
+      117
      ],
      "cols": 1,
      "rows": 1
@@ -1928,10 +2996,10 @@
      "id": "pilot",
      "kind": "lamp",
      "box": [
-      900.0,
-      384.0,
-      1020.0,
-      498.0
+      904.5,
+      387.0,
+      1017.0,
+      495.0
      ],
      "c": [
       954.66,
@@ -1943,8 +3011,8 @@
      ],
      "sheet": "rack-monitor-pilot.webp",
      "frame": [
-      120,
-      114
+      112,
+      108
      ],
      "cols": 1,
      "rows": 1
@@ -1953,10 +3021,10 @@
      "id": "ineye",
      "kind": "eye",
      "box": [
-      312.0,
-      156.0,
-      528.0,
-      366.0
+      315.0,
+      157.5,
+      526.5,
+      360.0
      ],
      "c": [
       424.78,
@@ -2026,8 +3094,8 @@
      ],
      "sheet": "rack-monitor-ineye.webp",
      "frame": [
-      216,
-      210
+      212,
+      202
      ],
      "cols": 12,
      "rows": 5
@@ -2036,10 +3104,10 @@
      "id": "outeye",
      "kind": "eye",
      "box": [
-      588.0,
-      156.0,
-      804.0,
-      366.0
+      589.5,
+      157.5,
+      801.0,
+      360.0
      ],
      "c": [
       701.53,
@@ -2109,8 +3177,8 @@
      ],
      "sheet": "rack-monitor-outeye.webp",
      "frame": [
-      216,
-      210
+      212,
+      202
      ],
      "cols": 12,
      "rows": 5
@@ -2623,28 +3691,28 @@
    ],
    "tube_boxes_px": [
     [
-     42.0,
+     45.0,
      0.0,
-     228.0,
-     300.0
+     229.5,
+     297.0
     ],
     [
      162.0,
      0.0,
-     354.0,
-     300.0
+     346.5,
+     297.0
     ],
     [
-     276.0,
+     279.0,
      0.0,
-     474.0,
-     300.0
+     468.0,
+     297.0
     ],
     [
-     396.0,
+     400.5,
      0.0,
-     594.0,
-     300.0
+     589.5,
+     297.0
     ]
    ],
    "states": [
@@ -2662,20 +3730,20 @@
    ],
    "frames": [
     [
-     186,
-     300
+     184,
+     297
     ],
     [
-     192,
-     300
+     184,
+     297
     ],
     [
-     198,
-     300
+     189,
+     297
     ],
     [
-     198,
-     300
+     189,
+     297
     ]
    ],
    "how": "one tube a sheet, one row: frame i = states.index(digit) at (i * frame.w, 0). The frames are the lit glow only, made to lie over the Counter's face (rack-counter.webp, whose window holds the four unlit tubes): crop face_window_px from the face as the background (its tubes unlit, numerals showing), then draw each tube's frame at its tube_boxes_px (the face's px; the boxes overlap the window's top, where the frames are transparent). Alone on another background the frames show fringes. The face's other legends (COUNTER, ADDED DELAY ...) are the bench's: crop them out"

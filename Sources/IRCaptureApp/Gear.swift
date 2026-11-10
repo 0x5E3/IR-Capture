@@ -636,35 +636,45 @@ struct MagicEye: View {
     @ObservedObject private var clock = PowerClock.shared
     @State private var shown = 0.0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    /// The eye's centre in rack-monitor.webp (layout.json: ineye c = 424.78, 255.86); the crop is 200 px round it.
-    static let base = CGRect(x: 325, y: 156, width: 200, height: 200)
-    /// The same square in a frame of the sheet: frames are 216 x 210, 12 a row, their origin at the base box (312, 156).
+    /// The eye's centre in rack-monitor.webp (layout.json: ineye c = 424.78, 255.86); the crop is 196 px round it.
+    static let base = CGRect(x: 327, y: 158, width: 196, height: 196)
+    static let crop: CGFloat = 196
+    /// The same square in a frame of the sheet (11-10 kit: frames 212 x 202, 12 a row, their origin at the ineye box
+    /// (315, 157.5), so the centre is at (109.78, 98.36) in a frame).
     static func cell(_ i: Int) -> CGRect {
-        CGRect(x: CGFloat(i % 12) * 216 + 13, y: CGFloat(i / 12) * 210, width: 200, height: 200)
+        CGRect(x: CGFloat(i % 12) * 212 + 12, y: CGFloat(i / 12) * 202, width: 196, height: 196)
     }
+
+    /// (11-10, Lowell: the eyes "not having perspective") IR Capture's own eye, rendered in its one camera (10 degrees
+    /// above, design/render/ircapture_eye.py): irc-eye-base.webp and the 59-frame irc-eye.webp, read from
+    /// SwellKit/irc-eye.json. Each frame is the whole eye with its chrome escutcheon on a transparent ground, so it is
+    /// drawn unclipped, the escutcheon `Own.outer` times the eye's diameter across. nil: the bench's frames, as before.
+    struct Own: Decodable {
+        let side_px: CGFloat
+        let per_row: Int
+        let r_outer_px: CGFloat
+        static let outer: CGFloat = 1.1
+        func cell(_ i: Int) -> CGRect {
+            CGRect(x: CGFloat(i % per_row) * side_px, y: CGFloat(i / per_row) * side_px, width: side_px, height: side_px)
+        }
+        /// The picture's side in points for an eye of `diameter`.
+        func side(_ diameter: CGFloat) -> CGFloat { diameter * Own.outer * side_px / (2 * r_outer_px) }
+        static let shared: Own? = {
+            let url = SwellKit.folder.appendingPathComponent("irc-eye.json")
+            guard let data = try? Data(contentsOf: url), let o = try? JSONDecoder().decode(Own.self, from: data),
+                  o.side_px > 0, o.per_row > 0,
+                  SwellPictures.shared.cgImage("irc-eye.webp") != nil, SwellPictures.shared.cgImage("irc-eye-base.webp") != nil
+            else { return nil }
+            return o
+        }()
+    }
+
     /// The closure as a frame position, 0 … 55.
     var target: Double { max(0, min(55, (closure ?? 0) * 55)) }
     var body: some View {
-        let k = diameter / 200
         TimelineView(.animation(paused: !lit || !clock.warming || reduceMotion)) { ctx in
             let glow = lit ? (reduceMotion ? 1 : clock.eyeGlow(at: ctx.date)) : 0
-            ZStack {
-                if let b = SwellPictures.shared.sprite("rack-monitor.webp", rect: MagicEye.base, pxPerPoint: 1 / k) {
-                    Image(nsImage: b).resizable().interpolation(.high)
-                } else { Color.black }
-                if lit {
-                    // the heater's own dull glow first (warm frames), then the target's glow over it
-                    if glow < 1, let w = SwellPictures.shared.sprite("rack-monitor-ineye.webp", rect: MagicEye.cell(2), pxPerPoint: 1 / k) {
-                        Image(nsImage: w).resizable().interpolation(.high).opacity(min(1, glow * 3) * (1 - glow))
-                    }
-                    EyeFrames(x: reduceMotion ? target.rounded() : target, k: k)
-                        .animation(reduceMotion ? nil : SwellMotion.eye(closing: target > shown), value: target)
-                        .opacity(glow)
-                }
-            }
-            .frame(width: diameter, height: diameter)
-            .clipShape(Circle())
-            .shadow(color: Color(red: 0.4, green: 1, blue: 0.5, opacity: 0.25 * glow), radius: 3)
+            if let own = Own.shared { ownEye(own, glow: glow) } else { benchEye(glow: glow) }
         }
         .onChange(of: target) { shown = $0 }
         .onAppear { shown = target }
@@ -673,10 +683,55 @@ struct MagicEye: View {
         .accessibilityValue(!lit ? "off" : closure.map { String(format: "%.0f percent closed", $0 * 100) } ?? "open")
     }
 
+    @ViewBuilder private func ownEye(_ own: Own, glow: Double) -> some View {
+        let side = own.side(diameter), ppp = own.side_px / side
+        ZStack {
+            if let b = SwellPictures.shared.sprite("irc-eye-base.webp", rect: own.cell(0), pxPerPoint: ppp) {
+                Image(nsImage: b).resizable().interpolation(.high)
+            }
+            if lit {
+                if glow < 1, let w = SwellPictures.shared.sprite("irc-eye.webp", rect: own.cell(2), pxPerPoint: ppp) {
+                    Image(nsImage: w).resizable().interpolation(.high).opacity(min(1, glow * 3) * (1 - glow))
+                }
+                EyeFrames(x: reduceMotion ? target.rounded() : target) { n in
+                    SwellPictures.shared.sprite("irc-eye.webp", rect: own.cell(n), pxPerPoint: ppp)
+                }
+                .animation(reduceMotion ? nil : SwellMotion.eye(closing: target > shown), value: target)
+                .opacity(glow)
+            }
+        }
+        .frame(width: side, height: side)
+        .frame(width: diameter, height: diameter)          // laid out at the eye's size; the escutcheon runs past it
+    }
+
+    @ViewBuilder private func benchEye(glow: Double) -> some View {
+        let k = diameter / MagicEye.crop
+        ZStack {
+            if let b = SwellPictures.shared.sprite("rack-monitor.webp", rect: MagicEye.base, pxPerPoint: 1 / k) {
+                Image(nsImage: b).resizable().interpolation(.high)
+            } else { Color.black }
+            if lit {
+                // the heater's own dull glow first (warm frames), then the target's glow over it
+                if glow < 1, let w = SwellPictures.shared.sprite("rack-monitor-ineye.webp", rect: MagicEye.cell(2), pxPerPoint: 1 / k) {
+                    Image(nsImage: w).resizable().interpolation(.high).opacity(min(1, glow * 3) * (1 - glow))
+                }
+                EyeFrames(x: reduceMotion ? target.rounded() : target) { n in
+                    SwellPictures.shared.sprite("rack-monitor-ineye.webp", rect: MagicEye.cell(n), pxPerPoint: 1 / k)
+                }
+                .animation(reduceMotion ? nil : SwellMotion.eye(closing: target > shown), value: target)
+                .opacity(glow)
+            }
+        }
+        .frame(width: diameter, height: diameter)
+        .clipShape(Circle())
+        .shadow(color: Color(red: 0.4, green: 1, blue: 0.5, opacity: 0.25 * glow), radius: 3)
+    }
+
     /// The frames below and above x, summed: (1 - w) of frame floor(x) plus w of the next, in an isolated group.
+    /// Frame n of a sheet: 3 + the step (0 … 2 are the warm-up).
     private struct EyeFrames: View, Animatable {
         var x: Double
-        let k: CGFloat
+        let picture: (Int) -> NSImage?
         var animatableData: Double { get { x } set { x = newValue } }
         var body: some View {
             let i = Int(x.rounded(.down)), w = x - Double(i)
@@ -687,9 +742,7 @@ struct MagicEye: View {
             .compositingGroup()
         }
         @ViewBuilder func frame(_ n: Int) -> some View {
-            if let f = SwellPictures.shared.sprite("rack-monitor-ineye.webp", rect: MagicEye.cell(n), pxPerPoint: 1 / k) {
-                Image(nsImage: f).resizable().interpolation(.high)
-            }
+            if let f = picture(n) { Image(nsImage: f).resizable().interpolation(.high) }
         }
     }
 }
@@ -786,7 +839,9 @@ struct NixieReadout: View {
     let value: Int
     var height: CGFloat = 52
     static let window = CGRect(x: 80, y: 80, width: 488, height: 177)
-    static let tubes: [(x: CGFloat, w: CGFloat)] = [(42, 186), (162, 192), (276, 198), (396, 198)]
+    /// (11-10 kit, white light) layout.json nixie-tubes: tube_boxes_px' x and frames' widths; the frames 297 px tall.
+    static let tubes: [(x: CGFloat, w: CGFloat)] = [(45, 184), (162, 184), (279, 189), (400.5, 189)]
+    static let frameH: CGFloat = 297
     var scale: CGFloat { height / NixieReadout.window.height }
     @ObservedObject private var clock = PowerClock.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -809,10 +864,10 @@ struct NixieReadout: View {
             ForEach(0..<4, id: \.self) { k in
                 if k >= firstLit, let d = Int(String(digits[k])),
                    let glow = SwellPictures.shared.sprite("rack-counter-delay\(k).webp",
-                                                          rect: CGRect(x: CGFloat(d) * NixieReadout.tubes[k].w, y: 0, width: NixieReadout.tubes[k].w, height: 300),
+                                                          rect: CGRect(x: CGFloat(d) * NixieReadout.tubes[k].w, y: 0, width: NixieReadout.tubes[k].w, height: NixieReadout.frameH),
                                                           pxPerPoint: 1 / scale) {
                     Image(nsImage: glow).resizable()
-                        .frame(width: NixieReadout.tubes[k].w * scale, height: 300 * scale)
+                        .frame(width: NixieReadout.tubes[k].w * scale, height: NixieReadout.frameH * scale)
                         .offset(x: (NixieReadout.tubes[k].x - NixieReadout.window.minX) * scale, y: (0 - NixieReadout.window.minY) * scale)
                         .opacity(reduceMotion ? 1 : clock.nixieGlow(at: date, tube: k))
                 }
@@ -925,7 +980,7 @@ struct StageOpening<Content: View>: View {
         content
             .background(
                 Group {
-                    if let bd = SwellPictures.shared.image("frame-backdrop", pxPerPoint: 1.6) {
+                    if let bd = SwellPictures.shared.image("frame-backdrop", pxPerPoint: 4.0) {
                         Image(nsImage: bd).resizable().scaledToFill()
                     } else { Swell.stage }
                 }

@@ -403,13 +403,15 @@ struct Shelf: View {
 }
 
 /// IR Capture's own shelf (design/render/ircapture_kit.py: the plank and the boxes rendered in the Tools studio,
-/// orthographic and 10 degrees above, like every key, lamp and panel under it), read from SwellKit/irc-shelf.json.
+/// orthographic; since 11-10 seen from 9 degrees below, as the shelf is above the eye: its front edge and underside,
+/// no top), read from SwellKit/irc-shelf.json.
 /// nil when the file or a picture is missing: the shelf then uses the bench's frame pieces (seen from below).
 struct ShelfGeometry: Decodable {
     let pxPerPoint: CGFloat
     let plank: String
     /// The plank strip's height (pt, its shadow included), how far its top sits below the box picture's top, and
-    /// where its front edge ends in the strip (the shelf's frame ends there; the shadow runs on over the stage).
+    /// where the shelf ends in the strip (its front edge's bottom from above; from below, the underside's back edge
+    /// against the wall): the shelf's frame ends there; the shadow runs on over the stage.
     let plankHeight: CGFloat
     let plankBelowBoxTop: CGFloat
     let plankFrontBottom: CGFloat

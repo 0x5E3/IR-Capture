@@ -72,6 +72,16 @@ _scene0 = TK.scene
 def scene_now(*a, **k):
     """toolkit.scene() and then the 11-10 studio: the 1.0 px filter and the room in the reflections."""
     s, cam = _scene0(*a, **k)
+    if abs(ELEV - TK.ELEV) > 1e-6:                     # the shelf from below: the same studio, the camera turned
+        e = math.radians(ELEV)
+        cam.location = (0, 200 * math.sin(e), 200 * math.cos(e)); cam.rotation_euler = (-e, 0, 0)
+        # (11-10 proof) seen from below, a face toward the camera mirrors what is a little above in front: the studio's
+        # top softbox, which washed the bronze box's face out to a flat grey. It still lights; it is only not seen in
+        # reflections (the room in the world is: metal_kit.room_world).
+        for o in s.objects:
+            if o.name.split('.')[0] in ('top', 'topL'):
+                try: o.visible_glossy = False
+                except Exception: pass
     try: s.cycles.filter_width = FILTER
     except Exception: pass
     if ROOM: MK.room_world(s)
@@ -217,6 +227,21 @@ def map_wear(mp, rows_per_cm, K, rng, dents=0, scratch=0, water=None, ding_scale
 ELEV = TK.ELEV
 E = math.radians(ELEV)
 CE, SE = math.cos(E), math.sin(E)
+# (11-10, Lowell: "we should not be looking down on the top shelf that is above us") The shelf is above the eye: the
+# plank and the boxes standing on it are seen from 9 degrees below (the bench's frame camera puts its top shelf about
+# 54 cm above the eye and sees its underside at 8 to 9 degrees, no top). Still the Tools studio, orthographic, the same
+# lights and room: only the camera turns. The keys and lamp on the boxes come from the bench's own shelf sheets, seen
+# from below already. Everything under the shelf (panels, keys, machines, the opening's mouldings) stays 10 above.
+# IRC_SHELF_ELEV=10: the shelf from above, as 11-04.
+SHELF_ELEV = float(os.environ.get('IRC_SHELF_ELEV', '-9'))
+SHELF_PIECES = ('plank', 'box-bronze', 'box-oxblood')
+UNDER_FILL = float(os.environ.get('IRC_UNDER_FILL', '0.25'))   # the low fill on the plank seen from below
+
+
+def use_elev(deg):
+    """Set the camera elevation the shelf's helpers (v_of, frame, render_long) and the next scene use."""
+    global ELEV, E, CE, SE
+    ELEV = deg; E = math.radians(deg); CE, SE = math.cos(E), math.sin(E)
 
 # the shelf's measures (cm)
 PL = dict(thick=2.6, depth=12.0, edge=0.28, period=60.0, fade=10.0, pre=3.0)
@@ -767,12 +792,12 @@ def piece_box(name):
         bpy.ops.mesh.primitive_cylinder_add(radius=BOX['foot_r'], depth=fh + 0.05, vertices=40, location=(fx, fh / 2, zf - 1.3))
         f = bpy.context.active_object; f.rotation_euler = (math.radians(90), 0, 0); f.data.materials.append(rm)
         bpy.ops.object.shade_smooth()
-    v_top = v_of(fh + h, zf - d) + BOX['head']; v_bot = v_of(0.0, PL['depth'])   # the wall's darkening round the box
+    v_top = max(v_of(fh + h, zf - d), v_of(fh + h, zf)) + BOX['head']; v_bot = v_of(0.0, PL['depth'])   # the wall's darkening round the box
     frame(s, cam, -w / 2 - BOX['left'], w / 2 + BOX['right'], v_bot, v_top)
     bpy.context.view_layer.update()
     lay = {'cm': [w, h], 'box_x': [-w / 2, w / 2],
            'px_left': proj(s, cam, (-w / 2, 0, zf))[0], 'px_right': proj(s, cam, (w / 2, 0, zf))[0],
-           'row_lid_back': proj(s, cam, (0, fh + h, zf - d))[1], 'row_face_top': proj(s, cam, (0, fh + h, zf))[1],
+           'row_lid_back': proj(s, cam, (0, fh + h, zf - d if ELEV > 0 else zf))[1], 'row_face_top': proj(s, cam, (0, fh + h, zf))[1],
            'row_face_bot': proj(s, cam, (0, fh, zf))[1], 'row_plank_front_top': proj(s, cam, (0, 0, PL['depth']))[1],
            'row_plank_back': proj(s, cam, (0, 0, 0))[1], 'edge_in': BOX['r'] + BOX['roll'], 'roll': BOX['roll'],
            'foot_in': BOX['foot_in'], 'foot_r': BOX['foot_r']}
@@ -970,7 +995,10 @@ def piece_plank_shop():
     f = 1.0 / Kw
     # the top seen at 10 degrees: its 12 cm take about 2 cm of the picture (spacing over sin 10), the front whole, the
     # underside unseen (coarse)
-    pr = SWD.profile(-t, 0.0, 0.0, d, 0.32, 0.18, dict(hi=f / 0.2, front=f, lo=0.5, back=0.6, arris=f * 0.8))
+    below = ELEV < 0                              # (11-10) from below: the underside foreshortened, the top unseen
+    sv = max(0.12, abs(math.sin(E)))
+    pr = SWD.profile(-t, 0.0, 0.0, d, 0.32, 0.18, dict(hi=0.5 if below else f / 0.2, front=f, lo=f / sv if below else 0.5,
+                                                       back=0.6, arris=f * 0.8))
     lens = []
     while sum(lens) < Lt + 20:
         lens.append(float(rng.uniform(70, 125)))
@@ -999,12 +1027,21 @@ def piece_plank_shop():
         del M
         x += L
         if x > A1 + 10: break
-    v_top = 1.4; v_bot = v_of(-t, d) - 12.5
+    if below:
+        # (11-10 proof) the underside came out as bright as the front: the studio's low fill from the right and the floor
+        # below light it squarely. Under a real shelf lit from above it is the darkest face (the bench's frame studio:
+        # "its underside stays dark"); so for the shelf seen from below the fill is turned down and the floor left out.
+        for o in s.objects:
+            if o.type == 'LIGHT' and o.name.startswith('fill'): o.data.energy *= UNDER_FILL
+            if o.type == 'MESH' and o.name.split('.')[0] == 'Plane' and abs(o.rotation_euler.x) > 1.0: o.hide_render = True   # the floor, not the wall
+    if below: v_top = v_of(0, d) + 1.4; v_bot = v_of(-t, 0) - 12.5    # front top edge to the underside's back and its shadow
+    else: v_top = 1.4; v_bot = v_of(-t, d) - 12.5
     W, H = render_long(s, cam, 'plank', False, A0, A1, v_bot, v_top)
     # (frame() anchors each segment at its top edge: row r is v_top - (r + 0.5) / PXCM)
     LAY['out']['plank'] = {'size': [W, H], 'kind': 'long', 'x': [A0, A1], 'v_top': v_top, 'v_bot': v_bot,
-                           'row_back': (v_top - v_of(0, 0)) * PXCM, 'row_front_top': (v_top - v_of(0, d)) * PXCM,
+                           'row_back': (v_top - v_of(0, 0 if not below else d)) * PXCM, 'row_front_top': (v_top - v_of(0, d)) * PXCM,
                            'row_front_bot': (v_top - v_of(-t, d)) * PXCM, 'boards_cm': [round(v, 2) for v in lens]}
+    if below: LAY['out']['plank']['row_under_back'] = (v_top - v_of(-t, 0)) * PXCM     # where the underside meets the wall
 
 
 def piece_trim_shop(which):
@@ -1056,6 +1093,7 @@ def main():
             else WHAT.split(','))
     for pc in todo:
         t = time.time()
+        use_elev(SHELF_ELEV if pc in SHELF_PIECES else TK.ELEV)
         if pc.startswith('box-'): piece_box(pc)
         elif pc == 'plank' and WOOD == 'shop': piece_plank_shop()
         elif pc.startswith('trim-') and WOOD == 'shop': piece_trim_shop(pc[5:])

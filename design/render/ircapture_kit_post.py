@@ -225,6 +225,12 @@ def plank_long(L):
                          'thickness_pt': r2(y_fb - y_ft), 'top_surface_pt': r2(y_ft - y_back),
                          'shadow_outset_pt': {'top': y_back, 'leading': 0, 'bottom': r2(H1 / 2.4 - y_fb), 'trailing': 0},
                          'boards_cm': L.get('boards_cm'), 'measures_cm': {'thick': 2.6, 'depth': 12.0}}
+    META['irc-plank']['elev'] = L['elev']
+    if 'row_under_back' in L:                 # (11-10) seen from below: the underside under the front edge, to the wall
+        yu = ypt(L['row_under_back'])
+        META['irc-plank']['y_pt']['underside_back_edge'] = yu
+        META['irc-plank']['underside_pt'] = r2(yu - y_fb)
+        META['irc-plank']['shadow_outset_pt']['bottom'] = r2(META['irc-plank']['pt'][1] - yu)
 
 
 def trim_long(which, L):
@@ -436,7 +442,7 @@ def shelf_json():
     face = bx['front_face_pt']; fi = bx['face_flat_inset_pt']; Wb, Hb = bx['pt']
     new = dict(old)
     new.update({'plankHeight': r2(pk['pt'][1] * k), 'plankBelowBoxTop': r2((Hb - pk['y_pt']['front_top_edge']) * k),
-                'plankFrontBottom': r2(pk['y_pt']['front_bottom_edge'] * k), 'boxHeight': r2(Hb * k),
+                'plankFrontBottom': r2(pk['y_pt'].get('underside_back_edge', pk['y_pt']['front_bottom_edge']) * k), 'boxHeight': r2(Hb * k),
                 'boxInsets': [0, r2(bx['capInsets']['leading'] * k), 0, r2(bx['capInsets']['trailing'] * k)],
                 'boxFace': [r2((face['y'] + fi) * k), r2((face['x'] + fi) * k), r2((Hb - face['y'] - face['h'] + fi) * k),
                             r2((face['trailing_from_right'] + fi) * k)],
