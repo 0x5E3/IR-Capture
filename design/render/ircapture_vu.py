@@ -63,7 +63,7 @@ def vu_angle(db):
 def face_png(path, w, h, px=150):
     """The printed card, w x h cm (larger than the window), origin its centre; the pivot at (0, PIVOT_Y - y_card)."""
     W, H = int(w * px), int(h * px)
-    paper = np.array([241, 231, 203], np.float32)
+    paper = np.array([232, 199, 132], np.float32)      # (a warm ivory-yellow card, as the classic meters')
     rng = np.random.default_rng(11)
     im = Image.new('RGB', (W, H), tuple(int(c) for c in paper)); d = ImageDraw.Draw(im)
     cy_card = WIN['y']                                   # the card's centre (world y)
@@ -138,9 +138,9 @@ def card_material(path, w, h, lit):
         fall = node(nt, 'ShaderNodeMapRange', **{'From Min': 0.1, 'From Max': 1.05, 'To Min': 1.0, 'To Max': 0.22})
         fall.interpolation_type = 'SMOOTHSTEP'; nt.links.new(ln.outputs['Value'], fall.inputs['Value'])
         warm = node(nt, 'ShaderNodeMix', data_type='RGBA'); warm.blend_type = 'MULTIPLY'; warm.inputs[0].default_value = 1.0
-        nt.links.new(ti.outputs['Color'], warm.inputs[6]); warm.inputs[7].default_value = (*srgb('#ffb468'), 1)
+        nt.links.new(ti.outputs['Color'], warm.inputs[6]); warm.inputs[7].default_value = (*srgb('#ffa646'), 1)
         nt.links.new(warm.outputs[2], b.inputs['Emission Color'])
-        st = node(nt, 'ShaderNodeMath', operation='MULTIPLY'); st.inputs[1].default_value = float(os.environ.get('VU_LAMP', '0.75'))
+        st = node(nt, 'ShaderNodeMath', operation='MULTIPLY'); st.inputs[1].default_value = float(os.environ.get('VU_LAMP', '1.0'))
         nt.links.new(fall.outputs['Result'], st.inputs[0]); nt.links.new(st.outputs[0], b.inputs['Emission Strength'])
     return m
 

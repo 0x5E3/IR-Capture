@@ -186,9 +186,10 @@ def job_reel():
     pw, ph = W_ - 2 * R['plate_inset'], H_ - 2 * R['plate_inset']
     plate = rbox('plate', pw, ph, 0.25, 0.0, 0.6, roll=0.08)
     TK.flat_faces(plate); plate.data.materials.append(T.brushed_alu())
-    # (11-10, handoff 1.5) the plate mirrors the workshop room where it reflects (plate_room's card, light-linked to
-    # it; brushed, it reads as a soft streak); IRC_PLATE_ROOM=0 leaves it out
-    if os.environ.get('IRC_PLATE_ROOM', '1') != '0':
+    # (11-10, handoff 1.5) plate_room's card, where the plate mirrors to: off by default. On the proof (11-10) its
+    # window washed a bright patch across the warm brushed plate; the room in the world (ircapture_kit's studio) stays,
+    # a dim reflection. IRC_PLATE_ROOM=1 puts the card back
+    if os.environ.get('IRC_PLATE_ROOM', '0') == '1':
         import plate_room as PRM
         PRM.mirror_card(bpy, plate, pw, ph, seed=0.37)
     ni = TK.nickel(); ch = SG.chrome('chr', seed=3); blk = SG.black_cast('bc'); alu = T.reel_alu(); tp = T.oxide()

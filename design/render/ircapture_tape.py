@@ -137,7 +137,7 @@ def satin_alu(name='deckalu', base='#b2a993'):
     return grimy(m, dirt='#3b3428', amount=0.45, dist=0.1)
 
 
-def brushed_alu(name='deckbrush', base='#bdae90'):
+def brushed_alu(name='deckbrush', base='#a99772'):     # (11-10: a shade deeper; with the studio's softboxes now on in the layers the plate read pale)
     """The deck plate (Lowell, 11-03: "warm brushed"): aluminium brushed along x, the grain long and visible, an
     anisotropic sheen that runs across the plate, gone warm with age; rubbed edges, handling marks round the keys."""
     m = mat(name, srgb(base), rough=0.3, metal=0.92, spec=0.5, aniso=0.55)

@@ -904,7 +904,8 @@ def render_long(s, cam, name, vertical, u0, u1, c0, c1):
         bpy.context.view_layer.update()
         path = os.path.join(OUT, '%s-seg%02d.png' % (name, i))
         P.render(s, path)
-        im = np.asarray(Image.open(path).convert('RGBA')).astype(np.float32) / 255.0
+        with Image.open(path) as f:                                   # (closed before the remove: Windows, the iMac)
+            im = np.asarray(f.convert('RGBA')).astype(np.float32) / 255.0
         im[..., :3] *= im[..., 3:4]
         span = hi - lo
         im = im[:span] if vertical else im[:, :span]                  # frame() rounds up to 4 px: its extra px dropped

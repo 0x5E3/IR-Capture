@@ -1,0 +1,57 @@
+{
+ "about": "IR Capture's VU meter (design/render/ircapture_vu.py, the Tools studio; ircapture_vu_post.py). Pixels of the 1x files; the app scales by its width over outline[2]. lit and unlit are the same meter with its lamp on and off (cross-faded as the lamp warms); the needle is turned about needle_pivot, laid on pivot, by the angle table (degrees from vertical by VU), and masked to the window.",
+ "lit": "irc-vu-lit",
+ "unlit": "irc-vu-unlit",
+ "needle": "irc-vu-needle",
+ "px_per_pt": 2.483,
+ "size": [
+  480,
+  353
+ ],
+ "outline": [
+  24.0,
+  24.37,
+  432.0,
+  304.0
+ ],
+ "window": [
+  52.0,
+  43.79,
+  376.0,
+  236.0
+ ],
+ "pivot": [
+  240.0,
+  309.41
+ ],
+ "needle_size": [
+  28,
+  194
+ ],
+ "needle_pivot": [
+  14.0,
+  217.58
+ ],
+ "shadow": [
+  7.37,
+  7.37,
+  2.0
+ ],
+ "angles": {
+  "-20": -47.0,
+  "-10": -31.514,
+  "-7": -22.172,
+  "-5": -13.889,
+  "-3": -3.461,
+  "-2": 2.726,
+  "-1": 9.667,
+  "0": 17.455,
+  "1": 26.194,
+  "2": 35.999,
+  "3": 47.0
+ },
+ "render": {
+  "pxcm": 80.0,
+  "samples": 128
+ }
+}
