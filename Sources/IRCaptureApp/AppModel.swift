@@ -219,7 +219,7 @@ final class AppModel: ObservableObject {
     @Published var outputFolder: URL { didSet { defaults.set(outputFolder.path, forKey: "outputFolder") } }
 
     // ---------------------------------------------------------------- level check state
-    @Published var levelRunning = false
+    @Published var levelRunning = false { didSet { if levelRunning { PowerClock.shared.powerOn() } } }
     @Published var levelPhase: String?
     @Published var levelReadings: [LevelReading] = []
     /// Inputs marked Not used that showed signal during the level check (P0.5 auto-suggest).
@@ -229,8 +229,8 @@ final class AppModel: ObservableObject {
     /// Room noise per input channel, RMS dBFS, from the 2 s of silence before the sweeps.
     @Published var noise: [Int: Double] = [:]
     @Published var levelError: String?
-    @Published var busy: Busy?
-    @Published var tapeRun: TapeRun?
+    @Published var busy: Busy? { didSet { if busy != nil { PowerClock.shared.powerOn() } } }
+    @Published var tapeRun: TapeRun? { didSet { if tapeRun != nil { PowerClock.shared.powerOn() } } }
     @Published var errorText: String?
     @Published var result: ResultSummary?
     @Published var reexportFolder: URL?
@@ -267,7 +267,7 @@ final class AppModel: ObservableObject {
     @Published var namSignalPath: String { didSet { defaults.set(namSignalPath, forKey: "namSignalPath") } }
     @Published var namSignalStatus: String?
     @Published var namSignal: [Float]?
-    @Published var namLevelRunning = false
+    @Published var namLevelRunning = false { didSet { if namLevelRunning { PowerClock.shared.powerOn() } } }
     @Published var namLevelError: String?
     @Published var namMeters: [NAMMeter] = []
     private var namMeterHistory: [Int: [Float]] = [:]

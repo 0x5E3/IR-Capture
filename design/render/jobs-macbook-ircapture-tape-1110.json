@@ -1,0 +1,26 @@
+{
+ "runner": "macbook",
+ "note": "IR Capture's tape machines in the bench's 11-10 look (IR Capture chat, 11-10): as jobs-imac-tape.json (11-04, never rendered: the machines were busy) with the 1.0 px filter, the workshop room in the reflections, the studio's softboxes kept on in every layer (they had been hidden with the other meshes, so the flanges and chrome mirrored black), the deck's plate mirroring the room (plate_room.mirror_card), and the liquid bronze hammertone on the deck's case and head base. Render density @2x of the app's scale: deck and boxes 55.2 px/cm, cart 81.2; 160 samples. ircapture_tape_layers.py imports ircapture_tape.py and ircapture_kit.py (all in design/render/ beside the bench's scripts). Fonts: yes. Estimate on the M1 (about 1.75 times the iMac): box 10 min, cart 45 to 70, reel 70 to 120: 2 to 3.5 h. It runs as well on the iMac: set runner to imac. Post (in the IR Capture repo): python3 design/render/ircapture_tape_post.py <render-out>/<job> Resources/SwellKit for box, cart and reel (lossless; it merges into tape-pieces.json); check the deck with ircapture_tape_check.py.",
+ "estimate_min": {
+  "box": 10,
+  "cart": 60,
+  "reel": 100
+ },
+ "jobs": [
+  {
+   "id": "box",
+   "fonts": true,
+   "cmd": "design/render/ircapture_tape_layers.py OUT box 55.2 160"
+  },
+  {
+   "id": "cart",
+   "fonts": true,
+   "cmd": "design/render/ircapture_tape_layers.py OUT cart 81.2 160"
+  },
+  {
+   "id": "reel",
+   "fonts": true,
+   "cmd": "design/render/ircapture_tape_layers.py OUT reel 55.2 160"
+  }
+ ]
+}

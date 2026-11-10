@@ -17,6 +17,8 @@
 import sys, os, json, glob, math
 import numpy as np
 from PIL import Image
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import webp_out          # (11-10) every WebP lossless and exact (the bench's rule since 11-06); POST_LOSSY=1 the old
 
 R, O = sys.argv[1], sys.argv[2]
 PIC = os.path.join(O, 'pictures')

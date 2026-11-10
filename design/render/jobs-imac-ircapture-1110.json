@@ -1,0 +1,38 @@
+{
+ "runner": "imac",
+ "note": "IR Capture's own pieces in the bench's 11-10 look (IR Capture chat, 11-10; handoff HANDOFF-desktop-to-ircapture-2026-11-09.md, section B): the 1.0 px pixel filter, the workshop room in the reflections (metal_kit.room_world), the liquid hammertone in a dark bronze on the Cab IR panels and the bronze shelf box (hammer_liquid.liquid_paint), and the shelf and its mouldings as rough shop wood (shop_wood.py meshes, seen from the Tools studio's 10 degrees above), long strips that never repeat (plank and top/bottom trims 400 cm, sides 260 cm), each rendered in 40 cm segments with the studio moved along so every part is lit alike. Keys, panels and boxes as 11-04 (48 px/cm, 192 samples); the strips at 36 px/cm. Scripts beside the bench's in design/render/ (ircapture_kit.py imports toolkit, shelf_gear, shelf_wood, shop_wood, gear_kit, parts, instrument, metal_kit, hammer_liquid, finish_maps). No fonts. Estimate on the iMac: keys 10 min, panels 12, boxes 8, plank 25 to 45 (its boards' maps and meshes 3 to 6 of that), trims 10 to 20 each: about 1.5 to 2 h. Post (in the IR Capture repo): for each job folder, python3 design/render/ircapture_kit_post.py <render-out>/<job> Resources/SwellKit (lossless; it rewrites irc-pieces.json and irc-shelf.json).",
+ "estimate_min": {
+  "keys": 10,
+  "panels": 12,
+  "boxes": 8,
+  "plank": 40,
+  "trim-h": 15,
+  "trim-v": 12
+ },
+ "jobs": [
+  {
+   "id": "keys",
+   "cmd": "design/render/ircapture_kit.py OUT key-a,key-b,key-c,key-d,key-e,key-f 48 192"
+  },
+  {
+   "id": "panels",
+   "cmd": "design/render/ircapture_kit.py OUT panel-fine,panel-fine-b,panel-nam,panel-nam-b 48 192"
+  },
+  {
+   "id": "boxes",
+   "cmd": "design/render/ircapture_kit.py OUT box-bronze,box-oxblood 48 192"
+  },
+  {
+   "id": "plank",
+   "cmd": "design/render/ircapture_kit.py OUT plank 36 192"
+  },
+  {
+   "id": "trim-h",
+   "cmd": "design/render/ircapture_kit.py OUT trim-h 36 192"
+  },
+  {
+   "id": "trim-v",
+   "cmd": "design/render/ircapture_kit.py OUT trim-v 36 192"
+  }
+ ]
+}

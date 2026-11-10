@@ -257,23 +257,35 @@ struct KeyButtonStyle: ButtonStyle {
         let size: CGFloat
         let big: Bool
         @Environment(\.isEnabled) private var isEnabled
+        @Environment(\.accessibilityReduceMotion) private var reduceMotion
         @State private var hover = false
         var body: some View {
             let down = configuration.isPressed && isEnabled
-            let state = lit ? (down ? "litdown" : "lit") : (down ? "down" : "off")
             configuration.label
                 .font(.swellLegend(size))
                 .textCase(.uppercase)
                 .tracking(size * 0.05)
                 .foregroundColor(lit ? Swell.keyLegendLit : Swell.keyLegend)
                 .shadow(color: lit ? Color(swellHex: 0xFFD296, opacity: 0.6) : Color(swellHex: 0xFFF4DC, opacity: 0.35), radius: 0, x: 0, y: lit ? 0 : 1)
+                .animation(reduceMotion ? nil : SwellMotion.filament(lit), value: lit)
                 .lineLimit(1)
                 .fixedSize()
                 .padding(.horizontal, big ? 24 : 12)
                 .padding(.vertical, big ? 11 : 6)
                 .frame(minWidth: big ? 120 : 44, minHeight: big ? 40 : 26)
                 .offset(y: down ? 1 : 0)
-                .background(Panel9Slice(piece: SwellNine.key(state, variant: variant)))
+                .background(
+                    // the lamp under the cap is a filament: the lit cap comes up over the unlit one (90 ms) and dies
+                    // away (240 ms); a press moves the cap at once
+                    ZStack {
+                        // (the unlit cap goes once the lit one is fully up, so the two shadows never double)
+                        Panel9Slice(piece: SwellNine.key(down ? "down" : "off", variant: variant))
+                            .opacity(lit ? 0 : 1)
+                            .animation(reduceMotion ? nil : SwellMotion.underLayer(lit), value: lit)
+                        Panel9Slice(piece: SwellNine.key(down ? "litdown" : "lit", variant: variant))
+                            .opacity(lit ? 1 : 0)
+                            .animation(reduceMotion ? nil : SwellMotion.filament(lit), value: lit)
+                    })
                 .brightness(hover && isEnabled && !down ? 0.04 : 0)
                 .opacity(isEnabled ? 1 : 0.5)
                 .saturation(isEnabled ? 1 : 0.6)
@@ -329,18 +341,30 @@ struct Lamp: View {
 }
 
 /// A coloured jewel lamp (rlamp-jewel<colour>-<on|off>.webp, 120 px and @2x 240 px); draw it at the size you need.
+/// A filament behind the jewel: the lit picture comes up over the unlit one in 90 ms and dies away in 240 ms.
 struct JewelLamp: View {
     var colour = "amber"          // amber, red, green, clear, blue
     var on: Bool
     var diameter: CGFloat = 24
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var body: some View {
         // The picture is the jewel in its chrome ring with a shadow margin round it: the jewel's own size is
         // `diameter`, so the picture is drawn 1.7 times larger and overhangs its frame.
-        if let img = SwellPictures.shared.image("rlamp-jewel\(colour)-\(on ? "on" : "off")", pxPerPoint: 120 / (diameter * 1.7)) {
-            Image(nsImage: img).resizable().interpolation(.high)
-                .frame(width: diameter * 1.7, height: diameter * 1.7)
-                .frame(width: diameter, height: diameter).accessibilityHidden(true)
+        let ppp = 120 / (diameter * 1.7)
+        ZStack {
+            if let off = SwellPictures.shared.image("rlamp-jewel\(colour)-off", pxPerPoint: ppp) {
+                Image(nsImage: off).resizable().interpolation(.high)
+                    .opacity(on ? 0 : 1)
+                    .animation(reduceMotion ? nil : SwellMotion.underLayer(on), value: on)
+            }
+            if let lit = SwellPictures.shared.image("rlamp-jewel\(colour)-on", pxPerPoint: ppp) {
+                Image(nsImage: lit).resizable().interpolation(.high)
+                    .opacity(on ? 1 : 0)
+                    .animation(reduceMotion ? nil : SwellMotion.filament(on), value: on)
+            }
         }
+        .frame(width: diameter * 1.7, height: diameter * 1.7)
+        .frame(width: diameter, height: diameter).accessibilityHidden(true)
     }
 }
 

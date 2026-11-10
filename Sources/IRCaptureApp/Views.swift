@@ -269,8 +269,6 @@ enum GearPreview {
 /// The oak shelf across the top: the job keys, the pilot lamp with its words, the Help key.
 struct Shelf: View {
     @EnvironmentObject var m: AppModel
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var pulse = false
     var status: (Lamp.Glow, String) {
         if m.errorText != nil || m.levelError != nil || m.namError != nil || m.namLevelError != nil { return (.red, "Error: see the message") }
         if let b = m.busy {
@@ -315,7 +313,6 @@ struct Shelf: View {
                             Lamp(state: st.0, size: 46)
                         }
                     }
-                    .opacity(st.0 == .amber && pulse ? 0.72 : 1)
                     .accessibilityHidden(true)
                     GlassWindow(size: 13) {
                         VStack(alignment: .leading, spacing: 1) {
@@ -335,10 +332,6 @@ struct Shelf: View {
             .padding(.horizontal, 26).offset(y: g?.boxTop ?? 2)
         }
         .frame(height: g?.height ?? 119, alignment: .top)
-        .onAppear {
-            guard !reduceMotion else { return }
-            withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) { pulse = true }
-        }
     }
 }
 

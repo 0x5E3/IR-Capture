@@ -4,7 +4,7 @@
 #
 # Every piece is resampled (area filter, on premultiplied alpha so shadows and edges keep no fringe) to 24 px a cm (1x)
 # and 48 (@2x), set to its true shape (the camera's 10 degrees shortens what faces it by 1.5 %: y is stretched by
-# 1 / cos 10), and written as pictures/<name>.webp and <name>@2x.webp (quality 90, method 6). IR Capture draws these at
+# 1 / cos 10), and written as pictures/<name>.webp and <name>@2x.webp (lossless since 11-10: webp_out). IR Capture draws these at
 # 10 pt a cm, so 1x is 2.4 px a pt. The layout (sizes, cap insets, where the faces and edges are) goes to
 # irc-pieces.json beside pictures/.
 #
@@ -20,6 +20,9 @@
 import sys, os, json, glob, math
 import numpy as np
 from PIL import Image
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, '/home/claude/desktop-bench/design/render')
+import webp_out          # (11-10) every WebP lossless and exact (the bench's rule since 11-06); POST_LOSSY=1 the old
 
 R = sys.argv[1]
 O = sys.argv[2]
@@ -136,7 +139,7 @@ def save(a, name, rgb=False):
     os.makedirs(PIC, exist_ok=True)
     im = unpremul(a, rgb)
     p = os.path.join(PIC, name + '.webp')
-    im.save(p, 'WEBP', quality=90, method=6)
+    im.save(p, 'WEBP', quality=90, method=6)          # lossless (webp_out): quality is the encoder's effort
     print(name + '.webp', im.size, os.path.getsize(p), flush=True)
     return im.size
 
@@ -195,9 +198,71 @@ def contrast(hex_fg, rgb_bg):
 
 
 # ---------------------------------------------------------------------------------------------------------------------
+def drop(name):
+    """A picture this post no longer writes (a long strip has no @2x): removed, since the app prefers an @2x file."""
+    p = os.path.join(PIC, name + '.webp')
+    if os.path.exists(p): os.remove(p); print('removed', name + '.webp', flush=True)
+
+
+def plank_long(L):
+    """(11-10) The shop-wood shelf: one long strip that never repeats (ircapture_kit.py renders it whole, lit alike
+    along its length), 1x only at 24 px a cm (3 px a point at the shelf's 8 pt a cm: more than a Retina screen's 2)."""
+    key = 'plank'; px = L['pxcm']; ce = math.cos(math.radians(L['elev']))
+    top = max(0.0, L['row_back'] - 1.0 * px * ce)
+    bot = min(alpha_extent(key, 0, 0, L['size'][0], thresh=1.0) + 0.25 * px, L['size'][1])
+    H1 = int(round((bot - top) / (px * ce) * OUTS[0])); bot = top + H1 / OUTS[0] * px * ce
+    Lcm = L['x'][1] - L['x'][0]; W1 = int(round(Lcm * OUTS[0]))
+    a = resample(key, (0, top, L['size'][0], bot), (W1, H1))
+    a = feather(a, 'tb', int(round(0.5 * OUTS[0])))
+    save(a, 'irc-plank'); drop('irc-plank@2x')
+    def ypt(row): return r2((row - top) / (px * ce) * PT_CM)
+    y_back, y_ft, y_fb = ypt(L['row_back']), ypt(L['row_front_top']), ypt(L['row_front_bot'])
+    META['irc-plank'] = {'file': 'irc-plank.webp', 'x2': None, 'px': [W1, H1], 'px_per_pt': 2.4,
+                         'pt': [r2(W1 / 2.4), r2(H1 / 2.4)], 'kind': 'strip-h',
+                         'capInsets': {'top': 0, 'leading': 0, 'bottom': 0, 'trailing': 0}, 'resizingMode': 'tile',
+                         'repeat_pt': r2(Lcm * PT_CM), 'how': 'crop to the length needed from its start (never resize); it repeats only past its end',
+                         'y_pt': {'top_back_edge': y_back, 'front_top_edge': y_ft, 'front_bottom_edge': y_fb},
+                         'thickness_pt': r2(y_fb - y_ft), 'top_surface_pt': r2(y_ft - y_back),
+                         'shadow_outset_pt': {'top': y_back, 'leading': 0, 'bottom': r2(H1 / 2.4 - y_fb), 'trailing': 0},
+                         'boards_cm': L.get('boards_cm'), 'measures_cm': {'thick': 2.6, 'depth': 12.0}}
+
+
+def trim_long(which, L):
+    key = 'trim-' + which; px = L['pxcm']; ce = math.cos(math.radians(L['elev']))
+    if which == 'h':
+        top = max(0.0, L['row_top'] - 0.6 * px * ce)
+        bot = min(alpha_extent(key, 0, 0, L['size'][0], thresh=1.0) + 0.15 * px, L['size'][1])
+        H1 = int(round((bot - top) / (px * ce) * OUTS[0])); bot = top + H1 / OUTS[0] * px * ce
+        Lcm = L['x'][1] - L['x'][0]; W1 = int(round(Lcm * OUTS[0]))
+        save(feather(resample(key, (0, top, L['size'][0], bot), (W1, H1)), 'tb', int(round(0.25 * OUTS[0]))), 'irc-trim-h')
+        drop('irc-trim-h@2x')
+        def ypt(row): return r2((row - top) / (px * ce) * PT_CM)
+        y0, y1 = ypt(L['row_top']), ypt(L['row_bot'])
+        META['irc-trim-h'] = {'file': 'irc-trim-h.webp', 'x2': None, 'px': [W1, H1], 'px_per_pt': 2.4,
+                              'pt': [r2(W1 / 2.4), r2(H1 / 2.4)], 'kind': 'strip-h',
+                              'capInsets': {'top': 0, 'leading': 0, 'bottom': 0, 'trailing': 0}, 'resizingMode': 'tile',
+                              'repeat_pt': r2(Lcm * PT_CM), 'face_pt': {'y_top': y0, 'y_bottom': y1, 'w': r2(y1 - y0)},
+                              'shadow_outset_pt': {'top': y0, 'leading': 0, 'bottom': r2(H1 / 2.4 - y1), 'trailing': 0}}
+    else:
+        left = max(0.0, L['px_left'] - 0.6 * px)
+        right = min(alpha_extent(key, 1, 0, L['size'][1], thresh=1.0) + 0.15 * px, L['size'][0])
+        W1 = int(round((right - left) / px * OUTS[0])); right = left + W1 / OUTS[0] * px
+        Lcm = L['y'][1] - L['y'][0]; H1 = int(round(Lcm * OUTS[0]))
+        save(feather(resample(key, (left, 0, right, L['size'][1]), (W1, H1)), 'lr', int(round(0.25 * OUTS[0]))), 'irc-trim-v')
+        drop('irc-trim-v@2x')
+        def xpt(col): return r2((col - left) / px * PT_CM)
+        x0, x1 = xpt(L['px_left']), xpt(L['px_right'])
+        META['irc-trim-v'] = {'file': 'irc-trim-v.webp', 'x2': None, 'px': [W1, H1], 'px_per_pt': 2.4,
+                              'pt': [r2(W1 / 2.4), r2(H1 / 2.4)], 'kind': 'strip-v',
+                              'capInsets': {'top': 0, 'leading': 0, 'bottom': 0, 'trailing': 0}, 'resizingMode': 'tile',
+                              'repeat_pt': r2(Lcm * PT_CM), 'face_pt': {'x_left': x0, 'x_right': x1, 'w': r2(x1 - x0)},
+                              'shadow_outset_pt': {'top': 0, 'leading': x0, 'bottom': 0, 'trailing': r2(W1 / 2.4 - x1)}}
+
+
 def plank():
     key = 'plank'
     if key not in lay: return
+    if lay[key].get('kind') == 'long': return plank_long(lay[key])
     L = lay[key]; px = L['pxcm']; ce = math.cos(math.radians(L['elev']))
     P_cm = L['x_tile'][1] - L['x_tile'][0]; F = 2.5
     xa0, xa1 = L['px_tile0'] - F * px, L['px_tile1']
@@ -266,6 +331,7 @@ def box(name):
 def trim(which):
     key = 'trim-' + which
     if key not in lay: return
+    if lay[key].get('kind') == 'long': return trim_long(which, lay[key])
     L = lay[key]; px = L['pxcm']; ce = math.cos(math.radians(L['elev'])); F = 1.8
     if which == 'h':
         P_cm = L['x_tile'][1] - L['x_tile'][0]
@@ -357,9 +423,32 @@ doc = {'about': 'IR Capture\'s own rendered pieces (ircapture_kit.py, the deskto
                 'the picture runs past the object on each side (shadow and margin).',
        'renders': {k: {'pxcm': v['pxcm'], 'samples': v['samples'], 's': v.get('s')} for k, v in lay.items()},
        'pieces': META}
+# (11-10) irc-shelf.json, the app's shelf layout, from the pieces (it was written by hand from irc-pieces.json): the
+# shelf is drawn at 8 pt a cm (pxPerPoint 3.0 of the 1x files), boxTop and gapBelowPlank are layout choices and kept
+def shelf_json():
+    sp = os.path.join(O, 'irc-shelf.json')
+    if not os.path.exists(sp): return
+    old = json.load(open(sp)); allp = dict(json.load(open(os.path.join(O, 'irc-pieces.json')))['pieces']) if os.path.exists(os.path.join(O, 'irc-pieces.json')) else {}
+    allp.update(META)
+    pk, bx, th = allp.get('irc-plank'), allp.get('irc-box-bronze'), allp.get('irc-trim-h')
+    if not (pk and bx and th): return
+    k = 0.8                                                           # 10 pt a cm (the pieces) to the shelf's 8
+    face = bx['front_face_pt']; fi = bx['face_flat_inset_pt']; Wb, Hb = bx['pt']
+    new = dict(old)
+    new.update({'plankHeight': r2(pk['pt'][1] * k), 'plankBelowBoxTop': r2((Hb - pk['y_pt']['front_top_edge']) * k),
+                'plankFrontBottom': r2(pk['y_pt']['front_bottom_edge'] * k), 'boxHeight': r2(Hb * k),
+                'boxInsets': [0, r2(bx['capInsets']['leading'] * k), 0, r2(bx['capInsets']['trailing'] * k)],
+                'boxFace': [r2((face['y'] + fi) * k), r2((face['x'] + fi) * k), r2((Hb - face['y'] - face['h'] + fi) * k),
+                            r2((face['trailing_from_right'] + fi) * k)],
+                'trimWidth': r2(th['pt'][1] * k)})
+    if new != old:
+        json.dump(new, open(sp, 'w'), indent=0); print('wrote', sp, {k2: new[k2] for k2 in new if new[k2] != old.get(k2)})
+
+
 path = os.path.join(O, 'irc-pieces.json')
 existing = json.load(open(path)) if os.path.exists(path) else None
 if existing:                                  # keep pieces posted from another renders folder
     existing['pieces'].update(META); existing['renders'].update(doc['renders']); doc = existing
 json.dump(doc, open(path, 'w'), indent=1)
 print('wrote', path)
+shelf_json()

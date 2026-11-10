@@ -327,7 +327,11 @@ struct ReelDeckFace<Keys: View>: View {
         let ey = d.ellipse_y
         let a = (d.reels["s"]!.pack_full * d.reels["s"]!.pack_full - d.reels["s"]!.hub * d.reels["s"]!.hub)
         let hub = d.reels["s"]!.hub
-        let rs = (hub * hub + a * CGFloat(1 - state.p)).squareRoot(), rt = (hub * hub + a * CGFloat(state.p)).squareRoot()
+        // a few turns of leader stay on each hub (the tape is threaded through the heads to the take-up reel even
+        // when it is all wound back), so an empty reel still shows its turns and the tape still runs to it
+        let leader = 0.22 * d.pt_per_cm
+        let rs = max(hub + leader, (hub * hub + a * CGFloat(1 - state.p)).squareRoot())
+        let rt = max(hub + leader, (hub * hub + a * CGFloat(state.p)).squareRoot())
         let sR = d.reels["s"]!, tR = d.reels["t"]!
         let span = { (pack: TapePieces.Deck.Reel, r: CGFloat, roller: TapePieces.Deck.Roller, supply: Bool) -> Path in
             var p = Path()
@@ -384,7 +388,8 @@ struct ReelDeck: View {
     var body: some View {
         let moving = !reduceMotion && (m.tapeRun != nil || rewinding || coasting)
         ScaledMachine(size: d.size, outline: d.outline) {
-            TimelineView(.animation(minimumInterval: 1.0 / 60, paused: !moving)) { ctx in
+            // at the display's own rate (ProMotion: 120 Hz); paused whenever the reels stand still
+            TimelineView(.animation(paused: !moving)) { ctx in
                 ReelDeckFace(d: d, state: state(at: ctx.date)) { keys }
             }
         }

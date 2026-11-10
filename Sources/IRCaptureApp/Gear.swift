@@ -405,34 +405,125 @@ struct KeyChoice<T: Hashable>: View {
 }
 
 // ------------------------------------------------------------------ the VU meter
-/// One analogue VU meter (the rack's level unit, rack-vu.webp, its face cropped). Honest mapping (handoff, B):
-/// 0 VU is the target level, so the red arc above 0 means "turn down"; the face reads −20 to +3 VU and the needle
-/// rests at the left end below that. It is driven by IR Capture's peak reading, not VU ballistics, so the needle is
-/// smoothed (about 300 ms) and the dBFS figure stays in a glass window beside it.
+/// IR Capture's own VU meter (design/render/ircapture_vu.py, the Tools studio): the meter with its face lamp lit and
+/// unlit, and the needle alone, upright, which the app turns. Layout in SwellKit/irc-vu.json (pixels of the 1x files).
+struct VUKit: Decodable {
+    let lit: String
+    let unlit: String
+    let needle: String
+    let px_per_pt: CGFloat          // the 1x files' pixels a point at the meter's design width
+    let size: [CGFloat]             // the face pictures' size, 1x px
+    let outline: [CGFloat]          // the meter's bezel in them (x, y, w, h): `width` is this box's width
+    let window: [CGFloat]           // the opening the needle shows through (x, y, w, h)
+    let pivot: [CGFloat]            // the needle's pivot in the face pictures (below the opening, behind the bezel)
+    let needle_size: [CGFloat]      // the needle picture, 1x px
+    let needle_pivot: [CGFloat]     // its pivot in that picture
+    let shadow: [CGFloat]           // the needle's shadow on the card, 1x px (dx, dy) and its softness (px)
+    let angles: [String: Double]    // degrees from vertical by VU (-20 ... +3)
+
+    static let shared: VUKit? = {
+        let url = SwellKit.folder.appendingPathComponent("irc-vu.json")
+        guard let data = try? Data(contentsOf: url), let k = try? JSONDecoder().decode(VUKit.self, from: data) else { return nil }
+        let files = [k.lit, k.unlit, k.needle]
+        return files.allSatisfy { SwellPictures.shared.cgImage($0 + ".webp") != nil } ? k : nil
+    }()
+    var table: [(Double, Double)] { angles.compactMap { k, v in Double(k).map { ($0, v) } }.sorted { $0.0 < $1.0 } }
+}
+
+/// One analogue VU meter. Honest mapping (handoff, B): 0 VU is the target level, so the red arc above 0 means "turn
+/// down"; the face reads -20 to +3 VU and the needle rests at the left end below that. The reading is IR Capture's
+/// peak level; the needle follows it with VU ballistics (SwellMotion.vuSpring) and the dBFS figure stays in a glass
+/// window beside it. The face lamp warms with the power clock.
+/// Without irc-vu.json (or its pictures) the rack's level unit is used (rack-vu.webp, its face cropped, the needle drawn).
 struct VUMeter: View {
-    /// Peak minus target, in dB. nil (no signal) rests the needle at −20.
+    /// Peak minus target, in dB. nil (no signal) rests the needle at -20.
     let vu: Double?
     var width: CGFloat = 150
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ObservedObject private var clock = PowerClock.shared
     // rack-vu.webp, the left meter: its bezel box, the face inside it, the needle pivot (all in the picture's px)
     static let box = CGRect(x: 258, y: 60, width: 306, height: 186)
     static let face = CGRect(x: 266.02, y: 69.84, width: 553.31 - 266.02, height: 237.42 - 69.84)
     static let pivot = CGPoint(x: 409.67, y: 276.32)
     static let length = 172.5
-    // layout.json's angle table: degrees from vertical, VU −20 … +3
-    static let table: [(Double, Double)] = [(-20, -47.0), (-10, -31.514), (-7, -22.172), (-5, -13.889), (-3, -3.461), (-2, 2.726),
-                                            (-1, 9.667), (0, 17.455), (1, 26.194), (2, 35.999), (3, 47.0)]
-    static func angle(_ vu: Double?) -> Double {
+    // layout.json's angle table: degrees from vertical, VU -20 ... +3
+    static let rackTable: [(Double, Double)] = [(-20, -47.0), (-10, -31.514), (-7, -22.172), (-5, -13.889), (-3, -3.461), (-2, 2.726),
+                                                (-1, 9.667), (0, 17.455), (1, 26.194), (2, 35.999), (3, 47.0)]
+    static func angle(_ vu: Double?, table: [(Double, Double)] = rackTable) -> Double {
+        guard table.count > 1 else { return 0 }
         guard let v = vu else { return table[0].1 }
-        let x = max(-20, min(3, v))
+        let x = max(table.first!.0, min(table.last!.0, v))
         for k in 1..<table.count where x <= table[k].0 {
             let (a, b) = (table[k - 1], table[k])
             return a.1 + (x - a.0) / (b.0 - a.0) * (b.1 - a.1)
         }
         return table.last!.1
     }
+    static func height(width: CGFloat) -> CGFloat {
+        if let k = VUKit.shared { return k.outline[3] * width / k.outline[2] }
+        return box.height * width / box.width
+    }
     var scale: CGFloat { width / VUMeter.box.width }
+
     var body: some View {
+        Group {
+            if let kit = VUKit.shared { rendered(kit) } else { rack }
+        }
+        .accessibilityElement()
+        .accessibilityLabel("Level meter")
+        .accessibilityValue(vu.map { String(format: "%+.0f dB from the target", $0) } ?? "no signal")
+    }
+
+    /// IR Capture's own meter: unlit face, the lamp's light over it, the needle and its shadow turned about the pivot.
+    @ViewBuilder func rendered(_ kit: VUKit) -> some View {
+        let k = width / kit.outline[2]                         // points per 1x px
+        let ox = kit.outline[0], oy = kit.outline[1]
+        let a = VUMeter.angle(vu, table: kit.table)
+        let win = CGRect(x: (kit.window[0] - ox) * k, y: (kit.window[1] - oy) * k, width: kit.window[2] * k, height: kit.window[3] * k)
+        let nw = kit.needle_size[0] * k, nh = kit.needle_size[1] * k
+        let anchor = UnitPoint(x: kit.needle_pivot[0] / kit.needle_size[0], y: kit.needle_pivot[1] / kit.needle_size[1])
+        let nx = (kit.pivot[0] - ox - kit.needle_pivot[0]) * k, ny = (kit.pivot[1] - oy - kit.needle_pivot[1]) * k
+        let face = { (name: String) -> AnyView in
+            if let img = SwellPictures.shared.image(name, pxPerPoint: 1 / k) {
+                return AnyView(Image(nsImage: img).resizable().interpolation(.high)
+                    .frame(width: kit.size[0] * k, height: kit.size[1] * k)
+                    .offset(x: -ox * k, y: -oy * k))
+            }
+            return AnyView(EmptyView())
+        }
+        let needle = SwellPictures.shared.image(kit.needle, pxPerPoint: 1 / k).map {
+            Image(nsImage: $0).resizable().interpolation(.high).frame(width: nw, height: nh)
+        }
+        ZStack(alignment: .topLeading) {
+            TimelineView(.animation(paused: !clock.warming || reduceMotion)) { ctx in
+                let glow = reduceMotion ? 1 : clock.lampGlow(at: ctx.date)
+                ZStack(alignment: .topLeading) {
+                    face(kit.unlit).opacity(glow >= 1 ? 0 : 1)      // (gone once the lamp is full: no doubled shadow)
+                    face(kit.lit).opacity(glow)
+                }
+            }
+            if let needle {
+                ZStack(alignment: .topLeading) {
+                    needle
+                        .colorMultiply(.black).opacity(0.34)
+                        .blur(radius: kit.shadow[2] * k)
+                        .rotationEffect(.degrees(a), anchor: anchor)
+                        .offset(x: nx + kit.shadow[0] * k, y: ny + kit.shadow[1] * k)
+                    needle
+                        .rotationEffect(.degrees(a), anchor: anchor)
+                        .offset(x: nx, y: ny)
+                }
+                .animation(reduceMotion ? nil : SwellMotion.vuSpring, value: a)
+                .frame(width: width, height: kit.outline[3] * k, alignment: .topLeading)
+                .mask(Rectangle().frame(width: win.width, height: win.height).offset(x: win.minX, y: win.minY)
+                        .frame(width: width, height: kit.outline[3] * k, alignment: .topLeading))
+            }
+        }
+        .frame(width: width, height: kit.outline[3] * k, alignment: .topLeading)
+    }
+
+    /// The rack's level unit (the bench's 11-03 kit), the needle drawn.
+    @ViewBuilder var rack: some View {
         let h = VUMeter.box.height * scale
         ZStack(alignment: .topLeading) {
             if let img = SwellPictures.shared.sprite("rack-vu.webp", rect: VUMeter.box, pxPerPoint: 1 / scale) {
@@ -444,12 +535,9 @@ struct VUMeter: View {
                 .stroke(Color(swellHex: 0x16110B, opacity: 0.92), style: StrokeStyle(lineWidth: max(1.1, 1.6 * scale * 2), lineCap: .round))
                 .shadow(color: .black.opacity(0.35), radius: 0.6, x: 0.8, y: 0.8)
                 .frame(width: width, height: h)
-                .animation(reduceMotion ? nil : .easeOut(duration: 0.3), value: vu)
+                .animation(reduceMotion ? nil : SwellMotion.vuSpring, value: VUMeter.angle(vu))
         }
         .frame(width: width, height: h)
-        .accessibilityElement()
-        .accessibilityLabel("Level meter")
-        .accessibilityValue(vu.map { String(format: "%+.0f dB from the target", $0) } ?? "no signal")
     }
 
     /// The needle from where it enters the face (the pivot is below it, behind the panel) to its tip.
@@ -536,13 +624,17 @@ struct MeterBridge<Content: View>: View {
 // ------------------------------------------------------------------ the magic eye
 /// A tuning eye from the rack's Monitor unit (rack-monitor.webp's unlit eye, rack-monitor-ineye.webp's 59 frames:
 /// warm0..2 as the tube heats, then x00 wide open … x55 closed), cropped round its bezel. As a radio's eye closes
-/// on a station, it closes here as the input stands clear of the room noise. Lit, it warms up for about a second.
+/// on a station, it closes here as the input stands clear of the room noise.
+/// Motion (the bench's): the two frames round the exact closure are summed (plus-lighter, weights 1 - w and w), so the
+/// shadow wedge moves smoothly instead of stepping; closing eases in 25 ms, opening in 70 ms. The tube's glow comes up
+/// with the power clock (none until 1.75 s, full at 6 s); lit later, it strikes at once.
 struct MagicEye: View {
     /// 0 wide open … 1 closed; nil while lit with nothing measured yet (open).
     let closure: Double?
     let lit: Bool
     var diameter: CGFloat = 30
-    @State private var warm = -1
+    @ObservedObject private var clock = PowerClock.shared
+    @State private var shown = 0.0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// The eye's centre in rack-monitor.webp (layout.json: ineye c = 424.78, 255.86); the crop is 200 px round it.
     static let base = CGRect(x: 325, y: 156, width: 200, height: 200)
@@ -550,36 +642,55 @@ struct MagicEye: View {
     static func cell(_ i: Int) -> CGRect {
         CGRect(x: CGFloat(i % 12) * 216 + 13, y: CGFloat(i / 12) * 210, width: 200, height: 200)
     }
-    var frameIndex: Int? {
-        guard lit else { return nil }
-        if warm >= 0 { return warm }                       // warm0, warm1, warm2
-        let x = Int(((closure ?? 0) * 55).rounded())
-        return 3 + max(0, min(55, x))
-    }
+    /// The closure as a frame position, 0 … 55.
+    var target: Double { max(0, min(55, (closure ?? 0) * 55)) }
     var body: some View {
         let k = diameter / 200
-        ZStack {
-            if let b = SwellPictures.shared.sprite("rack-monitor.webp", rect: MagicEye.base, pxPerPoint: 1 / k) {
-                Image(nsImage: b).resizable().interpolation(.high)
-            } else { Color.black }
-            if let i = frameIndex, let f = SwellPictures.shared.sprite("rack-monitor-ineye.webp", rect: MagicEye.cell(i), pxPerPoint: 1 / k) {
-                Image(nsImage: f).resizable().interpolation(.high)
+        TimelineView(.animation(paused: !lit || !clock.warming || reduceMotion)) { ctx in
+            let glow = lit ? (reduceMotion ? 1 : clock.eyeGlow(at: ctx.date)) : 0
+            ZStack {
+                if let b = SwellPictures.shared.sprite("rack-monitor.webp", rect: MagicEye.base, pxPerPoint: 1 / k) {
+                    Image(nsImage: b).resizable().interpolation(.high)
+                } else { Color.black }
+                if lit {
+                    // the heater's own dull glow first (warm frames), then the target's glow over it
+                    if glow < 1, let w = SwellPictures.shared.sprite("rack-monitor-ineye.webp", rect: MagicEye.cell(2), pxPerPoint: 1 / k) {
+                        Image(nsImage: w).resizable().interpolation(.high).opacity(min(1, glow * 3) * (1 - glow))
+                    }
+                    EyeFrames(x: reduceMotion ? target.rounded() : target, k: k)
+                        .animation(reduceMotion ? nil : SwellMotion.eye(closing: target > shown), value: target)
+                        .opacity(glow)
+                }
             }
+            .frame(width: diameter, height: diameter)
+            .clipShape(Circle())
+            .shadow(color: Color(red: 0.4, green: 1, blue: 0.5, opacity: 0.25 * glow), radius: 3)
         }
-        .frame(width: diameter, height: diameter)
-        .clipShape(Circle())
-        .shadow(color: frameIndex.map { $0 >= 3 } == true ? Color(red: 0.4, green: 1, blue: 0.5, opacity: 0.25) : .clear, radius: 3)
-        .task(id: lit) {
-            guard lit, !reduceMotion else { warm = -1; return }
-            for k in 0..<3 {
-                warm = k
-                try? await Task.sleep(nanoseconds: 370_000_000)
-            }
-            warm = -1
-        }
+        .onChange(of: target) { shown = $0 }
+        .onAppear { shown = target }
         .accessibilityElement()
         .accessibilityLabel("Noise eye")
         .accessibilityValue(!lit ? "off" : closure.map { String(format: "%.0f percent closed", $0 * 100) } ?? "open")
+    }
+
+    /// The frames below and above x, summed: (1 - w) of frame floor(x) plus w of the next, in an isolated group.
+    private struct EyeFrames: View, Animatable {
+        var x: Double
+        let k: CGFloat
+        var animatableData: Double { get { x } set { x = newValue } }
+        var body: some View {
+            let i = Int(x.rounded(.down)), w = x - Double(i)
+            ZStack {
+                frame(3 + max(0, min(55, i))).opacity(1 - w).blendMode(.plusLighter)
+                if w > 0.001 { frame(3 + max(0, min(55, i + 1))).opacity(w).blendMode(.plusLighter) }
+            }
+            .compositingGroup()
+        }
+        @ViewBuilder func frame(_ n: Int) -> some View {
+            if let f = SwellPictures.shared.sprite("rack-monitor-ineye.webp", rect: MagicEye.cell(n), pxPerPoint: 1 / k) {
+                Image(nsImage: f).resizable().interpolation(.high)
+            }
+        }
     }
 }
 
@@ -677,7 +788,17 @@ struct NixieReadout: View {
     static let window = CGRect(x: 80, y: 80, width: 488, height: 177)
     static let tubes: [(x: CGFloat, w: CGFloat)] = [(42, 186), (162, 192), (276, 198), (396, 198)]
     var scale: CGFloat { height / NixieReadout.window.height }
+    @ObservedObject private var clock = PowerClock.shared
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var body: some View {
+        TimelineView(.animation(paused: !clock.warming || reduceMotion)) { ctx in
+            tubes(at: ctx.date)
+        }
+        .accessibilityElement()
+        .accessibilityLabel("\(value) seconds left")
+    }
+    /// The tubes; each digit's glow comes up with the power clock (a digit changes at once, as a neon's does).
+    @ViewBuilder func tubes(at date: Date) -> some View {
         let shown = String(max(0, min(9999, value)))
         let digits = Array(String(repeating: "0", count: 4 - shown.count) + shown)
         let firstLit = digits.firstIndex(where: { $0 != "0" }) ?? 3
@@ -693,13 +814,12 @@ struct NixieReadout: View {
                     Image(nsImage: glow).resizable()
                         .frame(width: NixieReadout.tubes[k].w * scale, height: 300 * scale)
                         .offset(x: (NixieReadout.tubes[k].x - NixieReadout.window.minX) * scale, y: (0 - NixieReadout.window.minY) * scale)
+                        .opacity(reduceMotion ? 1 : clock.nixieGlow(at: date, tube: k))
                 }
             }
         }
         .frame(width: NixieReadout.window.width * scale, height: height, alignment: .topLeading)
         .clipped()
-        .accessibilityElement()
-        .accessibilityLabel("\(value) seconds left")
     }
 }
 

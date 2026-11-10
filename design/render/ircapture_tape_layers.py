@@ -68,12 +68,18 @@ def want(name): return not ONLY or name in ONLY or any(name.startswith(o) for o 
 def objs_since(before): return [o for o in set(bpy.data.objects) - before if o.type in ('MESH', 'CURVE')]
 
 
+KEEP_LIT = {'key', 'top', 'rim', 'ceil', 'side', 'roomcard'}
+
+
 def show_only(s, visible, shadow_only=(), catchers=()):
     """visible: rendered normally; shadow_only: cast shadows but unseen by the camera; catchers: the shadow catchers in
     use. Every other mesh is left out of the render."""
     vis = set(visible); sh = set(shadow_only); ca = set(catchers)
     for o in s.objects:
         if o.type not in ('MESH', 'CURVE'): continue
+        # (11-10) the studio's softboxes and the room's card stay: they are seen only in reflections (until now every
+        # layer hid them, so the metal mirrored a black world)
+        if o.name.split('.')[0] in KEEP_LIT: continue
         on = o in vis or o in sh or o in ca
         o.hide_render = not on
         o.visible_camera = o not in sh
@@ -180,6 +186,11 @@ def job_reel():
     pw, ph = W_ - 2 * R['plate_inset'], H_ - 2 * R['plate_inset']
     plate = rbox('plate', pw, ph, 0.25, 0.0, 0.6, roll=0.08)
     TK.flat_faces(plate); plate.data.materials.append(T.brushed_alu())
+    # (11-10, handoff 1.5) the plate mirrors the workshop room where it reflects (plate_room's card, light-linked to
+    # it; brushed, it reads as a soft streak); IRC_PLATE_ROOM=0 leaves it out
+    if os.environ.get('IRC_PLATE_ROOM', '1') != '0':
+        import plate_room as PRM
+        PRM.mirror_card(bpy, plate, pw, ph, seed=0.37)
     ni = TK.nickel(); ch = SG.chrome('chr', seed=3); blk = SG.black_cast('bc'); alu = T.reel_alu(); tp = T.oxide()
     for sx in (-1, 1):
         for sy in (-1, 1): T.screw_at(sx * (pw / 2 - 0.9), sy * (ph / 2 - 0.9), 0.25, ni)

@@ -50,6 +50,37 @@ sys.argv = _argv
 TK.OUT, TK.PXCM, TK.SAMPLES = OUT, PXCM, SAMPLES
 
 # ---------------------------------------------------------------------------------------------------------------------
+# (11-10) the bench's look since 11-03 (handoff HANDOFF-desktop-to-ircapture-2026-11-09.md), for every piece made here
+# and in the tape scripts (they import this module):
+#   - the pixel filter 1.0 px, as the rig's (gear_kit.stage leaves Blender's 1.5 px, which softened every sprite);
+#     IRC_FILTER sets another
+#   - the workshop room in the world, seen by glossy rays only (metal_kit.room_world): polished and brushed parts mirror
+#     a dim room instead of black; diffuse light unchanged. IRC_ROOM=0 leaves it out
+#   - the liquid hammertone (hammer_liquid.liquid_paint) wherever a hammertone was (IRC_HAMMER=cells: the 11-04 cells)
+#   - the NAM panels' anodising from finish_maps' true-scale maps (IRC_ANOD=old: the 11-03 shader)
+#   - the shelf and its mouldings as rough shop wood (shop_wood.py: real meshes, the relief in true cm), long strips that
+#     never repeat, lit alike along their length (IRC_WOOD=oak: the 11-04 lacquered oak)
+import metal_kit as MK
+FILTER = float(os.environ.get('IRC_FILTER', '1.0'))
+ROOM = os.environ.get('IRC_ROOM', '1') != '0'
+HAMMER = os.environ.get('IRC_HAMMER', 'liquid')
+ANOD = os.environ.get('IRC_ANOD', 'old')         # (11-10 proof: the maps' worn rim and scratches read loud on a 16 cm panel)
+WOOD = os.environ.get('IRC_WOOD', 'shop')
+_scene0 = TK.scene
+
+
+def scene_now(*a, **k):
+    """toolkit.scene() and then the 11-10 studio: the 1.0 px filter and the room in the reflections."""
+    s, cam = _scene0(*a, **k)
+    try: s.cycles.filter_width = FILTER
+    except Exception: pass
+    if ROOM: MK.room_world(s)
+    return s, cam
+
+
+TK.scene = scene_now
+
+# ---------------------------------------------------------------------------------------------------------------------
 # shop wear (11-04), after the bench's shelf_wear.py (desktop-bench look, 128th chat; Lowell on the bench, 11-03: "each
 # device and switch looks practically identical. everything up there is too perfect and uniform ... a little shop wear
 # and texture so it looks real. some slight staining and discoloration of some switches")
@@ -226,7 +257,29 @@ def proj(s, cam, p): return TK.proj(s, cam, p)
 # ---------------------------------------------------------------------------------------------------------------------
 # materials
 
+# the liquid hammertone's paint for each of the 11-04 cells' base colours: the liquid's lumps and web scatter the light
+# more and its coat is glossier, so the paint is set a little lighter to land on the same mean tone (checked on the
+# panel proof: the panel's mean against the posted rkit-panel-fine's #34312F)
+LIQUID_BASE = {'#1d1812': '#262019', '#1a1610': '#241d16', '#191612': '#211b14'}
+LIQUID_K = float(os.environ.get('IRC_LIQUID_K', '0.12'))
+LIQUID_RELIEF = float(os.environ.get('IRC_LIQUID_RELIEF', '1.0'))   # the bench's 3.0 read loud under IR Capture's studio      # its wear: dust in the low ground, rubbed edges
+
+
 def hammertone_fine(base='#1d1812', hi='#3a3226', name='hfine', cells=8.0):
+    """(11-10) The bench's liquid hammertone (hammer_liquid.liquid_paint: a fine wandering web between mixed lumps under a
+    glossy coat, his Magnecorder's finish) in a dark bronze, each piece at its own place in the maps. Lowell, 11-03, on
+    the cells: "the hammertone is too busy--it could be a different surface or finer grain". IRC_HAMMER=cells: the cells."""
+    if HAMMER == 'liquid':
+        import hammer_liquid as HL
+        h = seed_of('liq-' + name + '-' + ','.join('%.2f' % v for v in SEED))
+        m = HL.liquid_paint(name, LIQUID_BASE.get(base, base), k=LIQUID_K, seed=101 + h % 3, size_cm=12.0, px_cm=90.0,
+                            relief=LIQUID_RELIEF, offset=((h // 3 % 1000) / 1000.0, (h // 3000 % 1000) / 1000.0))
+        surface_wear(m, dust=0.04, smudge=0.35, scuff=0.2)
+        return grimy(m, dirt='#17130e', amount=0.25, dist=0.25)
+    return hammertone_cells(base, hi, name, cells)
+
+
+def hammertone_cells(base='#1d1812', hi='#3a3226', name='hfine', cells=8.0):
     """shelf_gear.hammertone() calmed: the hammered cells 2.5 x smaller (Voronoi 8 against 3.2) and half as deep, the
     per-cell colour mottle and the metallic flake turned down, so a broad panel reads as a quiet fine-grain finish; the
     broad tone drift and the gloss variation kept (hand-sprayed enamel is never one even colour), the edges rolled and
@@ -257,6 +310,17 @@ def hammertone_fine(base='#1d1812', hi='#3a3226', name='hfine', cells=8.0):
 
 
 def anodised(name='anod', base='#2e2e30'):
+    """(11-10) finish_maps' anodised aluminium at true scale (the brushing at 0.05 mm, the dye a little uneven, the edges
+    worn through, hairline scratches and dust from its shared wear maps), each panel its own offset. IRC_ANOD=old: the
+    11-03 shader below."""
+    if ANOD == 'maps':
+        import finish_maps as FM
+        h = seed_of('anod-' + name + '-' + ','.join('%.2f' % v for v in SEED))
+        return FM.material(name, 'anod', base, 0.7, h % 997, 'irc-' + name + str(h))
+    return anodised_shader(name, base)
+
+
+def anodised_shader(name='anod', base='#2e2e30'):
     """Dark graphite anodised aluminium, 1970s-80s rack stock: satin, a fine horizontal brushed grain (streaks along x in
     the relief and the gloss, and an anisotropic highlight), a faint broad unevenness of the dye, the edges worn through
     to bright aluminium where hands and rack rails rub, faint handling marks."""
@@ -787,12 +851,213 @@ def piece_trim(which):
     shoot(s, cam, 'trim-' + which, lay)
 
 
+# ---------------------------------------------------------------------------------------------------------------------
+# (11-10) shop wood: the shelf and the mouldings as the bench's (shop_wood.py, Lowell 11-04 on the bench's shelf: "too
+# smooth ... office furniture, not a workshop shelf", then "loved the new wood"; on IR Capture's oak, 11-04: "looks too
+# smooth and fake, no texture"). Each board a real mesh: its section swept along its length about every mm, pushed out
+# and in by a height field in true cm (raised latewood, planer chatter or saw marks, knots with checks, the top arris
+# chewed and grimed where hands go, dents, gouges, screws and empty holes, stains), no lacquer.
+# The bench draws its shelf from the frame camera (from below); IR Capture's one camera is the Tools studio's, 10
+# degrees above, so the boards are built here in that studio and seen from above: the top face, the front edge.
+#
+# The strips are long enough for a large screen and never repeat (400 cm: 3200 pt at the shelf's 8 pt a cm). Rendered
+# whole under one studio, the far end would be lit from 2 m off the key's side; so the strip is rendered in segments
+# with the whole studio moved along with each (every part of the shelf lit as a piece at the studio's centre is), the
+# segments cross-faded over their overlaps.
+LONG = dict(plank=float(os.environ.get('IRC_PLANK_CM', 400.0)), trim_h=float(os.environ.get('IRC_TRIM_H_CM', 400.0)),
+            trim_v=float(os.environ.get('IRC_TRIM_V_CM', 260.0)), seg=40.0, ov=4.0)
+WOOD_AGE = float(os.environ.get('WOOD_AGE', 1.2))     # (a shade darker than the bench's 1.0: the Tools studio's light lifts raw pine toward orange)
+_EMIT = {'key', 'top', 'rim', 'ceil', 'side'}
+
+
+def studio_objects(s):
+    """The studio's lights and reflection cards (gear_kit.stage), to be moved together."""
+    return [o for o in s.objects if o.type == 'LIGHT' or (o.type == 'MESH' and o.name.split('.')[0] in _EMIT)]
+
+
+def wall(z=0.0, size=1400.0):
+    bpy.ops.mesh.primitive_plane_add(size=size, location=(0, 0, z)); c = bpy.context.active_object; c.is_shadow_catcher = True
+    return c
+
+
+def render_long(s, cam, name, vertical, u0, u1, c0, c1):
+    """A long strip rendered in segments, the studio moved to each segment's middle, cross-faded over the overlaps.
+    u: the strip's length in the picture's own axis, cm: x for a horizontal strip, the view plane's v (y cos 10) for a
+    vertical one (u1 its top); c0..c1 across: v (bottom, top) for a horizontal strip, x for a vertical one. Everything is
+    worked in whole pixels, so the segments' pixels fall on one grid. Writes <name>.png; returns its size (W, H)."""
+    sp, op = int(round(LONG['seg'] * PXCM)), int(round(LONG['ov'] * PXCM))
+    Lp = int(round((u1 - u0) * PXCM))
+    studio = studio_objects(s); home = {o.name: tuple(o.location) for o in studio}
+    acc = None; wsum = np.zeros(Lp, np.float32)
+    n = max(1, int(math.ceil(Lp / sp)))
+    for i in range(n):
+        pa, pb = i * sp, min(Lp, (i + 1) * sp)                       # px along the strip: from u0 (horizontal) or u1 (vertical)
+        lo, hi = pa - (op if i > 0 else 0), pb + (op if i < n - 1 else 0)
+        mid = (pa + pb) / 2 / PXCM
+        for o in studio:
+            x, y, z = home[o.name]
+            o.location = (x, y + (u1 - mid) / CE, z) if vertical else (x + u0 + mid, y, z)
+        if vertical:
+            frame(s, cam, c0, c1, u1 - hi / PXCM, u1 - lo / PXCM)
+        else:
+            frame(s, cam, u0 + lo / PXCM, u0 + hi / PXCM, c0, c1)
+        bpy.context.view_layer.update()
+        path = os.path.join(OUT, '%s-seg%02d.png' % (name, i))
+        P.render(s, path)
+        im = np.asarray(Image.open(path).convert('RGBA')).astype(np.float32) / 255.0
+        im[..., :3] *= im[..., 3:4]
+        span = hi - lo
+        im = im[:span] if vertical else im[:, :span]                  # frame() rounds up to 4 px: its extra px dropped
+        if acc is None:
+            acc = np.zeros((Lp, im.shape[1], 4) if vertical else (im.shape[0], Lp, 4), np.float32)
+        q = np.arange(lo, hi) + 0.5
+        w = np.ones(span, np.float32)
+        if i > 0: w *= np.clip((q - (pa - op)) / (2 * op), 0, 1)
+        if i < n - 1: w *= np.clip(((pb + op) - q) / (2 * op), 0, 1)
+        if vertical: acc[lo:hi] += im * w[:, None, None]
+        else: acc[:, lo:hi] += im * w[None, :, None]
+        wsum[lo:hi] += w
+        os.remove(path)
+        print(name, 'segment', i + 1, 'of', n, flush=True)
+    for o in studio: o.location = home[o.name]
+    ws = np.maximum(wsum, 1e-6)
+    out = acc / (ws[:, None, None] if vertical else ws[None, :, None])
+    al = out[..., 3:4]
+    rgb = np.where(al > 1e-6, out[..., :3] / np.maximum(al, 1e-6), 0)
+    img = np.concatenate([rgb, al], -1)
+    Image.fromarray(np.clip(img * 255 + 0.5, 0, 255).astype(np.uint8), 'RGBA').save(os.path.join(OUT, name + '.png'))
+    return out.shape[1], out.shape[0]
+
+
+def _board_spec(rng, L, pr, Kw, **kw):
+    """shelf_wear.wood_spec: a board's look with this rng's own draws (x0 = 0: each board built at its own origin)."""
+    t = rng.uniform(0.9, 1.08)
+    sp = dict(L=L, x0=0.0, prof=pr, K=Kw, seed=int(rng.integers(1, 1 << 30)), bend=rng.uniform(0.5, 1.5),
+              ring=rng.uniform(0.38, 0.62), late=rng.uniform(0.22, 0.34), raised=rng.uniform(0.02, 0.035),
+              age=rng.uniform(1.35, 1.75) * WOOD_AGE, tone=(t, t * rng.uniform(0.96, 1.02), t * rng.uniform(0.9, 1.0)),
+              grime=rng.uniform(0.4, 0.7), dents=rng.uniform(18, 34), gouges=rng.uniform(5, 11), scratches=rng.uniform(40, 80))
+    sp.update(kw)
+    return sp
+
+
+def _knots(rng, n, x_lo, x_hi, a_lo, a_hi, b, r=(0.35, 0.8), across=True):
+    out = []
+    for _ in range(n):
+        dead = 1 if rng.random() < 0.45 else 0
+        k = (float(rng.uniform(x_lo, x_hi)), float(rng.uniform(a_lo, a_hi)), b, float(rng.uniform(*r)), dead,
+             int(rng.integers(1, 4)) if dead or rng.random() < 0.4 else 0)
+        out.append(k + ((float(rng.uniform(70, 110)),) if across else ()))
+    return out
+
+
+def _vds(hi=0.2, lo=0.2, front=0.06, arris=0.035):
+    return {0: hi, 1: arris, 2: front, 3: arris, 4: lo, 5: 0.6}
+
+
+def piece_plank_shop():
+    """The shelf: old pine boards butted end to end, each its own colour, grain and knots, seen from 10 degrees above
+    (the top face foreshortened, the front edge whole): the top arris chewed dark where hands go, chips on the bottom
+    one, screws and empty holes along the front, dents, gouges, an oil soak, a soldering iron's burn, a cup ring."""
+    import shop_wood as SWD
+    set_seed('plank')
+    rng = np.random.default_rng(seed_of('irc-plank-boards'))
+    t, d = PL['thick'], PL['depth']
+    Lt = LONG['plank']; A0 = -Lt / 2; A1 = Lt / 2
+    s, cam = TK.scene(20, 10, 0.5)
+    wall(0.0)
+    Kw = max(8.0, 2.0 * PXCM)                     # map px a cm: two a picture px
+    f = 1.0 / Kw
+    # the top seen at 10 degrees: its 12 cm take about 2 cm of the picture (spacing over sin 10), the front whole, the
+    # underside unseen (coarse)
+    pr = SWD.profile(-t, 0.0, 0.0, d, 0.32, 0.18, dict(hi=f / 0.2, front=f, lo=0.5, back=0.6, arris=f * 0.8))
+    lens = []
+    while sum(lens) < Lt + 20:
+        lens.append(float(rng.uniform(70, 125)))
+    x = A0 - 10.0
+    hands = [(-150.0, -90.0, 0.9), (-30.0, 40.0, 0.6), (80.0, 150.0, 0.8)]
+    for i, L in enumerate(lens):
+        r = np.random.default_rng(seed_of('irc-plank-board-%d' % i))
+        holes = [(float(u), float(r.uniform(-1.9, -0.8))) for u in r.uniform(3, L - 3, int(L / 45) + 1)]
+        scr = [float(u) for u in r.uniform(3, L - 3, int(L / 70) + 1)]
+        stains = [(float(r.uniform(5, L - 5)), float(r.uniform(-2.0, -0.6)), float(r.uniform(1.2, 2.8)), 'oil', float(r.uniform(0.25, 0.45)))]
+        if i == 1: stains.append((float(r.uniform(10, L - 10)), -0.5, 0.35, 'burn', 0.95))
+        if i == 2: stains.append((float(r.uniform(10, L - 10)), -1.4, 1.5, 'ring', 0.3))
+        hb = [(h0 - x, h1 - x, k) for (h0, h1, k) in hands if h1 > x and h0 < x + L]
+        spec = _board_spec(r, L, pr, Kw, pith=(float(r.uniform(-24, -16)), float(r.uniform(6, 12))), bend=float(r.uniform(0.4, 1.0)),
+                           saw='chatter', saw_amp=0.002, feed=0.22,
+                           knots=_knots(r, int(L / 40) + 1, 2, L - 2, -2.0, -0.6, d, r=(0.22, 0.5)),
+                           hands=hb, chew_hi=0.85, chew_lo=0.3, holes=holes, stains=stains, wear_faces=(1, 2, 3, 4),
+                           seats=[(u, -1.3, 0.55) for u in scr])
+        M = SWD.board(spec)
+        X0 = x + 0.05
+        SWD.build('plank%d' % i, M, _vds(hi=0.25, lo=0.6), 0.1, lambda xx, a, b, X0=X0: (xx + X0, a, b))
+        for j, u in enumerate(scr):
+            SWD.drywall_screw(u + X0, -1.3, d, 0, 0, 1, r=0.4, finish='zinc' if i == 1 else 'black',
+                              proud=float(r.uniform(-0.04, 0.06)), turn=float(r.uniform(0, math.pi)), name='scr%d-%d' % (i, j))
+        print('plank board', i, '%.0f cm' % L, M['rows'], 'x', M['cols'], 'map px', flush=True)
+        del M
+        x += L
+        if x > A1 + 10: break
+    v_top = 1.4; v_bot = v_of(-t, d) - 12.5
+    W, H = render_long(s, cam, 'plank', False, A0, A1, v_bot, v_top)
+    # (frame() anchors each segment at its top edge: row r is v_top - (r + 0.5) / PXCM)
+    LAY['out']['plank'] = {'size': [W, H], 'kind': 'long', 'x': [A0, A1], 'v_top': v_top, 'v_bot': v_bot,
+                           'row_back': (v_top - v_of(0, 0)) * PXCM, 'row_front_top': (v_top - v_of(0, d)) * PXCM,
+                           'row_front_bot': (v_top - v_of(-t, d)) * PXCM, 'boards_cm': [round(v, 2) for v in lens]}
+
+
+def piece_trim_shop(which):
+    """A moulding round the opening: a rough 1x2 strip nailed up (planed, with chatter; the bottom one rough-sawn as
+    the bench's), its arrises eased and chipped, nail holes, a screw, knots, dents. 1.6 cm face, 0.65 cm proud of the
+    wall, as before."""
+    import shop_wood as SWD
+    vertical = which == 'v'
+    set_seed('trim-' + which)
+    rng = np.random.default_rng(seed_of('irc-trim-' + which))
+    w, zt = TRIM['w'], TRIM['proud']
+    L = LONG['trim_v' if vertical else 'trim_h']; A0, A1 = -L / 2, L / 2
+    s, cam = TK.scene(20, 10, 0.5)
+    wall(0.0)
+    Kw = max(8.0, 2.0 * PXCM); f = 1.0 / Kw
+    pr = SWD.profile(-w / 2, w / 2, 0.0, zt, 0.14, 0.14, dict(hi=f / 0.5, front=f, lo=f / 0.5, back=0.4, arris=f * 0.8))
+    holes = [(float(u), float(rng.uniform(-w / 4, w / 4))) for u in rng.uniform(2, L - 2, int(L / 30) + 1)]
+    rough = which == 'h' and os.environ.get('IRC_TRIM_ROUGH', '0') == '1'
+    spec = _board_spec(rng, L, pr, Kw, pith=(float(rng.uniform(-6, 6)), float(rng.choice([-5.0, 6.5]))),
+                       saw='rough' if rough else 'chatter', saw_amp=0.012 if rough else 0.002, feed=0.45 if rough else 0.22,
+                       knots=_knots(rng, int(L / 35) + 1, 3, L - 3, -w / 3, w / 3, zt, r=(0.3, 0.6)),
+                       hands=[(0, L, 0.25)], chew_hi=0.35, chew_lo=0.35, holes=holes, wear_faces=(0, 1, 2, 3, 4),
+                       stains=[(float(rng.uniform(L / 6, 5 * L / 6)), 0.0, float(rng.uniform(1.0, 2.0)), 'oil', 0.3)])
+    M = SWD.board(spec)
+    # the section's a runs across the face (x for the vertical strip, y for the horizontal), b out from the wall (z)
+    fr = (lambda xx, a, b: (a, A1 - xx, b)) if vertical else (lambda xx, a, b: (xx + A0, a, b))
+    SWD.build('trim', M, _vds(hi=0.1, lo=0.1), 0.1, fr)
+    for k in range(int(L / 90) + 1):
+        u = float(rng.uniform(4, L - 4))
+        p = (0.0, A1 - u, zt) if vertical else (u + A0, 0.0, zt)
+        SWD.drywall_screw(p[0], p[1], p[2], 0, 0, 1, r=0.32, finish='zinc', proud=0.02 + float(rng.uniform(-0.02, 0.03)),
+                          turn=float(rng.uniform(0, math.pi)), name='tscr%d' % k)
+    del M
+    hw = w / 2
+    if vertical:
+        W, H = render_long(s, cam, 'trim-v', True, v_of(A0, 0.0), v_of(A1, 0.0), -hw - 0.9, hw + 1.7)
+        LAY['out']['trim-v'] = {'size': [W, H], 'kind': 'long', 'y': [A0, A1], 'x_left': -hw - 0.9,
+                                'px_left': 0.9 * PXCM, 'px_right': (0.9 + w) * PXCM}
+    else:
+        vt = v_of(hw, 0.0) + 0.9; vb = v_of(-hw, 0.0) - 1.7
+        W, H = render_long(s, cam, 'trim-h', False, A0, A1, vb, vt)
+        LAY['out']['trim-h'] = {'size': [W, H], 'kind': 'long', 'x': [A0, A1], 'v_top': vt,
+                                'row_top': (vt - v_of(hw, 0.0)) * PXCM, 'row_bot': (vt - v_of(-hw, 0.0)) * PXCM,
+                                'row_crown': (vt - v_of(0.0, zt)) * PXCM}
+
+
 def main():
     todo = (['panel-fine', 'panel-nam', 'plank', 'box-bronze', 'box-oxblood', 'trim-h', 'trim-v'] if WHAT == 'all'
             else WHAT.split(','))
     for pc in todo:
         t = time.time()
         if pc.startswith('box-'): piece_box(pc)
+        elif pc == 'plank' and WOOD == 'shop': piece_plank_shop()
+        elif pc.startswith('trim-') and WOOD == 'shop': piece_trim_shop(pc[5:])
         elif pc.startswith('trim-'): piece_trim(pc[5:])
         elif pc.startswith('panel-'): panel_piece(pc, 'nam' if pc.startswith('panel-nam') else 'fine')
         elif pc.startswith('key-'):

@@ -35,6 +35,33 @@ jobs:
       - name: Install Python reference dependencies
         run: pip install numpy scipy soundfile pillow reportlab dmgbuild
 
+      # (11-10) Every kit picture lossless (the desktop bench's rule, handoff 2026-11-09 1.2): a WebP's chunk VP8L is
+      # lossless, "VP8 " lossy. A warning until the white-light, lossless kit is posted; then set LOSSLESS_STRICT to 1.
+      - name: Kit pictures are lossless
+        env:
+          LOSSLESS_STRICT: "0"
+        run: |
+          python - <<'PY'
+          import glob, os
+          lossy = []
+          files = sorted(glob.glob('Resources/SwellKit/pictures/*.webp'))
+          for f in files:
+              b = open(f, 'rb').read()
+              if b[:4] != b'RIFF' or b[8:12] != b'WEBP': lossy.append(f); continue
+              i = 12
+              while i + 8 <= len(b):
+                  tag = b[i:i + 4]
+                  if tag in (b'VP8 ', b'VP8L'):
+                      if tag == b'VP8 ': lossy.append(f)
+                      break
+                  i += 8 + int.from_bytes(b[i + 4:i + 8], 'little') + (int.from_bytes(b[i + 4:i + 8], 'little') & 1)
+          print(f'{len(files) - len(lossy)} of {len(files)} pictures lossless')
+          if lossy:
+              lvl = 'error' if os.environ.get('LOSSLESS_STRICT') == '1' else 'warning'
+              print(f'::{lvl} title=Lossy kit pictures::{len(lossy)} of {len(files)} pictures are lossy WebP (VP8), e.g. ' + ', '.join(os.path.basename(x) for x in lossy[:6]))
+              if lvl == 'error': raise SystemExit(1)
+          PY
+
       - name: Version file matches the Swift default
         run: |
           V="$(tr -d '[:space:]' < VERSION)"
