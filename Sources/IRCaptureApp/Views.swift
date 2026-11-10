@@ -98,6 +98,8 @@ struct ContentView: View {
             page
                 .frame(width: g.size.width / s, height: g.size.height / s)
                 .scaleEffect(s, anchor: .topLeading)
+                .frame(width: g.size.width, height: g.size.height, alignment: .topLeading)
+                .clipped()
         }
         .background(WorkshopWall().ignoresSafeArea())
         .sheet(isPresented: $m.showWelcome) { WelcomeSheet().environmentObject(m).workshopDefaults(.panel) }
@@ -126,6 +128,7 @@ struct ContentView: View {
                         .padding(22).frame(maxWidth: 900, alignment: .leading).frame(maxWidth: .infinity)
                         .environment(\.swellTheme, m.job == .nam ? .nam : .cab)
                     }
+                    .clipped()     // (under View › Page Size's scale the scroll view's own clip runs short; this one holds)
                     .onChange(of: m.result?.folder) { _ in withAnimation { proxy.scrollTo("results", anchor: .top) } }
                     .task {
                         // CI hook: open scrolled to the tape machine (screenshot-deck.png, screenshot-cart.png).
