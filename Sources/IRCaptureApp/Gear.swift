@@ -865,22 +865,27 @@ struct FrameStrip: View {
             let thick = (vertical ? CGFloat(cg.width) : CGFloat(cg.height)) / scale
             let n = max(1, Int((4000 / max(len, 1)).rounded(.up)))
             Group {
+                // the copies sit in an overlay, so their length never widens the layout round the strip
                 if vertical {
-                    VStack(spacing: 0) {
-                        ForEach(0..<n, id: \.self) { _ in
-                            Image(decorative: cg, scale: scale).resizable().interpolation(.high).frame(width: thick, height: len)
+                    Color.clear.frame(width: height).frame(maxHeight: .infinity)
+                        .overlay(alignment: .topLeading) {
+                            VStack(spacing: 0) {
+                                ForEach(0..<n, id: \.self) { _ in
+                                    Image(decorative: cg, scale: scale).resizable().interpolation(.high).frame(width: thick, height: len)
+                                }
+                            }
+                            .fixedSize()
                         }
-                    }
-                    .frame(width: height, alignment: .topLeading)
-                    .frame(maxHeight: .infinity, alignment: .topLeading)
                 } else {
-                    HStack(spacing: 0) {
-                        ForEach(0..<n, id: \.self) { _ in
-                            Image(decorative: cg, scale: scale).resizable().interpolation(.high).frame(width: len, height: thick)
+                    Color.clear.frame(height: height).frame(maxWidth: .infinity)
+                        .overlay(alignment: .topLeading) {
+                            HStack(spacing: 0) {
+                                ForEach(0..<n, id: \.self) { _ in
+                                    Image(decorative: cg, scale: scale).resizable().interpolation(.high).frame(width: len, height: thick)
+                                }
+                            }
+                            .fixedSize()
                         }
-                    }
-                    .frame(height: height, alignment: .topLeading)
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
                 }
             }
             .clipped()
