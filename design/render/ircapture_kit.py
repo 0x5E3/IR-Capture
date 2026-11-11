@@ -913,6 +913,63 @@ GAS_LINE_N = 26
 GAS_DIG_N = 4                               # "-12.4": the sign's cell, three digits, the point between two of them
 GAS_PITCH = {'matrix': 0.075, 'seg7': 0.62}  # cm: a dot pitch; a digit's cell height
 GAS_DEMO = {'line': ['READY  INTERFACE 1  96 KHZ'], 'dig': '-12.4'}
+# (11-11, later) the status line is the bench's VFD (its EQ screen: Lowell, 11-05, "let's do VFD"), not gas: Lowell, 11-11,
+# "the plasma and the digits are too similar in appearance". The dBFS digits stay orange gas. IRC_GAS_LINE_LOOK=plasma: the
+# 11-11 orange Self-Scan line. The VFD's colours are plasma.js' LOOKS.vfd, its filter glass eqpanel.py's.
+GAS_LINE_LOOK = os.environ.get('IRC_GAS_LINE_LOOK', 'vfd')
+VFD_GLASS = '#a9cfc6'                        # eqpanel.py's eqglass: a VFD's blue-green filter glass
+VFD_CORE, VFD_GLOW = (225, 255, 246), (62, 214, 190)   # plasma.js LOOKS.vfd: the hot core, the glow
+GAS_BEZEL = float(os.environ.get('IRC_GAS_BEZEL', '0.6'))        # cm round the window (0.32 left the screws outside it)
+GAS_BEZEL_WEAR = float(os.environ.get('IRC_GAS_BEZEL_WEAR', '0.25'))   # (0.45, the VU's, read loud on a part this small)
+
+
+def vfd_matrix_maps(GD, base_path, emit_path, n, nl, dpx=34, lines=None, seed=0):
+    """matrix_maps' VFD: the same grid and geometry (the app's mtx unchanged), but the dots are phosphor-coated anodes,
+    unlit a dull grey-green; three filament wires run across in front, and the control grid's fine mesh (plasma.js / eqpanel.css:
+    lines at 60 and -60 degrees) shades dots and glow alike. No keep-alive column (that is a gas panel's)."""
+    W, H, Wu, Hu = GD.mtx_geom(n, nl)
+    Wp, Hp = int(round(Wu * dpx)), int(round(Hu * dpx))
+    rng = np.random.default_rng(seed)
+    yy, xx = np.mgrid[0:Hp, 0:Wp].astype(np.float32)
+    alb = np.zeros((Hp, Wp, 3), np.float32); alb[:] = np.array([9, 11, 11], np.float32)
+    u = xx / dpx - GD.MX_L; v = yy / dpx - GD.MY
+    i = np.floor(u).astype(np.int32); j = np.floor(v).astype(np.int32); fu = u - i - 0.5; fv = v - j - 0.5
+    rowok = (j >= 0) & (j < H) & (np.mod(j, 9) < 7)
+    colok = (i >= 0) & (i < W) & (np.mod(i, 6) < 5)
+    # the anodes: each dot a phosphor-coated pad, a little uneven
+    rnd = 0.85 + 0.3 * rng.random((H + 20, W + 20)).astype(np.float32)
+    ri = np.clip(i + 10, 0, W + 19); rj = np.clip(j + 10, 0, H + 19)
+    dots = np.clip((0.34 - np.hypot(fu, fv)) / 0.05, 0, 1) * (rowok & colok) * rnd[rj, ri]
+    alb = alb * (1 - dots[..., None]) + dots[..., None] * np.array([44, 58, 54], np.float32)
+    # the control grid: a fine mesh just in front of the anodes
+    pm = 0.36                                             # mesh pitch, in dot pitches
+    a1 = np.mod((u * 0.5 + v * 0.866) / pm, 1.0); a2 = np.mod((u * 0.5 - v * 0.866) / pm, 1.0)
+    wire = np.maximum(np.clip(1 - np.abs(a1 - 0.5) * 2 / 0.12, 0, 1), np.clip(1 - np.abs(a2 - 0.5) * 2 / 0.12, 0, 1))
+    inside = (u > -0.6) & (u < W + 0.6) & (v > -0.6) & (v < H + 0.6)
+    mesh = 1 - 0.32 * wire * inside
+    alb *= mesh[..., None]
+    # the filaments: three hair-thin tungsten wires across the whole face, a dull glint
+    for fy in (H * 0.18, H * 0.5, H * 0.82):
+        f = np.clip(1 - np.abs(v - fy) / 0.035, 0, 1) * (u > -GD.MX_L + 0.8) * (u < W + GD.MX_R - 0.6)
+        alb = alb * (1 - 0.6 * f[..., None]) + f[..., None] * np.array([58, 56, 52], np.float32) * 0.6
+    edge = np.minimum.reduce([xx, yy, Wp - 1 - xx, Hp - 1 - yy]) / dpx
+    alb *= (0.55 + 0.45 * np.clip(edge / 0.7, 0, 1))[..., None]
+    Image.fromarray(np.clip(alb, 0, 255).astype(np.uint8), 'RGB').save(base_path)
+    lit = GD.mtx_lit(n, nl, lines) if lines else set()
+    from PIL import ImageDraw
+    em = Image.new('L', (Wp, Hp), 0); d = ImageDraw.Draw(em)
+    for (ii, jj) in lit:
+        k = 0.88 + 0.12 * rng.random(); r = 0.32 * dpx
+        cx, cy = (GD.MX_L + ii + 0.5) * dpx, (GD.MY + jj + 0.5) * dpx
+        d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=int(255 * k))
+    a = em.filter(ImageFilter.GaussianBlur(max(0.5, dpx * 0.02)))
+    core = np.asarray(a, np.float32) / 255
+    glow = np.asarray(em.filter(ImageFilter.GaussianBlur(dpx * 0.2)), np.float32) / 255
+    rgb = np.array(VFD_GLOW, np.float32)[None, None] * np.clip(core + glow * 0.4, 0, 1.4)[..., None]
+    rgb += (np.array(VFD_CORE, np.float32) - np.array(VFD_GLOW, np.float32))[None, None] * (core ** 3 * 0.35)[..., None]
+    rgb *= mesh[..., None]
+    Image.fromarray(np.clip(rgb, 0, 255).astype(np.uint8), 'RGB').save(emit_path)
+    return Wp, Hp, [GD.MX_L, GD.MY, round(Wu, 4), round(Hu, 4)]
 
 
 class _RackAdapter:
@@ -948,7 +1005,7 @@ def gas_bezel_mat():
     """The VU bezel's textured black (finish_maps powder, wear 0.45), else the bench's black casting."""
     try:
         import finish_maps as FM
-        m = FM.material('gbezel', 'powder', '#0d0c0b', 0.45, 4213, 'irc-gas-bezel', bare='#3b2c22', dirt='#1e1b17',
+        m = FM.material('gbezel', 'powder', '#0d0c0b', GAS_BEZEL_WEAR, 4213, 'irc-gas-bezel', bare='#3b2c22', dirt='#1e1b17',
                         dirt_k=0.35, coat_rough=0.5)
         calm_up(m, 0.6)
         return m
@@ -965,7 +1022,11 @@ def piece_gas(kind):
     if disp == 'matrix':
         W, H, Wu, Hu = GD.mtx_geom(n, 1); dw, dh = Wu * GAS_PITCH['matrix'], Hu * GAS_PITCH['matrix']
     else:
-        dh = GAS_PITCH['seg7'] * 1.25; dw = n * GAS_PITCH['seg7'] * 0.78 + 0.25
+        dw = n * GAS_PITCH['seg7'] * 0.78 + 0.25
+        # (11-11, later) the window's height from the digits' own picture, so no spare black under them
+        _tmp = os.path.join(OUT, 'gas', '_aspect'); os.makedirs(_tmp, exist_ok=True)
+        _wp, _hp = GD.seg7_maps(os.path.join(_tmp, 'b.png'), os.path.join(_tmp, 'e.png'), n)
+        dh = dw * _hp / _wp
     ww, wh = dw + 0.5 + 0.1, dh + 0.5 + 0.1             # the window: gas_window keeps 0.25 cm round the display
     pw, ph = ww + 2.4, wh + 1.4                        # a piece of the panel round it (the screws sit 0.42 out)
     T = 0.32
@@ -978,20 +1039,25 @@ def piece_gas(kind):
     pnl = rbox('gpanel', pw + 6, ph + 6, T, -T, 0.05)
     hole = rbox('ghole', ww, wh, T + 2, -T - 1, 0.08)
     bpy.context.view_layer.update(); cut(pnl, hole); pnl.is_shadow_catcher = True
-    bw = 0.32
+    bw = GAS_BEZEL
     bez = rbox('gbezel', ww + 2 * bw, wh + 2 * bw, 0.14, 0.0, 0.12, roll=0.05)
     bh = rbox('gbezh', ww - 0.04, wh - 0.04, 1.0, -0.5, 0.06)
     bpy.context.view_layer.update(); cut(bez, bh); chamfer(bez, 0.02, 2); TK.flat_faces(bez)
     bez.data.materials.append(gas_bezel_mat())
     RA = _RackAdapter(T, rd)
-    old = GD.DEMO, GD.demo_text
+    old = GD.DEMO, GD.demo_text, GD.matrix_maps, GD.thin_glass
     GD.DEMO = demo; GD.demo_text = lambda eid: GAS_DEMO['line'] if disp == 'matrix' else [GAS_DEMO['dig']]
+    if disp == 'matrix' and GAS_LINE_LOOK == 'vfd':
+        _mm, _tg = GD.matrix_maps, GD.thin_glass
+        GD.matrix_maps = lambda b, e, n_, nl, **kw: vfd_matrix_maps(GD, b, e, n_, nl, **kw)
+        GD.thin_glass = lambda RA_, name, tint='#c8b49e', dust=0.5, rough=0.03: _tg(
+            RA_, name, VFD_GLASS if name.endswith('pane') else tint, dust, rough)
     L = []
     try:
         GD.gas_window(RA, L, 'gas-' + kind, disp, -ww / 2, -wh / 2, ww / 2, wh / 2, SG.nickel('gscrew', seed=3),
                       seed_of(kind) % 7, n=n, **({'lines': 1} if disp == 'matrix' else {}))
     finally:
-        GD.DEMO, GD.demo_text = old
+        GD.DEMO, GD.demo_text, GD.matrix_maps, GD.thin_glass = old
     # the studio's cards off the glass (pane and envelope), as the VU's and the eye's
     for o in bpy.data.objects:
         if o.name.endswith('pane') or o.name.endswith('env'):
@@ -1000,7 +1066,8 @@ def piece_gas(kind):
     TK.shoot(s, cam, 'gas-' + kind, pw, ph,
              lambda s, cam: {'cells_tl': proj(s, cam, (x0, y1, zd)), 'cells_br': proj(s, cam, (x1, y0, zd)),
                              'disp': disp, 'n': n, 'mtx': e.get('mtx'), 'pitch': e.get('pitch'), 'slant': e.get('slant'),
-                             'cellpx': e['cellpx'], 'demo': demo})
+                             'cellpx': e['cellpx'], 'demo': demo,
+                             'look': (GAS_LINE_LOOK if disp == 'matrix' else 'gas')})
 
 
 def piece_panel_fine(): panel_piece('panel-fine', 'fine')
