@@ -285,7 +285,7 @@ enum GearPreview {
             }
             // (11-11) the lettering: the status line on the VFD, mic names on scribble strips, printed keys
             Engraved("The status line, mic names on tape, printed keys", size: 12)
-            VFDStatusLine(text: vfdLine(left: "Ready", middle: "Scarlett 18i20 USB", right: "96 KHZ", n: VFDStatusLine.n))
+            VFDStatusLine(text: vfdLine(left: "Ready", middle: "Scarlett 18i20 USB", right: "96K", n: VFDStatusLine.n))
             HStack(spacing: 16) {
                 ScribbleNameField(name: .constant("SM57 cap edge"), strip: 0)
                 ScribbleNameField(name: .constant("R121 6 in center, 15 deg off axis"), strip: 1)
@@ -369,8 +369,8 @@ struct Shelf: View {
         let rate = m.job == .nam ? 48000 : m.captureRate
         return "\(d.name) · \(rateTag(rate).dropLast()) kHz"
     }
-    /// The rate for the VFD's right end, "96 KHZ".
-    var rateText: String { "\(rateTag(m.job == .nam ? 48000 : m.captureRate).dropLast()) KHZ" }
+    /// The rate for the VFD's right end, "96K".
+    var rateText: String { "\(rateTag(m.job == .nam ? 48000 : m.captureRate).dropLast())K" }
     var body: some View {
         let st = status
         let g = ShelfGeometry.own

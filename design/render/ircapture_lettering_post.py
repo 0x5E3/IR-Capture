@@ -6,7 +6,7 @@
 # resample), the layout in points beside pictures/:
 #   legend-<state>-<id>.png  -> irc-legend-<state>-<id>.webp, irc-legends.json   printed keys, drawn at 12 pt a cm
 #   scribble-<v>.png         -> irc-scribble-<v>.webp, irc-scribble.json         masking-tape strips, 15.8 pt a cm
-#   gas-line.png, gas-dig.png -> irc-gas-line.webp, irc-gas-dig.webp, irc-gas.json   the VFD status line (14 pt a cm),
+#   gas-line.png, gas-dig.png -> irc-gas-line.webp, irc-gas-dig.webp, irc-gas.json   the VFD status line (17 pt a cm),
 #                                                                                the dBFS gas digits (14 pt a cm)
 # A piece missing from the renders keeps whatever the kit has (its json entry is merged, not replaced).
 import sys, os, json, glob
@@ -83,7 +83,8 @@ def merge(path, new, key):
 
 
 # --- printed keys --------------------------------------------------------------------------------------------------
-KEY_PX_PT = 20.0 / LG.PT_PER_CM          # 1x: 20 px a cm (@2x 40, the container's render density)
+_kd = [v['pxcm'] for k, v in lay.items() if k.startswith('legend-')]
+KEY_PX_PT = (min(_kd) if _kd else 40.0) / 2 / LG.PT_PER_CM   # @2x at the render's density (40 px a cm in the container, 48 on the iMac)
 KEY_M = 0.12                             # cm round the bezel: its shadow
 keys = {}
 for lid, (text, size, names) in LG.LEGENDS.items():
@@ -105,7 +106,7 @@ if keys:
                     'and its bezel plus outset_pt of shadow on every side, drawn at pt (points, outset included). Looked '
                     'up by size ("std", or "big" for KeyButtonStyle(big: true)) and the key name, lowercased, a leading '
                     '"‹ " and trailing "…" or "." dropped. cap: the cap in the picture (x, y, w, h).',
-           'pt_per_cm': LG.PT_PER_CM, 'px_per_pt': r2(KEY_PX_PT), 'keys': keys}, 'keys')
+           'pt_per_cm': LG.PT_PER_CM, 'px_per_pt': round(KEY_PX_PT, 5), 'keys': keys}, 'keys')
 
 # --- scribble strips -----------------------------------------------------------------------------------------------
 SCRIB_PT, SCRIB_PX_PT, SCRIB_M = 15.8, 1.5, 0.35
@@ -125,7 +126,7 @@ if strips:
                     'and mid the strip\'s middle line.', 'pt_per_cm': SCRIB_PT, 'px_per_pt': SCRIB_PX_PT, 'strips': strips}, 'strips')
 
 # --- the displays --------------------------------------------------------------------------------------------------
-GAS = {'line': (14.0, 2.0), 'dig': (14.0, 2.0)}
+GAS = {'line': (17.0, 1.75), 'dig': (14.0, 2.0)}
 disp = {}
 for kind, (pt_cm, px_pt) in GAS.items():
     k = 'gas-' + kind

@@ -1,0 +1,14 @@
+{
+ "runner": "imac",
+ "note": "IR Capture's printed keys at full quality (IR Capture chat, 11-11; Lowell's lettering plan: key legends rendered on the keys). The 51 keys of ircapture_legends.py (each its legend engraved and filled in the cap, the cap its own width, the wear by the app's hash of its name, salt 14007), four states each: 204 pictures, in the 11-10 studio (1.0 px filter, the room) as the blank keys of imac-ircapture-1110 (48 px/cm, 192 samples). The preview build has the same keys rendered in Claude's container at 40 px/cm and 64 samples; these replace them. Scripts beside the bench's in design/render/ (ircapture_kit.py, ircapture_legends.py). Fonts: yes (the cap's legend face). Estimate on the iMac: about 25 s a state, 85 to 100 min. Post (in the IR Capture repo): python3 design/render/ircapture_lettering_post.py <render-out>/<job> Resources/SwellKit (lossless; it merges into irc-legends.json).",
+ "estimate_min": {
+  "legends": 95
+ },
+ "jobs": [
+  {
+   "id": "legends",
+   "fonts": true,
+   "cmd": "design/render/ircapture_kit.py OUT legends 48 192"
+  }
+ ]
+}

@@ -316,9 +316,14 @@ func vfdLine(left: String, middle: String, right: String, n: Int) -> String {
         String(s.uppercased().map { GasFont.m57[$0] != nil ? $0 : ($0 == "–" || $0 == "—" ? "-" : " ") })
     }
     let l = clean(left), r = clean(right)
-    var mid = clean(middle).trimmingCharacters(in: .whitespaces)
+    // the interface's name: as many whole words as fit (a word cut short only when the first alone is too long)
     let room = n - l.count - r.count - 4
-    if room < 3 { mid = "" } else if mid.count > room { mid = String(mid.prefix(room - 1)).trimmingCharacters(in: .whitespaces) + "." }
+    var mid = ""
+    for w in clean(middle).split(separator: " ") {
+        let next = mid.isEmpty ? String(w) : mid + " " + w
+        if next.count <= room { mid = next } else { break }
+    }
+    if mid.isEmpty, room >= 4 { mid = String(clean(middle).trimmingCharacters(in: .whitespaces).prefix(room)) }
     let body = mid.isEmpty ? l : l + "  " + mid
     let pad = max(1, n - body.count - r.count)
     return String((body + String(repeating: " ", count: pad) + r).prefix(n))

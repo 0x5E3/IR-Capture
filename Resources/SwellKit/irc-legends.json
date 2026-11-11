@@ -1,0 +1,1284 @@
+{
+ "about": "Printed keys (design/render/ircapture_legends.py, ircapture_kit.py legend-<id>): each picture is the key and its bezel plus outset_pt of shadow on every side, drawn at pt (points, outset included). Looked up by size (\"std\", or \"big\" for KeyButtonStyle(big: true)) and the key name, lowercased, a leading \"\u2039 \" and trailing \"\u2026\" or \".\" dropped. cap: the cap in the picture (x, y, w, h).",
+ "pt_per_cm": 12.0,
+ "px_per_pt": 1.66667,
+ "keys": {
+  "cab-ir": {
+   "legend": "CAB IR",
+   "size": "std",
+   "names": [
+    "Cab IR"
+   ],
+   "variant": "b",
+   "pt": [
+    53.76,
+    29.76
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.08,
+    5.03,
+    45.6,
+    21.6
+   ],
+   "files": {
+    "off": "irc-legend-off-cab-ir",
+    "lit": "irc-legend-lit-cab-ir",
+    "down": "irc-legend-down-cab-ir",
+    "litdown": "irc-legend-litdown-cab-ir"
+   }
+  },
+  "amp-nam": {
+   "legend": "AMP NAM",
+   "size": "std",
+   "names": [
+    "Amp NAM"
+   ],
+   "variant": "c",
+   "pt": [
+    66.96,
+    29.76
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.08,
+    5.03,
+    58.8,
+    21.6
+   ],
+   "files": {
+    "off": "irc-legend-off-amp-nam",
+    "lit": "irc-legend-lit-amp-nam",
+    "down": "irc-legend-down-amp-nam",
+    "litdown": "irc-legend-litdown-amp-nam"
+   }
+  },
+  "help": {
+   "legend": "HELP",
+   "size": "std",
+   "names": [
+    "Help"
+   ],
+   "variant": "f",
+   "pt": [
+    46.56,
+    29.76
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.08,
+    5.03,
+    38.4,
+    21.6
+   ],
+   "files": {
+    "off": "irc-legend-off-help",
+    "lit": "irc-legend-lit-help",
+    "down": "irc-legend-down-help",
+    "litdown": "irc-legend-litdown-help"
+   }
+  },
+  "check": {
+   "legend": "CHECK LEVELS",
+   "size": "std",
+   "names": [
+    "Check levels"
+   ],
+   "variant": "b",
+   "pt": [
+    94.56,
+    29.76
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.08,
+    5.03,
+    86.4,
+    21.6
+   ],
+   "files": {
+    "off": "irc-legend-off-check",
+    "lit": "irc-legend-lit-check",
+    "down": "irc-legend-down-check",
+    "litdown": "irc-legend-litdown-check"
+   }
+  },
+  "check-big": {
+   "legend": "CHECK LEVELS",
+   "size": "big",
+   "names": [
+    "Check levels"
+   ],
+   "variant": "b",
+   "pt": [
+    139.34,
+    44.54
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.87,
+    5.82,
+    129.6,
+    34.81
+   ],
+   "files": {
+    "off": "irc-legend-off-check-big",
+    "lit": "irc-legend-lit-check-big",
+    "down": "irc-legend-down-check-big",
+    "litdown": "irc-legend-litdown-check-big"
+   }
+  },
+  "capture": {
+   "legend": "CAPTURE",
+   "size": "std",
+   "names": [
+    "Capture"
+   ],
+   "variant": "c",
+   "pt": [
+    66.96,
+    29.76
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.08,
+    5.03,
+    58.8,
+    21.6
+   ],
+   "files": {
+    "off": "irc-legend-off-capture",
+    "lit": "irc-legend-lit-capture",
+    "down": "irc-legend-down-capture",
+    "litdown": "irc-legend-litdown-capture"
+   }
+  },
+  "capture-big": {
+   "legend": "CAPTURE",
+   "size": "big",
+   "names": [
+    "Capture"
+   ],
+   "variant": "c",
+   "pt": [
+    98.54,
+    44.54
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.87,
+    5.82,
+    88.8,
+    34.8
+   ],
+   "files": {
+    "off": "irc-legend-off-capture-big",
+    "lit": "irc-legend-lit-capture-big",
+    "down": "irc-legend-down-capture-big",
+    "litdown": "irc-legend-litdown-capture-big"
+   }
+  },
+  "record-big": {
+   "legend": "RECORD",
+   "size": "big",
+   "names": [
+    "Record"
+   ],
+   "variant": "d",
+   "pt": [
+    88.94,
+    44.54
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.87,
+    5.82,
+    79.2,
+    34.8
+   ],
+   "files": {
+    "off": "irc-legend-off-record-big",
+    "lit": "irc-legend-lit-record-big",
+    "down": "irc-legend-down-record-big",
+    "litdown": "irc-legend-litdown-record-big"
+   }
+  },
+  "stop": {
+   "legend": "STOP",
+   "size": "std",
+   "names": [
+    "Stop"
+   ],
+   "variant": "e",
+   "pt": [
+    46.56,
+    29.76
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.08,
+    5.03,
+    38.4,
+    21.6
+   ],
+   "files": {
+    "off": "irc-legend-off-stop",
+    "lit": "irc-legend-lit-stop",
+    "down": "irc-legend-down-stop",
+    "litdown": "irc-legend-litdown-stop"
+   }
+  },
+  "make-irs-big": {
+   "legend": "MAKE IRS",
+   "size": "big",
+   "names": [
+    "Make IRs"
+   ],
+   "variant": "e",
+   "pt": [
+    99.74,
+    44.54
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.87,
+    5.82,
+    90.0,
+    34.8
+   ],
+   "files": {
+    "off": "irc-legend-off-make-irs-big",
+    "lit": "irc-legend-lit-make-irs-big",
+    "down": "irc-legend-down-make-irs-big",
+    "litdown": "irc-legend-litdown-make-irs-big"
+   }
+  },
+  "prepare-big": {
+   "legend": "PREPARE",
+   "size": "big",
+   "names": [
+    "Prepare files"
+   ],
+   "variant": "a",
+   "pt": [
+    98.54,
+    44.54
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.87,
+    5.82,
+    88.8,
+    34.8
+   ],
+   "files": {
+    "off": "irc-legend-off-prepare-big",
+    "lit": "irc-legend-lit-prepare-big",
+    "down": "irc-legend-down-prepare-big",
+    "litdown": "irc-legend-litdown-prepare-big"
+   }
+  },
+  "record-again": {
+   "legend": "RECORD AGAIN",
+   "size": "std",
+   "names": [
+    "Record again"
+   ],
+   "variant": "f",
+   "pt": [
+    94.56,
+    29.76
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.08,
+    5.03,
+    86.4,
+    21.6
+   ],
+   "files": {
+    "off": "irc-legend-off-record-again",
+    "lit": "irc-legend-lit-record-again",
+    "down": "irc-legend-down-record-again",
+    "litdown": "irc-legend-litdown-record-again"
+   }
+  },
+  "mic": {
+   "legend": "MIC",
+   "size": "std",
+   "names": [
+    "Mic"
+   ],
+   "variant": "d",
+   "pt": [
+    38.16,
+    29.76
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.08,
+    5.03,
+    30.0,
+    21.6
+   ],
+   "files": {
+    "off": "irc-legend-off-mic",
+    "lit": "irc-legend-lit-mic",
+    "down": "irc-legend-down-mic",
+    "litdown": "irc-legend-litdown-mic"
+   }
+  },
+  "off": {
+   "legend": "OFF",
+   "size": "std",
+   "names": [
+    "Off"
+   ],
+   "variant": "f",
+   "pt": [
+    39.36,
+    29.76
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.08,
+    5.03,
+    31.2,
+    21.6
+   ],
+   "files": {
+    "off": "irc-legend-off-off",
+    "lit": "irc-legend-lit-off",
+    "down": "irc-legend-down-off",
+    "litdown": "irc-legend-litdown-off"
+   }
+  },
+  "ref": {
+   "legend": "REF",
+   "size": "std",
+   "names": [
+    "Ref"
+   ],
+   "variant": "b",
+   "pt": [
+    39.36,
+    29.76
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.08,
+    5.03,
+    31.2,
+    21.6
+   ],
+   "files": {
+    "off": "irc-legend-off-ref",
+    "lit": "irc-legend-lit-ref",
+    "down": "irc-legend-down-ref",
+    "litdown": "irc-legend-litdown-ref"
+   }
+  },
+  "skip": {
+   "legend": "SKIP",
+   "size": "std",
+   "names": [
+    "Skip"
+   ],
+   "variant": "f",
+   "pt": [
+    44.16,
+    29.76
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.08,
+    5.03,
+    36.0,
+    21.6
+   ],
+   "files": {
+    "off": "irc-legend-off-skip",
+    "lit": "irc-legend-lit-skip",
+    "down": "irc-legend-down-skip",
+    "litdown": "irc-legend-litdown-skip"
+   }
+  },
+  "use": {
+   "legend": "USE",
+   "size": "std",
+   "names": [
+    "Use"
+   ],
+   "variant": "b",
+   "pt": [
+    40.56,
+    29.76
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.08,
+    5.03,
+    32.4,
+    21.6
+   ],
+   "files": {
+    "off": "irc-legend-off-use",
+    "lit": "irc-legend-lit-use",
+    "down": "irc-legend-down-use",
+    "litdown": "irc-legend-litdown-use"
+   }
+  },
+  "remove": {
+   "legend": "REMOVE",
+   "size": "std",
+   "names": [
+    "Remove"
+   ],
+   "variant": "e",
+   "pt": [
+    60.96,
+    29.76
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.08,
+    5.03,
+    52.8,
+    21.61
+   ],
+   "files": {
+    "off": "irc-legend-off-remove",
+    "lit": "irc-legend-lit-remove",
+    "down": "irc-legend-down-remove",
+    "litdown": "irc-legend-litdown-remove"
+   }
+  },
+  "amp-only": {
+   "legend": "AMP ONLY",
+   "size": "std",
+   "names": [
+    "Amp only"
+   ],
+   "variant": "a",
+   "pt": [
+    71.76,
+    29.76
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.08,
+    5.03,
+    63.6,
+    21.6
+   ],
+   "files": {
+    "off": "irc-legend-off-amp-only",
+    "lit": "irc-legend-lit-amp-only",
+    "down": "irc-legend-down-amp-only",
+    "litdown": "irc-legend-litdown-amp-only"
+   }
+  },
+  "full-chain": {
+   "legend": "FULL CHAIN",
+   "size": "std",
+   "names": [
+    "Full chain"
+   ],
+   "variant": "e",
+   "pt": [
+    80.16,
+    29.76
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.08,
+    5.03,
+    72.0,
+    21.6
+   ],
+   "files": {
+    "off": "irc-legend-off-full-chain",
+    "lit": "irc-legend-lit-full-chain",
+    "down": "irc-legend-down-full-chain",
+    "litdown": "irc-legend-litdown-full-chain"
+   }
+  },
+  "ref-none": {
+   "legend": "NONE",
+   "size": "std",
+   "names": [
+    "None (simplest)"
+   ],
+   "variant": "e",
+   "pt": [
+    47.76,
+    29.76
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.08,
+    5.03,
+    39.6,
+    21.6
+   ],
+   "files": {
+    "off": "irc-legend-off-ref-none",
+    "lit": "irc-legend-lit-ref-none",
+    "down": "irc-legend-down-ref-none",
+    "litdown": "irc-legend-litdown-ref-none"
+   }
+  },
+  "ref-loadbox": {
+   "legend": "LOAD BOX",
+   "size": "std",
+   "names": [
+    "Load box line out"
+   ],
+   "variant": "f",
+   "pt": [
+    70.56,
+    29.76
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.08,
+    5.03,
+    62.4,
+    21.6
+   ],
+   "files": {
+    "off": "irc-legend-off-ref-loadbox",
+    "lit": "irc-legend-lit-ref-loadbox",
+    "down": "irc-legend-down-ref-loadbox",
+    "litdown": "irc-legend-litdown-ref-loadbox"
+   }
+  },
+  "ref-tap": {
+   "legend": "TAP OR PAD",
+   "size": "std",
+   "names": [
+    "Reference tap or pad"
+   ],
+   "variant": "a",
+   "pt": [
+    80.16,
+    29.76
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.08,
+    5.03,
+    72.0,
+    21.6
+   ],
+   "files": {
+    "off": "irc-legend-off-ref-tap",
+    "lit": "irc-legend-lit-ref-tap",
+    "down": "irc-legend-down-ref-tap",
+    "litdown": "irc-legend-litdown-ref-tap"
+   }
+  },
+  "as-mic": {
+   "legend": "AS MIC",
+   "size": "std",
+   "names": [
+    "As a mic"
+   ],
+   "variant": "c",
+   "pt": [
+    54.96,
+    29.76
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.08,
+    5.03,
+    46.8,
+    21.6
+   ],
+   "files": {
+    "off": "irc-legend-off-as-mic",
+    "lit": "irc-legend-lit-as-mic",
+    "down": "irc-legend-down-as-mic",
+    "litdown": "irc-legend-litdown-as-mic"
+   }
+  },
+  "as-ref": {
+   "legend": "AS REF",
+   "size": "std",
+   "names": [
+    "As the reference",
+    "Use it as the reference"
+   ],
+   "variant": "e",
+   "pt": [
+    56.16,
+    29.76
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.08,
+    5.03,
+    48.0,
+    21.6
+   ],
+   "files": {
+    "off": "irc-legend-off-as-ref",
+    "lit": "irc-legend-lit-as-ref",
+    "down": "irc-legend-down-as-ref",
+    "litdown": "irc-legend-litdown-as-ref"
+   }
+  },
+  "record-here": {
+   "legend": "\u2039 RECORD HERE",
+   "size": "std",
+   "names": [
+    "\u2039 Record here"
+   ],
+   "variant": "d",
+   "pt": [
+    96.96,
+    29.76
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.08,
+    5.03,
+    88.8,
+    21.6
+   ],
+   "files": {
+    "off": "irc-legend-off-record-here",
+    "lit": "irc-legend-lit-record-here",
+    "down": "irc-legend-down-record-here",
+    "litdown": "irc-legend-litdown-record-here"
+   }
+  },
+  "import-daw": {
+   "legend": "IMPORT DAW",
+   "size": "std",
+   "names": [
+    "Import DAW recordings\u2026"
+   ],
+   "variant": "b",
+   "pt": [
+    83.76,
+    29.76
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.08,
+    5.03,
+    75.6,
+    21.6
+   ],
+   "files": {
+    "off": "irc-legend-off-import-daw",
+    "lit": "irc-legend-lit-import-daw",
+    "down": "irc-legend-down-import-daw",
+    "litdown": "irc-legend-litdown-import-daw"
+   }
+  },
+  "reexport-past": {
+   "legend": "RE-EXPORT OLD",
+   "size": "std",
+   "names": [
+    "Re-export a past capture\u2026"
+   ],
+   "variant": "f",
+   "pt": [
+    100.56,
+    29.76
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.08,
+    5.03,
+    92.4,
+    21.6
+   ],
+   "files": {
+    "off": "irc-legend-off-reexport-past",
+    "lit": "irc-legend-lit-reexport-past",
+    "down": "irc-legend-down-reexport-past",
+    "litdown": "irc-legend-litdown-reexport-past"
+   }
+  },
+  "finder": {
+   "legend": "FINDER",
+   "size": "std",
+   "names": [
+    "Show in Finder"
+   ],
+   "variant": "c",
+   "pt": [
+    57.36,
+    29.76
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.08,
+    5.03,
+    49.2,
+    21.6
+   ],
+   "files": {
+    "off": "irc-legend-off-finder",
+    "lit": "irc-legend-lit-finder",
+    "down": "irc-legend-down-finder",
+    "litdown": "irc-legend-litdown-finder"
+   }
+  },
+  "reexport": {
+   "legend": "RE-EXPORT",
+   "size": "std",
+   "names": [
+    "Re-export\u2026",
+    "Re-export"
+   ],
+   "variant": "e",
+   "pt": [
+    77.76,
+    29.76
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.08,
+    5.03,
+    69.6,
+    21.6
+   ],
+   "files": {
+    "off": "irc-legend-off-reexport",
+    "lit": "irc-legend-lit-reexport",
+    "down": "irc-legend-down-reexport",
+    "litdown": "irc-legend-litdown-reexport"
+   }
+  },
+  "change": {
+   "legend": "CHANGE",
+   "size": "std",
+   "names": [
+    "Change\u2026"
+   ],
+   "variant": "a",
+   "pt": [
+    60.96,
+    29.76
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.08,
+    5.03,
+    52.8,
+    21.61
+   ],
+   "files": {
+    "off": "irc-legend-off-change",
+    "lit": "irc-legend-lit-change",
+    "down": "irc-legend-down-change",
+    "litdown": "irc-legend-litdown-change"
+   }
+  },
+  "choose-files": {
+   "legend": "CHOOSE FILES",
+   "size": "std",
+   "names": [
+    "Choose files\u2026"
+   ],
+   "variant": "c",
+   "pt": [
+    92.16,
+    29.76
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.08,
+    5.03,
+    84.0,
+    21.6
+   ],
+   "files": {
+    "off": "irc-legend-off-choose-files",
+    "lit": "irc-legend-lit-choose-files",
+    "down": "irc-legend-down-choose-files",
+    "litdown": "irc-legend-litdown-choose-files"
+   }
+  },
+  "choose-file": {
+   "legend": "CHOOSE FILE",
+   "size": "std",
+   "names": [
+    "Choose sweep file"
+   ],
+   "variant": "d",
+   "pt": [
+    84.96,
+    29.76
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.08,
+    5.03,
+    76.8,
+    21.6
+   ],
+   "files": {
+    "off": "irc-legend-off-choose-file",
+    "lit": "irc-legend-lit-choose-file",
+    "down": "irc-legend-down-choose-file",
+    "litdown": "irc-legend-litdown-choose-file"
+   }
+  },
+  "save-signal": {
+   "legend": "SAVE SIGNAL",
+   "size": "std",
+   "names": [
+    "Save test signal\u2026"
+   ],
+   "variant": "f",
+   "pt": [
+    87.36,
+    29.76
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.08,
+    5.03,
+    79.2,
+    21.6
+   ],
+   "files": {
+    "off": "irc-legend-off-save-signal",
+    "lit": "irc-legend-lit-save-signal",
+    "down": "irc-legend-down-save-signal",
+    "litdown": "irc-legend-litdown-save-signal"
+   }
+  },
+  "load-signal": {
+   "legend": "LOAD SIGNAL",
+   "size": "std",
+   "names": [
+    "Load settings from a test signal\u2026"
+   ],
+   "variant": "a",
+   "pt": [
+    87.36,
+    29.76
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.08,
+    5.03,
+    79.2,
+    21.6
+   ],
+   "files": {
+    "off": "irc-legend-off-load-signal",
+    "lit": "irc-legend-lit-load-signal",
+    "down": "irc-legend-down-load-signal",
+    "litdown": "irc-legend-litdown-load-signal"
+   }
+  },
+  "downloads": {
+   "legend": "DOWNLOADS",
+   "size": "std",
+   "names": [
+    "Find it in Downloads"
+   ],
+   "variant": "a",
+   "pt": [
+    83.76,
+    29.76
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.08,
+    5.03,
+    75.6,
+    21.6
+   ],
+   "files": {
+    "off": "irc-legend-off-downloads",
+    "lit": "irc-legend-lit-downloads",
+    "down": "irc-legend-down-downloads",
+    "litdown": "irc-legend-litdown-downloads"
+   }
+  },
+  "upload-page": {
+   "legend": "UPLOAD PAGE",
+   "size": "std",
+   "names": [
+    "Open tone3000.com/capture"
+   ],
+   "variant": "b",
+   "pt": [
+    89.76,
+    29.76
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.08,
+    5.03,
+    81.6,
+    21.6
+   ],
+   "files": {
+    "off": "irc-legend-off-upload-page",
+    "lit": "irc-legend-lit-upload-page",
+    "down": "irc-legend-down-upload-page",
+    "litdown": "irc-legend-litdown-upload-page"
+   }
+  },
+  "midi-setup": {
+   "legend": "AUDIO SETUP",
+   "size": "std",
+   "names": [
+    "Open Audio MIDI Setup"
+   ],
+   "variant": "a",
+   "pt": [
+    86.16,
+    29.76
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.08,
+    5.03,
+    78.0,
+    21.6
+   ],
+   "files": {
+    "off": "irc-legend-off-midi-setup",
+    "lit": "irc-legend-lit-midi-setup",
+    "down": "irc-legend-down-midi-setup",
+    "litdown": "irc-legend-litdown-midi-setup"
+   }
+  },
+  "privacy": {
+   "legend": "PRIVACY",
+   "size": "std",
+   "names": [
+    "Open Privacy & Security"
+   ],
+   "variant": "e",
+   "pt": [
+    64.56,
+    29.76
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.08,
+    5.03,
+    56.4,
+    21.6
+   ],
+   "files": {
+    "off": "irc-legend-off-privacy",
+    "lit": "irc-legend-lit-privacy",
+    "down": "irc-legend-down-privacy",
+    "litdown": "irc-legend-litdown-privacy"
+   }
+  },
+  "allow-rec": {
+   "legend": "ALLOW",
+   "size": "std",
+   "names": [
+    "Allow recording\u2026"
+   ],
+   "variant": "a",
+   "pt": [
+    56.16,
+    29.76
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.08,
+    5.03,
+    48.0,
+    21.6
+   ],
+   "files": {
+    "off": "irc-legend-off-allow-rec",
+    "lit": "irc-legend-lit-allow-rec",
+    "down": "irc-legend-down-allow-rec",
+    "litdown": "irc-legend-litdown-allow-rec"
+   }
+  },
+  "cancel": {
+   "legend": "CANCEL",
+   "size": "std",
+   "names": [
+    "Cancel"
+   ],
+   "variant": "a",
+   "pt": [
+    59.76,
+    29.76
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.08,
+    5.03,
+    51.6,
+    21.6
+   ],
+   "files": {
+    "off": "irc-legend-off-cancel",
+    "lit": "irc-legend-lit-cancel",
+    "down": "irc-legend-down-cancel",
+    "litdown": "irc-legend-litdown-cancel"
+   }
+  },
+  "done": {
+   "legend": "DONE",
+   "size": "std",
+   "names": [
+    "Done"
+   ],
+   "variant": "e",
+   "pt": [
+    47.76,
+    29.76
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.08,
+    5.03,
+    39.6,
+    21.6
+   ],
+   "files": {
+    "off": "irc-legend-off-done",
+    "lit": "irc-legend-lit-done",
+    "down": "irc-legend-down-done",
+    "litdown": "irc-legend-litdown-done"
+   }
+  },
+  "back": {
+   "legend": "BACK",
+   "size": "std",
+   "names": [
+    "Back"
+   ],
+   "variant": "b",
+   "pt": [
+    47.76,
+    29.76
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.08,
+    5.03,
+    39.6,
+    21.6
+   ],
+   "files": {
+    "off": "irc-legend-off-back",
+    "lit": "irc-legend-lit-back",
+    "down": "irc-legend-down-back",
+    "litdown": "irc-legend-litdown-back"
+   }
+  },
+  "next": {
+   "legend": "NEXT",
+   "size": "std",
+   "names": [
+    "Next"
+   ],
+   "variant": "d",
+   "pt": [
+    47.76,
+    29.76
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.08,
+    5.03,
+    39.6,
+    21.6
+   ],
+   "files": {
+    "off": "irc-legend-off-next",
+    "lit": "irc-legend-lit-next",
+    "down": "irc-legend-down-next",
+    "litdown": "irc-legend-litdown-next"
+   }
+  },
+  "start": {
+   "legend": "START",
+   "size": "std",
+   "names": [
+    "Start"
+   ],
+   "variant": "c",
+   "pt": [
+    53.76,
+    29.76
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.08,
+    5.03,
+    45.6,
+    21.6
+   ],
+   "files": {
+    "off": "irc-legend-off-start",
+    "lit": "irc-legend-lit-start",
+    "down": "irc-legend-down-start",
+    "litdown": "irc-legend-litdown-start"
+   }
+  },
+  "support": {
+   "legend": "SUPPORT",
+   "size": "std",
+   "names": [
+    "Contact Support\u2026"
+   ],
+   "variant": "b",
+   "pt": [
+    66.96,
+    29.76
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.08,
+    5.03,
+    58.8,
+    21.6
+   ],
+   "files": {
+    "off": "irc-legend-off-support",
+    "lit": "irc-legend-lit-support",
+    "down": "irc-legend-down-support",
+    "litdown": "irc-legend-litdown-support"
+   }
+  },
+  "log-file": {
+   "legend": "LOG FILE",
+   "size": "std",
+   "names": [
+    "Show Log File"
+   ],
+   "variant": "b",
+   "pt": [
+    64.56,
+    29.76
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.08,
+    5.03,
+    56.4,
+    21.6
+   ],
+   "files": {
+    "off": "irc-legend-off-log-file",
+    "lit": "irc-legend-lit-log-file",
+    "down": "irc-legend-down-log-file",
+    "litdown": "irc-legend-litdown-log-file"
+   }
+  },
+  "help-quick": {
+   "legend": "QUICK START",
+   "size": "std",
+   "names": [
+    "Quick start"
+   ],
+   "variant": "d",
+   "pt": [
+    86.16,
+    29.76
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.08,
+    5.03,
+    78.0,
+    21.6
+   ],
+   "files": {
+    "off": "irc-legend-off-help-quick",
+    "lit": "irc-legend-lit-help-quick",
+    "down": "irc-legend-down-help-quick",
+    "litdown": "irc-legend-litdown-help-quick"
+   }
+  },
+  "help-wiring": {
+   "legend": "WIRING",
+   "size": "std",
+   "names": [
+    "Wiring"
+   ],
+   "variant": "c",
+   "pt": [
+    57.36,
+    29.76
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.08,
+    5.03,
+    49.2,
+    21.6
+   ],
+   "files": {
+    "off": "irc-legend-off-help-wiring",
+    "lit": "irc-legend-lit-help-wiring",
+    "down": "irc-legend-down-help-wiring",
+    "litdown": "irc-legend-litdown-help-wiring"
+   }
+  },
+  "help-tap": {
+   "legend": "REF TAP",
+   "size": "std",
+   "names": [
+    "The reference tap"
+   ],
+   "variant": "b",
+   "pt": [
+    62.16,
+    29.76
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.08,
+    5.03,
+    54.0,
+    21.6
+   ],
+   "files": {
+    "off": "irc-legend-off-help-tap",
+    "lit": "irc-legend-lit-help-tap",
+    "down": "irc-legend-down-help-tap",
+    "litdown": "irc-legend-litdown-help-tap"
+   }
+  },
+  "help-trouble": {
+   "legend": "TROUBLE",
+   "size": "std",
+   "names": [
+    "Troubleshooting"
+   ],
+   "variant": "a",
+   "pt": [
+    65.76,
+    29.76
+   ],
+   "outset_pt": 1.44,
+   "cap": [
+    4.08,
+    5.03,
+    57.6,
+    21.6
+   ],
+   "files": {
+    "off": "irc-legend-off-help-trouble",
+    "lit": "irc-legend-lit-help-trouble",
+    "down": "irc-legend-down-help-trouble",
+    "litdown": "irc-legend-litdown-help-trouble"
+   }
+  }
+ }
+}
