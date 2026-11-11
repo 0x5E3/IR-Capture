@@ -46,6 +46,7 @@ from instrument import grimy, prism
 import toolkit as TK
 import shelf_gear as SG
 import shelf_wood as SW
+import ircapture_legends as LG
 sys.argv = _argv
 TK.OUT, TK.PXCM, TK.SAMPLES = OUT, PXCM, SAMPLES
 
@@ -615,8 +616,9 @@ KEY_LOOK = {
 }
 
 
-def cap_mat_blank(lit, name, wcm, hcm, look, rng):
-    """shelf_wear.cap_mat_worn() without a legend: this key's own age, stain, gloss and polish; the stipple flattened where
+def cap_mat_blank(lit, name, wcm, hcm, look, rng, legend=None):
+    """shelf_wear.cap_mat_worn() without a legend (or, 11-11, with one: legend = (text, capitals in cm), engraved and
+    filled as the bench's, the fill worn where fingers press): this key's own age, stain, gloss and polish; the stipple flattened where
     fingers have polished it; lit, the grain-of-wheat lamp glows through, a little less and warmer through an aged cap."""
     aged = look.get('aged', 0.3)
     new_off, old_off = np.array(srgb('#ddcca2')), np.array(srgb('#cdb072'))
@@ -647,6 +649,12 @@ def cap_mat_blank(lit, name, wcm, hcm, look, rng):
     t_st = SG.img_tex(nt, name + 's', stain.astype(np.float32), False, 'CLIP')
     t_po = SG.img_tex(nt, name + 'p', polish.astype(np.float32), False, 'CLIP')
     for t in (t_rim, t_st, t_po): nt.links.new(cv.outputs['Vector'], t.inputs['Vector'])
+    t_fill = t_eng = None
+    if legend:
+        mk, fill = legend_masks(legend[0], wcm, hcm, legend[1], look, rng)
+        mkb = np.asarray(Image.fromarray((mk * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(1.2)), np.float32) / 255
+        t_fill = SG.img_tex(nt, name + 'f', fill.astype(np.float32), False, 'CLIP'); t_eng = SG.img_tex(nt, name + 'e', mkb, False, 'CLIP')
+        for t in (t_fill, t_eng): nt.links.new(cv.outputs['Vector'], t.inputs['Vector'])
     co = obj_coords(nt)
     stip = noise(nt, co, 180.0, 2.0, 0.5)
     inv_po = node(nt, 'ShaderNodeMath', operation='SUBTRACT'); inv_po.inputs[0].default_value = 1.0
@@ -665,7 +673,12 @@ def cap_mat_blank(lit, name, wcm, hcm, look, rng):
         e = node(nt, 'ShaderNodeMath', operation='MULTIPLY_ADD'); e.inputs[1].default_value = 0.25
         nt.links.new(grain, e.inputs[0]); nt.links.new(fall.outputs['Result'], e.inputs[2])
         inv = node(nt, 'ShaderNodeMath', operation='SUBTRACT'); inv.inputs[0].default_value = 1.0; inv.use_clamp = True
-        nt.links.new(mul(nt, t_st.outputs['Color'], 0.8), inv.inputs[1])
+        if t_fill is not None:                        # the fill and the stain block the lamp
+            blk = node(nt, 'ShaderNodeMath', operation='MULTIPLY_ADD'); blk.inputs[1].default_value = 0.8
+            nt.links.new(t_st.outputs['Color'], blk.inputs[0]); nt.links.new(t_fill.outputs['Color'], blk.inputs[2])
+            nt.links.new(blk.outputs[0], inv.inputs[1])
+        else:
+            nt.links.new(mul(nt, t_st.outputs['Color'], 0.8), inv.inputs[1])
         e2 = node(nt, 'ShaderNodeMath', operation='MULTIPLY'); nt.links.new(e.outputs[0], e2.inputs[0]); nt.links.new(inv.outputs[0], e2.inputs[1])
         e3 = mul(nt, e2.outputs[0], 1.0 - 0.18 * aged)
         hot = np.array(srgb('#ff8c26')) * (1 - aged * 0.5) + np.array(srgb('#ff7414')) * aged * 0.5
@@ -676,8 +689,32 @@ def cap_mat_blank(lit, name, wcm, hcm, look, rng):
         mix_into(m, 'Base Color', mul(nt, t_rim.outputs['Color'], 0.35 * aged + 0.08), (*srgb('#b8995a'), 1))
     mix_into(m, 'Base Color', t_st.outputs['Color'], (*srgb('#8e6a3c' if not lit else '#9a4a14'), 1))
     mix_into(m, 'Roughness', t_st.outputs['Color'], 0.55, 'FLOAT')
+    if t_fill is not None:                            # the black fill; where it is gone, the engraving's floor, a little dirty
+        mix_into(m, 'Base Color', mul(nt, t_fill.outputs['Color'], 0.95), (*srgb('#141110'), 1))
+        mix_into(m, 'Roughness', t_fill.outputs['Color'], 0.75, 'FLOAT'); mix_into(m, 'Coat Weight', t_fill.outputs['Color'], 0.0, 'FLOAT')
+        mix_into(m, 'Specular IOR Level', t_fill.outputs['Color'], 0.1, 'FLOAT')
+        gone = node(nt, 'ShaderNodeMath', operation='SUBTRACT'); gone.use_clamp = True
+        nt.links.new(t_eng.outputs['Color'], gone.inputs[0]); nt.links.new(t_fill.outputs['Color'], gone.inputs[1])
+        mix_into(m, 'Base Color', mul(nt, gone.outputs[0], 0.5), (*srgb('#6e6150'), 1))
+        add_bump(m, t_eng.outputs['Color'], -0.6, 0.006)
     surface_wear(m, smudge=0.4 + 0.3 * look.get('use', 0.3), scuff=0.25)
     return grimy(m, dirt='#3a3122', amount=0.3 + 0.15 * aged, dist=0.06)
+
+
+def legend_masks(text, wcm, hcm, cap_cm, look, rng):
+    """shelf_wear.worn_legend() with the capitals exactly cap_cm: the engraving's mask and its fill (rows from the top,
+    150 px a cm), the fill lost in patches toward the middle where the finger lands, at the strokes' edges first."""
+    mk = SG.legend_mask(text, wcm, hcm, cap_cm, ppcm=150, track=LG.TRACK)
+    use = look.get('use', 0.3)
+    h, w = mk.shape
+    er = ss(0.8, 0.95, blur(mk, 9.0)); band = np.clip(mk - er, 0, 1)
+    yy, xx = np.mgrid[0:h, 0:w]
+    centre = np.exp(-(((xx - w * 0.5) / (w * 0.32)) ** 2 + ((yy - h * 0.48) / (h * 0.4)) ** 2))
+    sp = blur(rng.random((h, w)).astype(np.float32), 6.0); sp = (sp - sp.mean()) / (sp.std() + 1e-6)
+    sp2 = blur(rng.random((h, w)).astype(np.float32), 24.0); sp2 = (sp2 - sp2.mean()) / (sp2.std() + 1e-6)
+    patch = ss(0.95, 1.7, sp2 + 1.3 * centre * use - 1.2 * (1 - use)) * (0.55 + 0.45 * ss(-0.6, 0.6, sp))
+    fill = mk * (1 - np.clip(band * patch * (0.15 + 0.4 * use) + mk * patch * 0.08 * use, 0, 0.6))
+    return mk, fill
 
 
 def bezel_mat_chip(name, at):
@@ -722,6 +759,248 @@ def piece_key(v, states=('off', 'lit', 'down', 'litdown')):
             g = bpy.data.objects.new('kglow', L); s.collection.objects.link(g); g.location = (0, 0, zc + 0.9)
         TK.shoot(s, cam, 'key-%s-%s' % (state, v), w + 2 * bz, h + 2 * bz,
                  lambda s, cam: {'cap_tl': proj(s, cam, (-w / 2, h / 2, zc + 0.3)), 'cap_br': proj(s, cam, (w / 2, -h / 2, zc + 0.3))})
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# (11-11) the printed keys: each key the app names in ircapture_legends.LEGENDS, its legend engraved and filled in the cap
+# (shelf_wear.cap_mat_worn, the bench's worn legend, as its UNLOCK/REMOVE keys), the cap its own width (the legend's plus
+# margins), the same bezel, well, lamp and wear as piece_key(); the wear (KEY_LOOK) by the app's hash of the key's name, so
+# a key keeps the look it had blank. Writes legend-<state>-<id>.png and its layout (cap rectangle, the key's outline).
+def legend_width(text, size):
+    """The cap's width for a legend (cm): its letter-spaced capitals at cap_cm, plus margins, at least min_w."""
+    z = LG.SIZES[size]
+    f = SG.font('cap', 400); capH = f.getbbox('H')[3] - f.getbbox('H')[1]
+    k = z['cap_cm'] / capH                                       # cm per font px
+    wsum = sum(f.getlength(c) for c in text) * k + LG.TRACK * z['cap_cm'] * (len(text) - 1)
+    return max(z['min_w'], round((wsum + 2 * z['margin']) * 10) / 10)
+
+
+def piece_legend(lid, states=None):
+    states = states or tuple(os.environ.get('IRC_LEGEND_STATES', 'off,lit,down,litdown').split(','))
+    text, size, names = LG.LEGENDS[lid]
+    z = LG.SIZES[size]
+    v = LG.variant(names[0]); look = KEY_LOOK[v]
+    h = z['cap_h']; w = legend_width(text, size)
+    bz = TK.KEY['bezel'] * (1.3 if size == 'big' else 1.0); r = TK.KEY['r'] * (1.4 if size == 'big' else 1.0)
+    for state in states:
+        rng = set_seed('legend-' + lid)               # the same key in every state
+        s, cam = TK.scene(w + 2 * bz, h + 2 * bz, 0.3)
+        TK.catcher(0.0)
+        bez = rbox('kbezel', w + 2 * bz, h + 2 * bz, 0.25, 0.0, r + bz * 0.6, roll=0.06)
+        cut(bez, prism('khole', _rring((w + 0.06) / 2, (h + 0.06) / 2, r, 0.0, 0, n_arc=8), -2, 2))
+        chamfer(bez, 0.02, 2)
+        if look.get('chip'):
+            cx, cy = look['chip']
+            bez.data.materials.append(bezel_mat_chip('kbez-' + lid, (cx * (w / 2 + bz - 0.07), cy * (h / 2 + bz - 0.07), 0.125)))
+        else:
+            bez.data.materials.append(SG.black_cast('kbez'))
+        well = rbox('kwell', w + 0.1, h + 0.1, 0.3, -0.3, 0.05); well.data.materials.append(mat('kwell', (0.01, 0.009, 0.008), rough=0.8))
+        lit = state in ('lit', 'litdown'); down = state in ('down', 'litdown')
+        zc = 0.03 if down else 0.15
+        cap = rbox('cap', w, h, 0.3, zc, r, roll=0.07, seg=4)
+        TK.flat_faces(cap)
+        cap.data.materials.append(cap_mat_blank(lit, 'cap-%s-%s' % (lid, state), w, h, look, rng, legend=(text, z['cap_cm'])))
+        if lit:
+            L = bpy.data.lights.new('kglow', 'POINT'); L.energy = 0.3 * (1 - 0.15 * look.get('aged', 0.3)) * (w * h) / (4.4 * 1.8)
+            L.color = srgb('#ffa040'); L.shadow_soft_size = 0.6 * max(1.0, w / 4.4)
+            g = bpy.data.objects.new('kglow', L); s.collection.objects.link(g); g.location = (0, 0, zc + 0.9)
+        TK.shoot(s, cam, 'legend-%s-%s' % (state, lid), w + 2 * bz, h + 2 * bz,
+                 lambda s, cam: {'cap_tl': proj(s, cam, (-w / 2, h / 2, zc + 0.3)), 'cap_br': proj(s, cam, (w / 2, -h / 2, zc + 0.3)),
+                                 'legend': text, 'size': size, 'variant': v, 'cap_cm': [w, h], 'bezel': bz})
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# (11-11) the scribble strip: a length of cream masking tape (3/4 in, 1.9 cm) stuck on the channel panel where the mic's
+# name goes, the name hand-lettered over it by the app (live: the user types it). Torn at both ends (a ragged edge, the
+# crepe's fibres showing), the paper's crepe across its width, a little translucent at the edges, its far end lifting
+# about 1.5 mm off the panel over its last 1.2 cm (a soft shadow under it). Seen 10 degrees above, on a shadow catcher
+# (the app draws it over the panel's own picture). Four strips (SCRIB_LOOK): each its own length, tear, lift and age.
+SCRIB = {'h': 1.9, 'pt_per_cm': 15.8}
+SCRIB_LOOK = {
+    'a': dict(len=12.8, lift=0.15, lift_len=1.2, age=0.2, skew=0.6),
+    'b': dict(len=13.1, lift=0.0, lift_len=0.0, age=0.45, skew=-0.9),
+    'c': dict(len=12.6, lift=0.1, lift_len=0.9, age=0.1, skew=0.2, lift_left=True),
+    'd': dict(len=13.0, lift=0.18, lift_len=1.4, age=0.6, skew=-0.3),
+}
+
+
+def tape_maps(L, H, look, rng, ppcm=120):
+    """The tape's alpha (torn ends, frayed fibres), its crepe (height) and its colour variation, rows from the top."""
+    w, h = int(L * ppcm), int(H * ppcm)
+    yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
+    v = yy / h                                                  # 0 at the top edge .. 1 at the bottom
+    def tear(seed_sh):
+        a = blur(rng.random(h).astype(np.float32)[:, None], 5.0)[:, 0]
+        b = blur(rng.random(h).astype(np.float32)[:, None], 28.0)[:, 0]
+        prof = (a - a.mean()) / (a.std() + 1e-6) * 0.025 + (b - b.mean()) / (b.std() + 1e-6) * 0.07
+        return prof + look['skew'] * 0.12 * (np.linspace(-1, 1, h) + seed_sh)
+    lt, rt = tear(0.0), tear(0.0)
+    x_cm = xx / ppcm
+    edge_l = 0.25 + lt[:, None]; edge_r = L - 0.25 - rt[:, None]
+    fib = blur(rng.random((h, w)).astype(np.float32), 1.0); fib = (fib - fib.mean()) / (fib.std() + 1e-6)
+    soft = np.clip(0.03 + 0.012 * fib, 0.01, None)              # the torn edge's fibres: a fuzzy fringe (never under 0.1 mm)
+    al = ss(-soft, soft, x_cm - edge_l) * ss(-soft, soft, edge_r - x_cm)
+    fringe = ss(0.0, 0.08, x_cm - edge_l) * ss(0.0, 0.08, edge_r - x_cm)
+    al = al * (0.72 + 0.28 * fringe)                            # the fringe is half paper, half gap
+    side = ss(0.0, 0.012, v) * ss(0.0, 0.012, 1 - v)            # the slit edges, clean
+    al = al * side
+    # the crepe: fine creases across the width (along v), about 0.35 mm apart, wavering
+    wav = blur(rng.random((1, w)).astype(np.float32), 30.0)[0]
+    ph = x_cm * (2 * math.pi / 0.06) + 6.0 * (yy / h) * (0.5 + wav[None, :]) + 3.0 * blur(rng.random((h, w)).astype(np.float32), 6.0)
+    crepe = 0.5 + 0.5 * np.sin(ph)
+    crepe = blur(crepe * 0.85 + 0.15 * blur(rng.random((h, w)).astype(np.float32), 4.0), 1.5)
+    tone = blur(rng.random((h, w)).astype(np.float32), 40.0); tone = (tone - tone.mean()) / (tone.std() + 1e-6)
+    edge_dark = np.exp(-np.minimum(x_cm - edge_l, edge_r - x_cm).clip(0) / 0.15) * 0.5 + (1 - side) * 0.3
+    return al.astype(np.float32), crepe.astype(np.float32), (0.5 + 0.08 * tone + 0.6 * edge_dark).astype(np.float32), (edge_l, edge_r)
+
+
+def piece_scribble(v):
+    look = SCRIB_LOOK[v]
+    L, H = look['len'], SCRIB['h']
+    rng = set_seed('scribble-' + v)
+    s, cam = TK.scene(L, H, 0.4)
+    TK.catcher(0.0)
+    al, crepe, tone, _ = tape_maps(L, H, look, rng)
+    # the strip: a fine grid, its lifted end bent up off the panel
+    nx, ny = 260, 8
+    bpy.ops.mesh.primitive_grid_add(x_subdivisions=nx, y_subdivisions=ny, size=1, location=(0, 0, 0))
+    o = bpy.context.active_object; o.name = 'tape'
+    o.scale = (L, H, 1); bpy.ops.object.transform_apply(scale=True)
+    for vt in o.data.vertices:
+        x = vt.co.x
+        d = (x - (L / 2 - look['lift_len'])) if not look.get('lift_left') else ((-L / 2 + look['lift_len']) - x)
+        z = 0.004
+        if look['lift'] > 0 and d > 0: z += look['lift'] * (d / look['lift_len']) ** 1.7
+        vt.co.z = z
+    bpy.ops.object.shade_smooth()
+    aged = look['age']
+    base = np.array(srgb('#efe4c2')) * (1 - aged) + np.array(srgb('#e2d09c')) * aged
+    m = mat('tape-' + v, tuple(base), rough=0.78, spec=0.25)
+    nt = m.node_tree; b = nt.nodes['Principled BSDF']
+    try:
+        b.inputs['Sheen Weight'].default_value = 0.3; b.inputs['Sheen Roughness'].default_value = 0.6   # paper fibres
+    except Exception: pass
+    uv = nt.nodes.new('ShaderNodeUVMap')
+    t_al = SG.img_tex(nt, 'tal' + v, al, False, 'CLIP'); t_cr = SG.img_tex(nt, 'tcr' + v, crepe, False, 'CLIP')
+    t_to = SG.img_tex(nt, 'tto' + v, tone, False, 'CLIP')
+    for t in (t_al, t_cr, t_to): nt.links.new(uv.outputs['UV'], t.inputs['Vector'])
+    nt.links.new(t_al.outputs['Color'], b.inputs['Alpha'])
+    add_bump(m, t_cr.outputs['Color'], 0.1, 0.002)
+    dark = node(nt, 'ShaderNodeMapRange', **{'From Min': 0.5, 'From Max': 1.3}); dark.clamp = True
+    nt.links.new(t_to.outputs['Color'], dark.inputs['Value'])
+    mix_into(m, 'Base Color', mul(nt, dark.outputs['Result'], 0.3), (*srgb('#c2a872'), 1))
+    lite = node(nt, 'ShaderNodeMapRange', **{'From Min': 0.5, 'From Max': 0.2}); lite.clamp = True
+    nt.links.new(t_to.outputs['Color'], lite.inputs['Value'])
+    mix_into(m, 'Base Color', mul(nt, lite.outputs['Result'], 0.3), (*srgb('#f3ead0'), 1))
+    try: m.blend_method = 'HASHED'
+    except Exception: pass
+    m = grimy(m, dirt='#8a7754', amount=0.04 + 0.08 * aged, dist=0.05)
+    o.data.materials.append(m)
+    # the grid's UVs run 0..1 left to right, bottom to top: the maps' rows are from the top, as img_tex expects
+    bpy.context.view_layer.update()
+    TK.shoot(s, cam, 'scribble-' + v, L, H,
+             lambda s, cam: {'pt_per_cm': SCRIB['pt_per_cm'], 'write_l': proj(s, cam, (-L / 2 + 0.7, 0, 0.0)),
+                             'write_r': proj(s, cam, (L / 2 - 0.7 - (look['lift_len'] if not look.get('lift_left') else 0), 0, 0.0))})
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# (11-11) the gas displays, the bench's gas_disp.py (its IR loader's Self-Scan panel and its solver's Panaplex digits) in a
+# window cut in IR Capture's own bronze panel: the status line (READY, the interface, the rate) on an orange gas-plasma
+# dot matrix, one line of GAS_LINE_N characters, and each input's dBFS on GAS_DIG_N orange seven-segment digits. Rendered
+# dark (the app lights the dots and segments, as the bench's page does: views/gasdisp.js); IRC_GAS_DEMO=1 bakes proof text
+# in. The pane is the bench's thin_glass (refractive glass darkens about four times), the studio's cards kept off it.
+GAS_LINE_N = 26
+GAS_DIG_N = 4                               # "-12.4": the sign's cell, three digits, the point between two of them
+GAS_PITCH = {'matrix': 0.075, 'seg7': 0.62}  # cm: a dot pitch; a digit's cell height
+GAS_DEMO = {'line': ['READY  INTERFACE 1  96 KHZ'], 'dig': '-12.4'}
+
+
+class _RackAdapter:
+    """What gas_disp.gas_window() reads from rack.py (sys.modules['rack']): the panel's thickness and its helpers."""
+    def __init__(self, T, rd):
+        import gear_kit as G
+        from parts import lathe as _lathe
+        self.T, self.RD = T, rd
+        self.rbox, self.cut, self.chamfer, self.node, self.obj_coords, self.noise = G.rbox, G.cut, G.chamfer, G.node, G.obj_coords, G.noise
+        self.mat, self.srgb, self._lathe = mat, srgb, _lathe
+
+    def math_n(self, nt, op, a, b=None, clamp=False):
+        n = self.node(nt, 'ShaderNodeMath', operation=op); n.use_clamp = clamp
+        for i, v in enumerate((a, b)):
+            if v is None: continue
+            if hasattr(v, 'is_linked'): nt.links.new(v, n.inputs[i])
+            else: n.inputs[i].default_value = v
+        return n.outputs[0]
+
+    def phillips(self, x, y, z, r, m, name='screw'):
+        head = self._lathe(name, [(r, 0), (r, 0.04 * r / 0.4), (r * 0.93, 0.12 * r / 0.4), (r * 0.7, 0.2 * r / 0.4),
+                                  (r * 0.3, 0.24 * r / 0.4), (0, 0.25 * r / 0.4)], 96)
+        head.location = (x, y, z); head.data.materials.append(m)
+        ang = math.radians((x * 37 + y * 53) % 90)
+        for k in (0, 1):
+            bpy.ops.mesh.primitive_cube_add(size=1, location=(x, y, z + 0.25 * r / 0.4)); c = bpy.context.active_object
+            c.scale = (r * 1.15, r * 0.2, r * 0.36); c.rotation_euler = (0, 0, ang + k * math.pi / 2); c.hide_render = True
+            mod = head.modifiers.new('x%d' % k, 'BOOLEAN'); mod.operation = 'DIFFERENCE'; mod.object = c
+        return head
+
+
+def gas_bezel_mat():
+    """The VU bezel's textured black (finish_maps powder, wear 0.45), else the bench's black casting."""
+    try:
+        import finish_maps as FM
+        m = FM.material('gbezel', 'powder', '#0d0c0b', 0.45, 4213, 'irc-gas-bezel', bare='#3b2c22', dirt='#1e1b17',
+                        dirt_k=0.35, coat_rough=0.5)
+        calm_up(m, 0.6)
+        return m
+    except Exception as ex:
+        print('gas bezel: finish_maps failed (%s); the black casting' % ex, flush=True)
+        return SG.black_cast('gbez')
+
+
+def piece_gas(kind):
+    import gas_disp as GD
+    demo = os.environ.get('IRC_GAS_DEMO', '0') == '1'
+    disp = 'matrix' if kind == 'line' else 'seg7'
+    n = GAS_LINE_N if kind == 'line' else GAS_DIG_N
+    if disp == 'matrix':
+        W, H, Wu, Hu = GD.mtx_geom(n, 1); dw, dh = Wu * GAS_PITCH['matrix'], Hu * GAS_PITCH['matrix']
+    else:
+        dh = GAS_PITCH['seg7'] * 1.25; dw = n * GAS_PITCH['seg7'] * 0.78 + 0.25
+    ww, wh = dw + 0.5 + 0.1, dh + 0.5 + 0.1             # the window: gas_window keeps 0.25 cm round the display
+    pw, ph = ww + 2.4, wh + 1.4                        # a piece of the panel round it (the screws sit 0.42 out)
+    T = 0.32
+    rng = set_seed('gas-' + kind)
+    s, cam = TK.scene(pw, ph, 0.2)
+    rd = os.path.join(OUT, 'gas'); os.makedirs(rd, exist_ok=True)
+    # the panel is the app's own picture: here a shadow catcher with the window cut, so only the bezel, the glass and the
+    # display are rendered, and their shadow on the panel; the window's cut edge hidden by a black phenolic bezel (the VU
+    # meter's and the magic eye's finish) screwed over it
+    pnl = rbox('gpanel', pw + 6, ph + 6, T, -T, 0.05)
+    hole = rbox('ghole', ww, wh, T + 2, -T - 1, 0.08)
+    bpy.context.view_layer.update(); cut(pnl, hole); pnl.is_shadow_catcher = True
+    bw = 0.32
+    bez = rbox('gbezel', ww + 2 * bw, wh + 2 * bw, 0.14, 0.0, 0.12, roll=0.05)
+    bh = rbox('gbezh', ww - 0.04, wh - 0.04, 1.0, -0.5, 0.06)
+    bpy.context.view_layer.update(); cut(bez, bh); chamfer(bez, 0.02, 2); TK.flat_faces(bez)
+    bez.data.materials.append(gas_bezel_mat())
+    RA = _RackAdapter(T, rd)
+    old = GD.DEMO, GD.demo_text
+    GD.DEMO = demo; GD.demo_text = lambda eid: GAS_DEMO['line'] if disp == 'matrix' else [GAS_DEMO['dig']]
+    L = []
+    try:
+        GD.gas_window(RA, L, 'gas-' + kind, disp, -ww / 2, -wh / 2, ww / 2, wh / 2, SG.nickel('gscrew', seed=3),
+                      seed_of(kind) % 7, n=n, **({'lines': 1} if disp == 'matrix' else {}))
+    finally:
+        GD.DEMO, GD.demo_text = old
+    # the studio's cards off the glass (pane and envelope), as the VU's and the eye's
+    for o in bpy.data.objects:
+        if o.name.endswith('pane') or o.name.endswith('env'):
+            o.visible_shadow = False
+    e = L[0]; x0, y0, x1, y1, zd = e['cells']
+    TK.shoot(s, cam, 'gas-' + kind, pw, ph,
+             lambda s, cam: {'cells_tl': proj(s, cam, (x0, y1, zd)), 'cells_br': proj(s, cam, (x1, y0, zd)),
+                             'disp': disp, 'n': n, 'mtx': e.get('mtx'), 'pitch': e.get('pitch'), 'slant': e.get('slant'),
+                             'cellpx': e['cellpx'], 'demo': demo})
 
 
 def piece_panel_fine(): panel_piece('panel-fine', 'fine')
@@ -1098,7 +1377,17 @@ def main():
         elif pc == 'plank' and WOOD == 'shop': piece_plank_shop()
         elif pc.startswith('trim-') and WOOD == 'shop': piece_trim_shop(pc[5:])
         elif pc.startswith('trim-'): piece_trim(pc[5:])
+        elif pc.startswith('scribble-'): piece_scribble(pc[9:])
+        elif pc.startswith('gas-'): piece_gas(pc[4:])
         elif pc.startswith('panel-'): panel_piece(pc, 'nam' if pc.startswith('panel-nam') else 'fine')
+        elif pc.startswith('legend-') or pc == 'legends':
+            ids = list(LG.LEGENDS) if pc == 'legends' else [pc[7:]]
+            for lid in ids:
+                t1 = time.time(); piece_legend(lid); print('legend', lid, '%.1fs' % (time.time() - t1), flush=True)
+            json.dump({'pxcm': PXCM, 'samples': SAMPLES, 'pt_per_cm': LG.PT_PER_CM,
+                       'out': {k: x for k, x in TK.LAY['out'].items() if k.startswith('legend-')}},
+                      open(os.path.join(OUT, 'irc-render-%s.json' % pc), 'w'), indent=1)
+            print('piece', pc, '%.1fs' % (time.time() - t), flush=True); continue
         elif pc.startswith('key-'):
             v = pc[4:]; piece_key(v)
             json.dump({'pxcm': PXCM, 'samples': SAMPLES, 'out': {k: x for k, x in TK.LAY['out'].items() if k.endswith('-' + v)}},
@@ -1107,7 +1396,7 @@ def main():
         else: globals()['piece_' + pc.replace('-', '_')]()
         print('piece', pc, '%.1fs' % (time.time() - t), flush=True)
         path = os.path.join(OUT, 'irc-render-%s.json' % pc)
-        json.dump({'pxcm': PXCM, 'elev': ELEV, 'samples': SAMPLES, 'out': {pc: LAY['out'][pc]}}, open(path, 'w'), indent=1)
+        json.dump({'pxcm': PXCM, 'elev': ELEV, 'samples': SAMPLES, 'out': {pc: LAY['out'].get(pc) or TK.LAY['out'][pc]}}, open(path, 'w'), indent=1)
 
 
 if __name__ == '__main__':
