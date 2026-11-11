@@ -406,7 +406,7 @@ def finish_glass():
 # ---------------------------------------------------------------------------------------------------------------------
 # the typed sheet (a printed form, filled in on a typewriter, stamped, ticked in pencil)
 
-TYPED = os.environ.get('IRC_TYPED_FONT', '/tmp/fonts/CourierPrime-400.ttf')
+TYPED = os.environ.get('IRC_TYPED_FONT', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'fonts', 'CourierPrime-400.ttf'))
 
 
 def take_sheet(path, w, h, px=110):
