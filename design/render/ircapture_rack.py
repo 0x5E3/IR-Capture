@@ -637,8 +637,201 @@ def unit_results():
     shoot(s, cam, 'unit-results', PW, h)
 
 
+# ---------------------------------------------------------------------------------------------------------------------
+# the reel deck as a rack unit (11-11, second proof)
+#
+# The audit (section 3): the old deck's three chrome levers looked like transport keys and did nothing, while its real
+# keys were ivory caps stuck on the plate; flat grey flanges, a flat brown pack, legends too small. Here the deck is a
+# rack-mount recorder of its own: 8U, a warm brushed plate (another maker's unit in a hodgepodge rack), two 7 inch reels
+# side by side, the head block under them, its own transport keys in one row along the bottom (CHECK LEVELS, CAPTURE with
+# its REC jewel, STOP: the printed keys, nothing else that looks pressable), the drum counter between the reels. The
+# flanges are spun aluminium (an anisotropic sheen round the hub, so they shade with the light), the packs wound tape.
+
+DECK = dict(u=8, rx=11.6, ry=6.4, ty=-6.2, heads=(-4.5, -1.0, 2.5), cap=4.6, gl=-8.0, gr=6.8, tr=(9.4, -3.8),
+            ky=-13.0, cy=12.0)
+
+
+def _tape():
+    if 'ircapture_tape' not in sys.modules:
+        a = sys.argv; sys.argv = [a[0], OUT, 'none', str(PXCM), str(SAMPLES)]
+        import ircapture_tape
+        sys.argv = a
+    return sys.modules['ircapture_tape']
+
+
+def spun_alu(name='spun'):
+    """A reel's flange: spun aluminium. Turned rings and an anisotropic sheen whose grain runs round the hub, so the
+    light lies on it as a broad radial streak (the old reels' plain metal mirrored the dark room straight on: flat grey)."""
+    m = mat(name, srgb('#a8a296'), rough=0.3, metal=1.0, spec=0.5, aniso=0.75)
+    nt = m.node_tree; b = nt.nodes['Principled BSDF']; co = obj_coords(nt)
+    tg = node(nt, 'ShaderNodeTangent'); tg.direction_type = 'RADIAL'; tg.axis = 'Z'
+    nt.links.new(tg.outputs['Tangent'], b.inputs['Tangent'])
+    wv = node(nt, 'ShaderNodeTexWave', Scale=9.0); wv.wave_type = 'RINGS'; wv.rings_direction = 'Z'
+    try: wv.inputs['Distortion'].default_value = 0.6; wv.inputs['Detail'].default_value = 4.0
+    except Exception: pass
+    nt.links.new(co, wv.inputs['Vector'])
+    add_bump(m, wv.outputs['Fac'], 0.06, 0.001)
+    mix_into(m, 'Roughness', mul(nt, wv.outputs['Fac'], 0.4), 0.16, 'FLOAT')
+    mix_into(m, 'Base Color', mul(nt, noise(nt, co, 0.35, 3.0, 0.55, lo=0.35, hi=0.75), 0.4), (*srgb('#9d978a'), 1))
+    surface_wear(m, dust=0.25, smudge=0.45, scuff=0.5)
+    return grimy(m, dirt='#3b3428', amount=0.35, dist=0.08)
+
+
+def deck_alu(name='deckplate'):
+    """The deck's plate: ircapture_tape.brushed_alu's grain (three scales of streaks along x, an anisotropic sheen across
+    the plate), but aged and duller: straight on, a bright brushed plate mirrors the room behind the camera and the
+    11-04 colours read a flat pale grey whatever the base (first test, 11-11). Less metal, more roughness, darker
+    streaks: old aluminium that has been handled for thirty years."""
+    k = float(os.environ.get('IRC_DECK_DIM', '0.62'))
+    def c(h): return tuple(v * k for v in srgb(h))
+    m = mat(name, c('#a99772'), rough=0.42, metal=0.72, spec=0.45, aniso=0.5)
+    nt = m.node_tree; b = nt.nodes['Principled BSDF']; co = obj_coords(nt)
+    tg = node(nt, 'ShaderNodeTangent'); tg.direction_type = 'RADIAL'; tg.axis = 'Y'
+    nt.links.new(tg.outputs['Tangent'], b.inputs['Tangent'])
+    def streak(sx, sc, lo, hi):
+        mp = node(nt, 'ShaderNodeMapping'); mp.inputs['Scale'].default_value = (sx, 1.0, 1.0); nt.links.new(co, mp.inputs[0])
+        return noise(nt, mp.outputs[0], sc, 5.0, 0.7, lo=lo, hi=hi)
+    stroke = streak(0.02, 2.5, 0.3, 0.7); hair = streak(0.006, 12.0, 0.35, 0.65); fine = streak(0.004, 60.0, 0.3, 0.7)
+    add_bump(m, hair, 0.35, 0.003); add_bump(m, fine, 0.2, 0.0015)
+    mix_into(m, 'Roughness', mul(nt, hair, 0.8), 0.56, 'FLOAT')
+    mix_into(m, 'Base Color', mul(nt, stroke, 0.4), (*c('#a4967a'), 1))
+    mix_into(m, 'Base Color', mul(nt, hair, 0.5), (*c('#d2c6ac'), 1))
+    mix_into(m, 'Base Color', mul(nt, fine, 0.25), (*c('#a99c82'), 1))
+    mix_into(m, 'Base Color', mul(nt, noise(nt, co, 0.3, 3.0, 0.55, lo=0.35, hi=0.75), 0.5), (*c('#7d7058'), 1))
+    surface_wear(m, dust=0.4, smudge=0.55, scuff=0.35)
+    return grimy(m, dirt='#3b3428', amount=0.55, dist=0.1)
+
+
+def wound_oxide(name='wound'):
+    """The pack's face: brown oxide wound layer on layer; each wind a hair lighter or darker, so the pack reads as tape
+    (no bump and no smooth normals: either shaded the old pack black)."""
+    m = mat(name, srgb('#8a6342'), rough=0.42, spec=0.45)
+    nt = m.node_tree; co = obj_coords(nt)
+    wv = node(nt, 'ShaderNodeTexWave', Scale=40.0); wv.wave_type = 'RINGS'; wv.rings_direction = 'Z'
+    try: wv.inputs['Distortion'].default_value = 1.5; wv.inputs['Detail'].default_value = 2.0
+    except Exception: pass
+    nt.links.new(co, wv.inputs['Vector'])
+    band = node(nt, 'ShaderNodeTexWave', Scale=2.2); band.wave_type = 'RINGS'; band.rings_direction = 'Z'
+    try: band.inputs['Distortion'].default_value = 3.0
+    except Exception: pass
+    nt.links.new(co, band.inputs['Vector'])
+    mix_into(m, 'Base Color', mul(nt, wv.outputs['Fac'], 0.22), (*srgb('#5f412a'), 1))
+    mix_into(m, 'Base Color', mul(nt, band.outputs['Fac'], 0.18), (*srgb('#a37a52'), 1))
+    mix_into(m, 'Roughness', mul(nt, wv.outputs['Fac'], 0.3), 0.6, 'FLOAT')
+    return m
+
+
+def counter(x, y, text, T_, plate):
+    """The tape counter: a black bezel and four drum wheels, white figures (the deck's own SECONDS LEFT)."""
+    cw, chh = 6.2, 2.0
+    blk = SG.black_cast('cbez')
+    ho = rbox('cwin', cw + 0.1, chh + 0.1, T + 2, -T - 1, 0.1); ho.location = (x, y, 0)
+    bpy.context.view_layer.update(); cut(plate, ho)
+    bz = rbox('cbez', cw + 0.6, chh + 0.6, 0.3, 0.0, 0.3, roll=0.1); bz.location = (x, y, 0)
+    cut(bz, prism('chole', [(px + x, py + y, pz) for px, py, pz in _rring(cw / 2, chh / 2, 0.15, 0.0, 0, n_arc=8)], -2, 2))
+    chamfer(bz, 0.02, 2); bz.data.materials.append(blk)
+    wm = mat('wheel', srgb('#141211'), rough=0.5, coat=0.2)
+    for i, d in enumerate(text):
+        dx = x - 2.25 + i * 1.5
+        # a drum: curved, so its figure rolls off a little top and bottom
+        bpy.ops.mesh.primitive_cylinder_add(radius=1.05, depth=1.25, vertices=64, location=(dx, y, -0.95))
+        dr = bpy.context.active_object; dr.name = 'drum'; dr.rotation_euler = (0, math.radians(90), 0)
+        dr.data.materials.append(wm); bpy.ops.object.shade_smooth()
+        T_.ink(d, dx, y, 0.12, 0.95, color='#ece6d6', kind='BarlowSemiCondensed-600-normal.ttf', track=0.0, w=1.2)
+    return cw + 0.6, chh + 0.6
+
+
+def unit_deck(prog=None, rec=True):
+    """8U: the reel deck. The proof's state: a capture running (CAPTURE lit, REC lit), 40 % of the take done."""
+    T_ = _tape()
+    prog = float(os.environ.get('IRC_DECK_PROG', '0.4')) if prog is None else prog
+    K.set_seed('rack-deck')
+    s, cam, h = unit_scene(DECK['u'])
+    backing(h)
+    pl, ph = rack_panel(DECK['u'], 'alu', 'deck')
+    # (straight on the plate mirrors the room behind the camera; at the 11-04 colour it washed to a pale grey) older,
+    # warmer, duller aluminium
+    D = '#1e1a15'                       # the legends on the plate: filled dark, as on the old deck
+    ni = TK.nickel(); ch = SG.chrome('chr', seed=3); blk = SG.black_cast('bc'); alu = spun_alu(); tp = wound_oxide()
+    rx, ry, ty = DECK['rx'], DECK['ry'], DECK['ty']
+    hub, full = T_.REEL['hub'], T_.REEL['pack_full']
+    A = full * full - hub * hub
+    rs = math.sqrt(hub * hub + A * (1 - prog)); rt = math.sqrt(hub * hub + A * prog)
+    hx = DECK['heads']; cx_ = DECK['cap']; gl, gr = DECK['gl'], DECK['gr']; trx, try_ = DECK['tr']
+    # everything below was laid out on the old deck's plate face at z = 0.25; here the panel's face is z = 0
+    with moved(0, 0, -0.25):
+        zt0, zt1 = T_.reel(-rx, ry, rs, 0.3, alu, tp, ch, blk)
+        T_.reel(rx, ry, rt, 1.4, alu, tp, ch, blk)
+        # the head block
+        base = rbox('hbase', 22.0, 5.6, 0.6, 0.25, 0.4, roll=0.12); base.location = (-0.7, ty + 3.2, 0)
+        chamfer(base, 0.02, 2); base.data.materials.append(K.hammertone_fine(base='#191612', hi='#2e271e', name='hbase'))
+        hood = rbox('hood', 12.4, 2.4, 1.6, 0.85, 0.6, roll=0.35); hood.location = (hx[1], ty + 4.9, 0)
+        chamfer(hood, 0.02, 2); hood.data.materials.append(blk)
+        mu = T_.mu_metal()
+        for x in hx:
+            hd = rbox('head', 2.3, 2.4, 2.2, 0.85, 0.9, roll=0.2); hd.location = (x, ty + 1.2, 0); hd.data.materials.append(mu)
+            gap = rbox('gap', 0.05, 0.7, 0.02, 3.04, 0.0); gap.location = (x, ty + 0.4, 0)
+            gap.data.materials.append(mat('gapblk', srgb('#151210'), rough=0.5))
+            sh = rbox('shield', 2.8, 0.35, 2.4, 0.85, 0.12, roll=0.05); sh.location = (x, ty + 2.55, 0); sh.data.materials.append(ch)
+        # (first test) chrome seen end on mirrors the dark room: the posts' and rollers' tops read as black blobs.
+        # Turned satin metal (the flanges' own) instead.
+        for gx in (gl, gr):
+            T_.cyl('post', 0.55, 0.85, zt1 + 0.25, gx, ty + 0.55, 64, alu)
+            for z in (zt0 - 0.06, zt1 + 0.06): T_.cyl('pfl', 0.8, z - 0.05, z + 0.05, gx, ty + 0.55, 64, alu)
+        T_.cyl('capstan', 0.22, 0.85, zt1 + 0.4, cx_, ty + 0.22, 48, mu)
+        T_.cyl('pinch', 1.05, 0.9, zt1 + 0.25, cx_, ty - 1.07, 128, T_.black_rubber())
+        T_.cyl('pinchcap', 0.4, zt1 + 0.25, zt1 + 0.4, cx_, ty - 1.07, 64, alu)
+        # the tension arms: each pivots on a boss below and outboard of its roller
+        for sx in (-1, 1):
+            ax, ay = sx * trx, try_
+            px_, py_ = sx * (trx + 2.0), try_ - 2.6
+            L = math.hypot(ax - px_, ay - py_); ang = math.atan2(ay - py_, ax - px_)
+            a = rbox('tarm', L + 0.7, 0.7, 0.3, 0.9, 0.3, roll=0.1)          # on top of the head base
+            a.location = ((ax + px_) / 2, (ay + py_) / 2, 0); a.rotation_euler = (0, 0, ang); a.data.materials.append(blk)
+            T_.cyl('tpiv', 0.6, 0.85, 1.4, px_, py_, 48, ni)
+            T_.cyl('troll', 0.7, 1.2, zt1 + 0.15, ax, ay, 64, alu)
+        circles = [((-rx, ry), rs, -1), ((-trx, try_), 0.7, +1), ((gl, ty + 0.55), 0.55, +1)]
+        circles += [((x, ty + 0.9), 0.9, +1) for x in hx]
+        circles += [((cx_, ty + 0.22), 0.22, +1), ((gr, ty + 0.55), 0.55, +1), ((trx, try_), 0.7, +1), ((rx, ry), rt, -1)]
+        tape = T_.ribbon('tape', T_.tape_path(circles), zt0, zt1, tp)
+        # straight on the tape is seen edge on (its width runs into the plate): a hair widened so the path reads
+        tape.modifiers['th'].thickness = 0.07; tape.modifiers['th'].offset = 0.0
+    # the head names on the hood's face, engraved and filled (each at least MIN_CAP_PT on screen)
+    for word, x in zip(('ERASE', 'RECORD', 'PLAY'), hx): engrave(word, x, ty + 4.9, 0.44, z=2.2, track=0.12)
+    # the counter between the reels
+    cw, chh = counter(0.0, DECK['cy'], '%04d' % int(os.environ.get('IRC_DECK_SECS', '32')), T_, pl)
+    engrave('SECONDS LEFT', 0.0, DECK['cy'] - chh / 2 - 0.7, 0.44, track=0.14, color=D)
+    pl.data.materials.append(deck_alu())         # after the counter's window: gear_kit.cut() clears the materials
+    # the transport: the deck's own keys in one row, the REC jewel beside CAPTURE
+    import ircapture_legends as LG
+    ky = DECK['ky']
+    row = [('check', False), ('capture', rec), ('rec', rec), ('stop', False)]
+    widths = []
+    for lid, _ in row:
+        widths.append(1.6 if lid == 'rec' else K.legend_width(LG.LEGENDS[lid][0], 'std') + 2 * TK.KEY['bezel'])
+    gap_ = 0.7
+    x = -0.7 - (sum(widths) + gap_ * (len(row) - 1)) / 2
+    for (lid, lit), wk in zip(row, widths):
+        if lid == 'rec':
+            jewel(x + wk / 2, ky, 'red', lit, r=0.5)
+            engrave('REC', x + wk / 2, ky + 1.55, 0.44, track=0.12, color=D)
+        else:
+            with moved(x + wk / 2, ky, 0): key(lid, lit=lit)
+        x += wk + gap_
+    engrave('RECORDER', 19.0, ky, 0.62, color=D)
+    finish_glass()
+    a = TK.proj(s, cam, (-rx, ry, 0)); b = TK.proj(s, cam, (rx, ry, 0))
+    shoot(s, cam, 'unit-deck', PW, h, {'reel_c_px': [a, b], 'prog': prog})
+
+
 def unit_cheeks():
     """The rack's sides and top: rough shop-wood boards on edge (ircapture_kit.piece_trim_shop), 1.9 cm, straight on."""
+    # (11-11, second proof) the zinc screw heads read as bright white dots straight on: the boards' screws black
+    import shop_wood as SWD
+    if not getattr(SWD, '_irc_black', False):
+        _ds = SWD.drywall_screw
+        SWD.drywall_screw = lambda *a, **k: _ds(*a, **dict(k, finish='black'))
+        SWD._irc_black = True
     K.TRIM['w'] = 1.9; K.TRIM['proud'] = 1.2
     K.LONG['trim_v'] = float(os.environ.get('IRC_CHEEK_CM', '76')); K.LONG['trim_h'] = 56.0
     K.piece_trim_shop('v'); K.piece_trim_shop('h')
@@ -646,11 +839,12 @@ def unit_cheeks():
     json.dump(LAY, open(os.path.join(OUT, 'rack-cheeks.json'), 'w'), indent=1)
 
 
-UNITS = {'step': unit_step, 'patch': unit_patch, 'meters': unit_meters, 'gap': unit_gap, 'results': unit_results, 'cheeks': unit_cheeks}
+UNITS = {'step': unit_step, 'patch': unit_patch, 'meters': unit_meters, 'gap': unit_gap, 'deck': unit_deck,
+         'results': unit_results, 'cheeks': unit_cheeks}
 
 
 def main():
-    todo = [u for u in UNITS if u != 'cheeks'] if WHAT == 'all' else WHAT.split(',')
+    todo = [u for u in UNITS if u not in ('cheeks', 'deck')] if WHAT == 'all' else WHAT.split(',')
     for u in todo:
         t = time.time(); UNITS[u](); print('unit', u, '%.0fs' % (time.time() - t), flush=True)
 

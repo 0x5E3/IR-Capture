@@ -1,7 +1,8 @@
 # ircapture_rack_mock.py: the rack units (ircapture_rack.py) stacked into a mock of the window, for Lowell to judge
 # (2026-11-11). Not app code: a picture. 14 pt a cm, 2 px a pt (28 px/cm renders, placed 1:1).
 #
-#   python3 design/render/ircapture_rack_mock.py <renders dir> <SwellKit pictures dir> <old screenshot or -> <out.png> [unit,unit,...]
+#   python3 design/render/ircapture_rack_mock.py <renders dir> <SwellKit pictures dir> <old screenshot | shelf | -> <out.png> [unit,unit,...]
+# "shelf": the shelf from below at 14 pt a cm (ircapture_shelf.py's shelf.png in the renders dir), its shadow on the wall.
 import sys, os, json
 from PIL import Image, ImageFilter, ImageDraw
 import numpy as np
@@ -13,14 +14,21 @@ WPT = 920; W = WPT * 2
 lay = {}
 for f in os.listdir(RD):
     if f.startswith('rack-') and f.endswith('.json'): lay.update(json.load(open(os.path.join(RD, f)))['out'])
-UN = {'step': 1, 'patch': 2, 'meters': 5, 'gap': 1, 'results': 6}
+UN = {'step': 1, 'patch': 2, 'meters': 5, 'gap': 1, 'deck': 8, 'results': 6}
 
 # the shelf strip from the old screenshot (the 11-04 shelf from above, 8 pt a cm: context only)
-top = None
-if SHOT != '-':
+top = None; shelf = None
+if SHOT == 'shelf':
+    shelf = Image.open(os.path.join(RD, 'shelf.png')).convert('RGBA')
+    SL = json.load(open(os.path.join(RD, 'shelf.json')))['shelf']
+    sx0 = (shelf.size[0] - W) // 2
+    shelf = shelf.crop((sx0, 0, sx0 + W, shelf.size[1]))
+    # the rack's top board starts 1.2 cm under the line where the shelf's underside meets the wall
+    TOP_H = int(round(SL.get('row_under_back', SL['row_front_bot']) + 1.2 * PXCM)) - 26
+elif SHOT != '-':
     s = Image.open(SHOT).convert('RGB')
     top = s.crop((52, 25, 972, 153)).resize((W, 128 * 2), Image.LANCZOS)
-TOP_H = top.size[1] if top else 60
+if shelf is None: TOP_H = top.size[1] if top else 60
 rack_h = int(round(sum(UN[u] for u in ORDER) * U * PXCM))
 CHEEK = int(round(1.9 * PXCM)); CAP = CHEEK
 H = TOP_H + 26 + CAP + rack_h + CAP + 70
@@ -31,6 +39,7 @@ t = int(round(10 * 2.54 * PXCM)); peg = peg.resize((t, t), Image.LANCZOS)
 for y in range(0, H, t):
     for x in range(0, W, t): im.paste(peg, (x, y))
 if top: im.paste(top, (0, 0))
+if shelf is not None: im.paste(shelf, (0, 0), shelf)
 x0 = (W - int(round(PW * PXCM))) // 2          # the panels' left edge
 y0 = TOP_H + 26 + CAP                            # the first unit's top
 pw = int(round(PW * PXCM))
