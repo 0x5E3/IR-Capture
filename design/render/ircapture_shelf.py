@@ -147,7 +147,12 @@ def main():
     K.render_long = _rl
     os.replace(os.path.join(OUT, 'plank.png'), os.path.join(OUT, 'shelf.png'))
     LAY['shelf'] = K.LAY['out']['plank']
-    LAY['shelf']['v_top'] = K.v_of(BOX['foot'] + BOX['h'], BOX['z_front']) + 1.6
+    # piece_plank_shop measured its rows from its own top (the plank's front edge + 1.4); the frame was raised for the
+    # boxes, so every row moves down by the difference
+    v0 = K.v_of(0, K.PL['depth']) + 1.4
+    v1 = max(v0, K.v_of(BOX['foot'] + BOX['h'], BOX['z_front']) + 1.6)
+    for k in [k for k in LAY['shelf'] if k.startswith('row_')]: LAY['shelf'][k] += (v1 - v0) * PXCM
+    LAY['shelf']['v_top'] = v1
     LAY['s'] = round(time.time() - t, 1)
     json.dump(LAY, open(os.path.join(OUT, 'shelf.json'), 'w'), indent=1)
     print('shelf %.0fs' % (time.time() - t), flush=True)
