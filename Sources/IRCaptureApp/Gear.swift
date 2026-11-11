@@ -575,6 +575,10 @@ struct MeterModule<Extra: View>: View {
     @ViewBuilder var extra: Extra
     /// (11-03, round 3b: Lowell wanted the meters bigger) Four full-size modules fill the 828 pt stage: 174 pt faces.
     var width: CGFloat { compact ? 100 : 174 }
+    /// The figure as a number ("−6.0 dBFS" → -6.0); nil when there is none.
+    var peakValue: Double? {
+        Double(dbfs.replacingOccurrences(of: "dBFS", with: "").replacingOccurrences(of: "−", with: "-").trimmingCharacters(in: .whitespaces))
+    }
     var body: some View {
         VStack(alignment: .leading, spacing: compact ? 6 : 8) {
             HStack(spacing: 4) {
@@ -589,7 +593,16 @@ struct MeterModule<Extra: View>: View {
             }
             VUMeter(vu: vu, width: width)
             HStack(alignment: .center, spacing: 6) {
-                GlassWindow(size: compact ? 10 : 12) { Text(dbfs).monospacedDigit() }
+                if GasDigits.available && !compact {
+                    // (11-11) the peak on orange gas digits, the units printed on the panel beside them
+                    HStack(alignment: .center, spacing: 5) {
+                        GasDigits(value: peakValue)
+                        Engraved("dBFS", size: 9, dim: true)
+                    }
+                    .help(dbfs)
+                } else {
+                    GlassWindow(size: compact ? 10 : 12) { Text(dbfs).monospacedDigit() }
+                }
                 Spacer(minLength: 0)
                 if let e = eye {
                     VStack(spacing: 1) {

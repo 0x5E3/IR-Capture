@@ -283,6 +283,21 @@ enum GearPreview {
                 Pill(text: "−11.6 dBFS", color: goodColor)
                 Lamp(state: .amber, size: 46)
             }
+            // (11-11) the lettering: the status line on the VFD, mic names on scribble strips, printed keys
+            Engraved("The status line, mic names on tape, printed keys", size: 12)
+            VFDStatusLine(text: vfdLine(left: "Ready", middle: "Scarlett 18i20 USB", right: "96 KHZ", n: VFDStatusLine.n))
+            HStack(spacing: 16) {
+                ScribbleNameField(name: .constant("SM57 cap edge"), strip: 0)
+                ScribbleNameField(name: .constant("R121 6 in center, 15 deg off axis"), strip: 1)
+                ScribbleNameField(name: .constant(""), strip: 2)
+            }
+            HStack(spacing: 12) {
+                Button("Show in Finder") {}.buttonStyle(KeyButtonStyle(key: "Show in Finder", size: 12))
+                Button("Re-export…") {}.buttonStyle(KeyButtonStyle(key: "Re-export…"))
+                Button("Record again") {}.buttonStyle(KeyButtonStyle(key: "Record again", size: 13))
+                Button("Import DAW recordings…") {}.buttonStyle(KeyButtonStyle(key: "Import DAW recordings…"))
+                Button("Remove") {}.buttonStyle(KeyButtonStyle(key: "Remove", size: 10)).disabled(true)
+            }
             JobStepper(steps: [("Connect", true), ("Set levels", true), ("Capture", false), ("Results", false)])
             HStack(alignment: .top, spacing: 16) {
                 Checklist(items: ["A manila card.", "Its second line, for the look of it."], style: PaperStyle(stock: .manila, ring: true))
@@ -354,6 +369,8 @@ struct Shelf: View {
         let rate = m.job == .nam ? 48000 : m.captureRate
         return "\(d.name) · \(rateTag(rate).dropLast()) kHz"
     }
+    /// The rate for the VFD's right end, "96 KHZ".
+    var rateText: String { "\(rateTag(m.job == .nam ? 48000 : m.captureRate).dropLast()) KHZ" }
     var body: some View {
         let st = status
         let g = ShelfGeometry.own
@@ -381,12 +398,19 @@ struct Shelf: View {
                         }
                     }
                     .accessibilityHidden(true)
-                    GlassWindow(size: 13) {
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(st.1).textCase(.uppercase).tracking(1.4)
-                            Text(rig).font(.swellLegend(10)).tracking(0.6).opacity(0.78)
+                    if GasKit.display("line") != nil {
+                        // (11-11) the status on the bench's VFD: the status, the interface (shortened to fit), the rate
+                        VFDStatusLine(text: vfdLine(left: st.1, middle: m.device?.name ?? "No interface",
+                                                    right: m.device == nil ? "" : rateText, n: VFDStatusLine.n))
+                            .help(rig)
+                    } else {
+                        GlassWindow(size: 13) {
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(st.1).textCase(.uppercase).tracking(1.4)
+                                Text(rig).font(.swellLegend(10)).tracking(0.6).opacity(0.78)
+                            }
+                            .frame(minWidth: 172, alignment: .leading)
                         }
-                        .frame(minWidth: 172, alignment: .leading)
                     }
                 }
                 .accessibilityElement(children: .combine)

@@ -1,0 +1,79 @@
+{
+ "about": "Masking-tape scribble strips (ircapture_kit.py scribble-<v>): tape is the strip itself in the picture (x, y, w, h, points; the rest is its shadow and margin); write is where the name goes (x from, x to) and mid the strip's middle line.",
+ "pt_per_cm": 15.8,
+ "px_per_pt": 1.5,
+ "strips": {
+  "a": {
+   "file": "irc-scribble-a",
+   "pt": [
+    213.3,
+    41.08
+   ],
+   "tape": [
+    5.53,
+    5.53,
+    202.24,
+    30.02
+   ],
+   "write": [
+    16.59,
+    177.75
+   ],
+   "mid": 20.54
+  },
+  "b": {
+   "file": "irc-scribble-b",
+   "pt": [
+    218.04,
+    41.08
+   ],
+   "tape": [
+    5.53,
+    5.53,
+    206.98,
+    30.02
+   ],
+   "write": [
+    16.59,
+    201.45
+   ],
+   "mid": 20.54
+  },
+  "c": {
+   "file": "irc-scribble-c",
+   "pt": [
+    210.14,
+    41.08
+   ],
+   "tape": [
+    5.53,
+    5.53,
+    199.08,
+    30.02
+   ],
+   "write": [
+    16.59,
+    193.55
+   ],
+   "mid": 20.54
+  },
+  "d": {
+   "file": "irc-scribble-d",
+   "pt": [
+    216.46,
+    41.08
+   ],
+   "tape": [
+    5.53,
+    5.53,
+    205.4,
+    30.02
+   ],
+   "write": [
+    16.59,
+    177.75
+   ],
+   "mid": 20.54
+  }
+ }
+}

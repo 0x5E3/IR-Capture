@@ -31,7 +31,7 @@ OUTS = (24.0, 48.0)                   # px a cm: 1x, @2x
 PT_CM = 10.0                          # IR Capture's points a cm
 lay = {}
 for f in glob.glob(os.path.join(R, 'irc-render-*.json')):
-    j = json.load(open(f)); lay.update({k: dict(v, pxcm=j['pxcm'], elev=j['elev'], samples=j['samples']) for k, v in j['out'].items()})
+    j = json.load(open(f)); lay.update({k: dict(v, pxcm=j['pxcm'], elev=j.get('elev', 10.0), samples=j['samples']) for k, v in j['out'].items()})
 META = {}
 
 

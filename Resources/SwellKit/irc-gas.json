@@ -1,0 +1,61 @@
+{
+ "about": "The displays (ircapture_kit.py gas-line, gas-dig), rendered dark: the app lights the dots and segments over cells (x, y, w, h, points) with the render's geometry (gas_disp.py; views/gasdisp.js). bezel: the bezel in the picture, the layout box.",
+ "displays": {
+  "line": {
+   "file": "irc-gas-line",
+   "pt": [
+    215.32,
+    43.4
+   ],
+   "pt_per_cm": 14.0,
+   "px_per_pt": 2.0,
+   "bezel": [
+    11.06,
+    4.06,
+    193.2,
+    35.28
+   ],
+   "cells": [
+    22.96,
+    13.86,
+    169.4,
+    10.15
+   ],
+   "disp": "matrix",
+   "n": 26,
+   "look": "vfd",
+   "mtx": [
+    3.5,
+    1.3,
+    160.0,
+    9.6
+   ]
+  },
+  "dig": {
+   "file": "irc-gas-dig",
+   "pt": [
+    77.9,
+    44.59
+   ],
+   "pt_per_cm": 14.0,
+   "px_per_pt": 2.0,
+   "bezel": [
+    11.06,
+    4.06,
+    55.78,
+    36.47
+   ],
+   "cells": [
+    22.96,
+    13.64,
+    31.98,
+    11.78
+   ],
+   "disp": "seg7",
+   "n": 4,
+   "look": "gas",
+   "pitch": 1.3,
+   "slant": 8.0
+  }
+ }
+}

@@ -152,6 +152,7 @@ struct NAMDirectSteps: View {
                 HStack(spacing: 12) {
                     Button(m.namLevelRunning ? "Stop" : "Check levels") { m.toggleNAMLevelCheck() }
                         .buttonStyle(KeyButtonStyle(key: "Check levels", lit: m.namLevelRunning, size: 14, big: true)).disabled(m.busy != nil)
+                        .help(m.namLevelRunning ? "Click again to stop the level check" : "Loop the loudest 6 seconds to set the levels")
                     if m.namLevelRunning { StatusLine(text: "Looping…", color: warnColor) }
                 }
                 if let e = m.namLevelError { ErrorNote(e) }
@@ -189,7 +190,7 @@ struct NAMInputsGrid: View {
                 GridRow {
                     Engraved("Input \(r.id + 1)", size: 12, dim: !r.use)
                     KeyChoice(selection: $r.use, options: [(true, "Use"), (false, "Off")]).frame(width: 130, alignment: .leading)
-                    MicNameField(name: $r.name, disabled: !r.use)
+                    ScribbleNameField(name: $r.name, disabled: !r.use, strip: r.id)
                 }
             }
         }

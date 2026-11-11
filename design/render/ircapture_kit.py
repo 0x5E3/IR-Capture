@@ -1066,7 +1066,7 @@ def piece_gas(kind):
     TK.shoot(s, cam, 'gas-' + kind, pw, ph,
              lambda s, cam: {'cells_tl': proj(s, cam, (x0, y1, zd)), 'cells_br': proj(s, cam, (x1, y0, zd)),
                              'disp': disp, 'n': n, 'mtx': e.get('mtx'), 'pitch': e.get('pitch'), 'slant': e.get('slant'),
-                             'cellpx': e['cellpx'], 'demo': demo,
+                             'cellpx': e['cellpx'], 'demo': demo, 'bezel_cm': [ww + 2 * bw, wh + 2 * bw], 'piece_cm': [pw, ph],
                              'look': (GAS_LINE_LOOK if disp == 'matrix' else 'gas')})
 
 

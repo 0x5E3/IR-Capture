@@ -176,7 +176,7 @@ struct InputsGrid: View {
                             KeyChoice(selection: Binding(get: { row.role }, set: { m.setRole($0, for: row.id) }),
                                       options: [(Role.mic, "Mic"), (Role.off, "Off")])
                                 .frame(width: 150, alignment: .leading)
-                            MicNameField(name: $row.name, disabled: row.role != .mic)
+                            ScribbleNameField(name: $row.name, disabled: row.role != .mic, strip: row.id)
                         }
                     }
                 }
@@ -198,6 +198,8 @@ struct IdleSignalChips: View {
                 Button("As a mic") { m.setRole(.mic, for: r.channel) }.buttonStyle(KeyButtonStyle(key: "As a mic"))
                 if m.refCandidate == r.channel || m.refInput == nil {
                     Button(m.refCandidate == r.channel ? "As the reference (detected)" : "As the reference") { m.setRefInput(r.channel) }.buttonStyle(KeyButtonStyle(key: "As the reference"))
+                        .help("Use this input as the reference")
+                    if m.refCandidate == r.channel, PrintedKeys.key(for: "As the reference", big: false) != nil { Note("Detected as the reference") }
                 }
             }
             .onPaper(padding: 9)
@@ -290,6 +292,7 @@ struct CabLevelStep: View {
             HStack(spacing: 12) {
                 Button(m.levelRunning ? "Stop" : "Check levels") { m.toggleLevelCheck() }
                     .buttonStyle(KeyButtonStyle(key: "Check levels", lit: m.levelRunning, size: 14, big: true))
+                    .help(m.levelRunning ? "Click again to stop the level check" : "Loop short sweeps to set the levels")
                     .disabled(m.busy != nil || m.device == nil)
                 if m.levelRunning { StatusLine(text: m.levelPhase ?? "Looping…", color: warnColor) }
                 Spacer()
@@ -466,7 +469,7 @@ struct LogicGrid: View {
                         GlassWindow(size: 12) { Text(c.label).font(.swellMono(11)).truncationMode(.middle) }
                         Note(c.meta)
                     }.frame(maxWidth: 260, alignment: .leading)
-                    MicNameField(name: $c.name, disabled: c.role != .mic)
+                    ScribbleNameField(name: $c.name, disabled: c.role != .mic, strip: (m.logicChannels.firstIndex { $0.id == c.id } ?? 0))
                     KeyChoice(selection: Binding(get: { c.role }, set: { m.setLogicRole($0, for: c.id) }),
                               options: [(Role.mic, "Mic"), (Role.ref, "Ref"), (Role.off, "Skip")], size: 10)
                     if c.channel == 0 {

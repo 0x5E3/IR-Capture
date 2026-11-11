@@ -255,8 +255,55 @@ struct KeyButtonStyle: ButtonStyle {
     var size: CGFloat = 12
     /// A large key (Capture, Record): more cap round the legend.
     var big = false
-    func makeBody(configuration: Configuration) -> some View {
-        KeyFace(configuration: configuration, variant: SwellNine.keyVariant(for: key), lit: lit, size: big ? max(size, 15) : size, big: big)
+    @ViewBuilder func makeBody(configuration: Configuration) -> some View {
+        if let pk = PrintedKeys.key(for: key, big: big) {
+            PrintedKeyFace(configuration: configuration, key: pk, lit: lit)
+        } else {
+            KeyFace(configuration: configuration, variant: SwellNine.keyVariant(for: key), lit: lit, size: big ? max(size, 15) : size, big: big)
+        }
+    }
+    /// (11-11) A key with its legend printed on the cap (irc-legends.json): the picture at its own size, the four
+    /// states as the blank key's (the lamp a filament), the label kept for VoiceOver only.
+    private struct PrintedKeyFace: View {
+        let configuration: ButtonStyleConfiguration
+        let key: PrintedKeys.Key
+        let lit: Bool
+        @Environment(\.isEnabled) private var isEnabled
+        @Environment(\.accessibilityReduceMotion) private var reduceMotion
+        @State private var hover = false
+        var body: some View {
+            let down = configuration.isPressed && isEnabled
+            let o = key.outset_pt, w = key.pt[0] - 2 * o, h = key.pt[1] - 2 * o
+            ZStack {
+                configuration.label
+                    .font(.swellLegend(9)).lineLimit(1)
+                    .frame(width: w, height: h).clipped()
+                    .opacity(0)
+                ZStack {
+                    picture(down ? "down" : "off")
+                        .opacity(lit ? 0 : 1)
+                        .animation(reduceMotion ? nil : SwellMotion.underLayer(lit), value: lit)
+                    picture(down ? "litdown" : "lit")
+                        .opacity(lit ? 1 : 0)
+                        .animation(reduceMotion ? nil : SwellMotion.filament(lit), value: lit)
+                }
+                .frame(width: key.pt[0], height: key.pt[1])
+                .padding(-o)
+                .accessibilityHidden(true)
+            }
+            .frame(width: w, height: h)
+            .brightness(hover && isEnabled && !down ? 0.04 : 0)
+            .opacity(isEnabled ? 1 : 0.5)
+            .saturation(isEnabled ? 1 : 0.6)
+            .contentShape(Rectangle())
+            .onHover { hover = $0 }
+            .accessibilityAddTraits(lit ? .isSelected : [])
+        }
+        @ViewBuilder func picture(_ state: String) -> some View {
+            if let f = key.files[state], let img = PrintedKeys.image(f) {
+                Image(nsImage: img).resizable().interpolation(.high)
+            }
+        }
     }
     private struct KeyFace: View {
         let configuration: ButtonStyleConfiguration
