@@ -203,7 +203,8 @@ def job_reel():
     chamfer(base, 0.02, 2); base.data.materials.append(T.K.hammertone_fine(base='#191612', hi='#2e271e', name='hbase'))
     hood = rbox('hood', 17.5, 2.4, 1.6, 0.85, 0.6, roll=0.35); hood.location = (-1.5, ty + 4.9, 0)
     chamfer(hood, 0.02, 2); hood.data.materials.append(blk)
-    T.ink('ERASE        RECORD        PLAY', -1.5, ty + 4.9, 2.45, 0.32, w=15.0)
+    # (11-11) each head's name over it, at least T.MIN_CAP_PT on screen (one 0.32 cm line had been 3.7 pt)
+    for word, hx in (('ERASE', -6.0), ('RECORD', -1.5), ('PLAY', 3.0)): T.ink(word, hx, ty + 4.9, 2.45, 0.55, w=4.4)
     mu = T.mu_metal()
     for hx in (-6.0, -1.5, 3.0):
         hd = rbox('head', 2.3, 2.4, 2.2, 0.85, 0.9, roll=0.2); hd.location = (hx, ty + 1.2, 0); hd.data.materials.append(mu)
@@ -241,14 +242,15 @@ def job_reel():
     for dx in WX:
         wh = rbox('wheel', 1.25, 1.9, 0.3, -0.05, 0.05, roll=0.06); wh.location = (dx, CY, 0.0); wh.data.materials.append(wheel_m)
     D = '#221e19'
-    T.ink('SECONDS LEFT', 0, CY - 1.65, 0.25, 0.34, color=D)
-    T.ink('SUPPLY', -rx, -10.4, 0.25, 0.34, color=D); T.ink('TAKE-UP', rx, -10.4, 0.25, 0.34, color=D)
-    T.ink('CAB IR RECORDER', 0, 10.0, 0.25, 0.5, track=0.3, color=D)
-    T.ink('FULL TRACK  .  ONE CAPTURE, EVERY RATE', 0, 9.0, 0.25, 0.24, track=0.2, color=D, w=12.0)
+    # (11-11, Lowell: lettering readable, as the bench's) the deck at 11.5 pt a cm: no capital under T.MIN_CAP_PT
+    T.ink('SECONDS LEFT', 0, CY - 1.9, 0.25, 0.55, color=D)
+    T.ink('SUPPLY', -rx, -10.4, 0.25, 0.6, color=D); T.ink('TAKE-UP', rx, -10.4, 0.25, 0.6, color=D)
+    T.ink('CAB IR RECORDER', 0, 10.45, 0.25, 0.85, track=0.3, color=D)
+    T.ink('FULL TRACK  .  ONE CAPTURE, EVERY RATE', 0, 9.05, 0.25, 0.52, track=0.2, color=D, w=24.0)
     KEYS = [('check', -15.0, 6.2), ('capture', -6.6, 5.4), ('stop', 1.6, 3.8)]
     KY, KH = -10.4, 1.9
     JX = -2.6
-    T.ink('REC', JX, KY + 1.3, 0.25, 0.26, color=D)
+    T.ink('REC', JX, KY + 1.5, 0.25, 0.52, color=D)
     deck_objs = objs_since(b0)
     # the reels
     b1 = set(bpy.data.objects)
@@ -365,7 +367,8 @@ def job_cart():
     blank = np.ones((int(lh * 110), int(lw * 110), 3), np.float32) * (np.array([250, 230, 180], np.float32) / 255.0)
     T.img_plane('cartlabel', blank, lw, lh, sx0, sy0 - 0.15, 1.402)
     Dc = '#cfc9bd'
-    T.ink('PLAY / RECORD', sx0 - sw / 2 + 1.6, sy0 + sh / 2 + 0.55, 0.0, 0.26, color=Dc)
+    # (11-11) the cart at 16.9 pt a cm: no capital under T.MIN_CAP_PT (0.36 cm)
+    T.ink('PLAY / RECORD', sx0 - sw / 2 + 2.0, sy0 + sh / 2 + 0.6, 0.0, 0.38, color=Dc)
     # the keys' legends and bezels stay on the face; the lenses are their own objects per state
     ky = -3.3; ks = 2.5
     KEYS = (('check', 'CHECK', -16.0, '#c88a30', '#ffa030'), ('record', 'RECORD', -10.4, '#5e0a05', '#ff1a08'),
@@ -374,12 +377,12 @@ def job_cart():
         bz = rbox('kbz', ks + 0.5, ks + 0.5, 0.22, 0.0, 0.2, roll=0.06); bz.location = (kx, ky, 0)
         cut(bz, prism('kh', [(x + kx, y + ky, z) for x, y, z in _rring(ks / 2 + 0.03, ks / 2 + 0.03, 0.15, 0.0, 0, n_arc=8)], -2, 2))
         chamfer(bz, 0.02, 2); bz.data.materials.append(SG.chrome('kch', seed=5))
-        T.ink(txt, kx, ky - ks / 2 - 0.62, 0.0, 0.3, color=Dc)
+        T.ink(txt, kx, ky - ks / 2 - 0.68, 0.0, 0.38, color=Dc)
     LAMPS = (('ready', 'READY', '#40e070'), ('cue1', 'CUE 1', '#ffb030'), ('cue2', 'CUE 2', '#ffb030'))
     for i, (k, txt, col) in enumerate(LAMPS):
         lx, ly = 1.2 + i * 2.5, 2.4
         T.cyl('ledbz', 0.36, 0.0, 0.12, lx, ly, 48, blk)
-        T.ink(txt, lx, ly - 0.85, 0.0, 0.24, color=Dc)
+        T.ink(txt, lx, ly - 0.9, 0.0, 0.38, color=Dc)
     tx, tyy, tw, th = 3.7, -2.6, 7.4, 2.6
     win = rbox('twin', tw, th, 0.3, 0.0, 0.1, roll=0.04); win.location = (tx, tyy, 0)
     cut(win, prism('twh', [(x + tx, y + tyy, z) for x, y, z in _rring(tw / 2 - 0.3, th / 2 - 0.3, 0.1, 0.0, 0, n_arc=8)], -2, 2))
@@ -388,9 +391,9 @@ def job_cart():
     back.data.materials.append(mat('tback', srgb('#120605'), rough=0.6))
     filt = rbox('tfilt', tw - 0.5, th - 0.5, 0.04, 0.16, 0.0); filt.location = (tx, tyy, 0)
     filt.data.materials.append(mat('tfilt', srgb('#e0a090'), rough=0.04, transm=1.0, ior=1.1, spec=0.35))
-    T.ink('TIME LEFT', tx, tyy - th / 2 - 0.5, 0.0, 0.24, color=Dc)
-    T.ink('AMP CAPTURE CART', 15.6, 0.9, 0.0, 0.48, track=0.3, color=Dc)
-    T.ink('NAM  .  TRAINING SIGNAL v3', 15.6, -0.2, 0.0, 0.24, track=0.2, color='#a8a298')
+    T.ink('TIME LEFT', tx, tyy - th / 2 - 0.55, 0.0, 0.38, color=Dc)
+    T.ink('AMP CAPTURE CART', 15.6, 1.0, 0.0, 0.62, track=0.3, color=Dc)
+    T.ink('NAM  .  TRAINING SIGNAL v3', 15.6, -0.3, 0.0, 0.38, track=0.2, color='#a8a298')
     face_objs = objs_since(b0)
     # the variable parts
     on_m, off_m = T.led_mat('segon', '#ff3a18', True, 14.0), T.led_mat('segoff', '#ff3a18', False)
@@ -511,8 +514,9 @@ def job_box():
         # the printed band across the top, and its legends
         band = rbox('band', W_ - 0.02, 2.2, 0.01, 0.0, 0.0); band.location = (0, H_ / 2 - 1.75, 0)
         band.data.materials.append(mat('band' + key, srgb('#5a2a1e'), rough=0.75, spec=0.3))
-        T.ink(B['band'], 0, H_ / 2 - 1.55, 0.012, 0.62, color='#e8dcc0', track=0.3)
-        T.ink(B['sub'], 0, H_ / 2 - 2.35, 0.012, 0.26, color='#d8c8a8', track=0.25, w=W_ - 2)
+        # (11-11) the sub-line at least T.MIN_CAP_PT on screen (0.26 cm had been about 3 pt)
+        T.ink(B['band'], 0, H_ / 2 - 1.3, 0.012, 0.62, color='#e8dcc0', track=0.3)
+        T.ink(B['sub'], 0, H_ / 2 - 2.25, 0.012, 0.52, color='#d8c8a8', track=0.25, w=W_ - 2)
         lw, lh, lx, ly = B['label']
         blank = np.ones((int(lh * 60), int(lw * 60), 3), np.float32) * (np.array([250, 230, 180], np.float32) / 255.0)
         lab = T.img_plane('label' + key, blank, lw, lh, lx, ly, 0.004)

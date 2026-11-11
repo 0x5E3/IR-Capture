@@ -69,20 +69,51 @@ def scene():
     return s, cam, side
 
 
+RING = os.environ.get('IRC_EYE_RING', 'black')
+
+
+def ring_mat():
+    """(11-11, Lowell: "a lot less shiny chrome") The escutcheon's finish. IRC_EYE_RING:
+    chrome   the 11-10 one: bright chrome, roughness 0.06 (mirrors the whole workshop room)
+    satin    satin nickel: warmer and darker, roughness 0.30, more handling grime
+    smoked   aged nickel gone dull and dark, roughness 0.24
+    black    black phenolic, the same finish as IR Capture's own VU bezel (finish_maps powder, wear 0.45); Lowell's pick, 11-11 (the default)"""
+    if RING == 'chrome': return RA.metal('chrome', '#eceeef', 0.06, grime=0.4)
+    if RING == 'satin': return RA.metal('satin', '#c2bcae', 0.30, dust=0.45, grime=0.7)
+    if RING == 'smoked': return RA.metal('smoked', '#8c867b', 0.24, dust=0.4, grime=0.8)
+    import finish_maps as FM
+    return FM.material('eyebezel', 'powder', '#0d0c0b', float(os.environ.get('IRC_EYE_WEAR', '0.45')), 4212, 'irc-eye-bezel',
+                       bare='#3b2c22', dirt='#1e1b17', dirt_k=0.35, coat_rough=0.5)
+
+
+def unlink_cards_from_glass():
+    """The studio's softboxes kept out of the dome glass's light (as the VU's glass): on the 11-10 render the dome
+    mirrored a softbox as a hard pale square. The room in the world shader still shows in the glass."""
+    glass = [o for o in bpy.data.objects if o.type == 'MESH' and o.name.split('.')[0] == 'eyeenv']
+    ex = bpy.data.collections.get('eye_glass_rx') or bpy.data.collections.new('eye_glass_rx')
+    for o in glass:
+        if o.name not in ex.objects: ex.objects.link(o)
+    for c in ex.collection_objects: c.light_linking.link_state = 'EXCLUDE'
+    cards = ('key', 'top', 'rim', 'ceil', 'side', 'keyL', 'topL', 'over')
+    for o in bpy.context.scene.objects:
+        if o.type == 'LIGHT' or (o.type == 'MESH' and o.name.split('.')[0] in cards):
+            o.light_linking.receiver_collection = ex
+
+
 def main():
     s, cam, side = scene()
     # the panel round the eye: a shadow catcher with the eye's hole (rack.py's monitor: 1.6 ES)
     bpy.ops.mesh.primitive_plane_add(size=40, location=(0, 0, 0)); pn = bpy.context.active_object
     cut(pn, cyl_cutter(1.6 * ES, 0, 0, -5, 5))
     pn.is_shadow_catcher = True
-    chrome = RA.metal('chrome', '#eceeef', 0.06, grime=0.4)
-    eye = RA.Eye(0.0, 0.0, chrome, 'irc')
+    eye = RA.Eye(0.0, 0.0, ring_mat(), 'irc')
+    if os.environ.get('IRC_EYE_GLASS_CARDS', '0') != '1': unlink_cards_from_glass()
     states = RA.EYE_STATES if WHICH == 'all' else ['unlit'] + [x for x in WHICH.split(',') if x != 'unlit']
     t0 = time.time()
     for st in states:
         eye.set(st)
         P.render(s, os.path.join(OUT, 'eye-base.png' if st == 'unlit' else 'eye-%s.png' % st))
-    json.dump({'px': side, 'pxcm': PXCM, 'samples': SAMPLES, 'elev': TK.ELEV, 'es': ES, 'half_cm': HALF,
+    json.dump({'px': side, 'pxcm': PXCM, 'samples': SAMPLES, 'elev': TK.ELEV, 'es': ES, 'ring': RING, 'half_cm': HALF,
                'r_outer_cm': R_OUT, 'r_show_cm': R_SHOW, 'r_glass_cm': 1.42 * ES,
                'centre_px': [side / 2, side / 2], 'states': states, 's': round(time.time() - t0, 1)},
               open(os.path.join(OUT, 'eye.json'), 'w'), indent=1)

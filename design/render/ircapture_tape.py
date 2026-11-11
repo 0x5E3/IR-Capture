@@ -68,6 +68,9 @@ def outline_prism(name, pts, z0, z1):
     return prism(name, [(x, y, 0) for x, y in pts], z0, z1)
 
 
+MIN_CAP_PT = 6.0   # (11-11) the smallest capital height of any printed legend, in points as the app draws it
+
+
 def ink(text, x, y, z, cap, color='#d8d0bd', kind='cap', track=0.16, w=None, m_name=None):
     """A legend printed or engraved and filled on a flat face at depth z, centred on (x, y), capitals cap cm tall."""
     wcm = w or cap * (len(text) * 0.9 + 2); hcm = cap * 2.4
@@ -274,7 +277,8 @@ def piece_reel(prog):
     chamfer(base, 0.02, 2); base.data.materials.append(K.hammertone_fine(base='#191612', hi='#2e271e', name='hbase'))
     hood = rbox('hood', 17.5, 2.4, 1.6, 0.85, 0.6, roll=0.35); hood.location = (-1.5, ty + 4.9, 0)
     chamfer(hood, 0.02, 2); hood.data.materials.append(blk)
-    ink('ERASE        RECORD        PLAY', -1.5, ty + 4.9, 2.45, 0.32, w=15.0)
+    # (11-11) each head's name over it, at least MIN_CAP_PT on screen (they were one 0.32 cm line: 3.7 pt, unreadable)
+    for word, hx in (('ERASE', -6.0), ('RECORD', -1.5), ('PLAY', 3.0)): ink(word, hx, ty + 4.9, 2.45, 0.55, w=4.4)
     mu = mu_metal()
     for hx in (-6.0, -1.5, 3.0):
         hd = rbox('head', 2.3, 2.4, 2.2, 0.85, 0.9, roll=0.2); hd.location = (hx, ty + 1.2, 0); hd.data.materials.append(mu)
@@ -312,10 +316,11 @@ def piece_reel(prog):
         wh.data.materials.append(mat('wheel', srgb('#141211'), rough=0.5, coat=0.2))
         ink(d, dx, CY, 0.26, 0.95, color='#ece6d6', kind='BarlowSemiCondensed-600-normal.ttf', track=0.0, w=1.2)
     D = '#221e19'
-    ink('SECONDS LEFT', 0, CY - 1.65, 0.25, 0.34, color=D)
-    ink('SUPPLY', -rx, -10.4, 0.25, 0.34, color=D); ink('TAKE-UP', rx, -10.4, 0.25, 0.34, color=D)
-    ink('CAB IR RECORDER', 0, 10.0, 0.25, 0.5, track=0.3, color=D)
-    ink('FULL TRACK  .  ONE CAPTURE, EVERY RATE', 0, 9.0, 0.25, 0.24, track=0.2, color=D, w=12.0)
+    # (11-11, Lowell: lettering readable, as the bench's) the deck is drawn at 11.5 pt a cm: no capital under MIN_CAP_PT
+    ink('SECONDS LEFT', 0, CY - 1.9, 0.25, 0.55, color=D)
+    ink('SUPPLY', -rx, -10.4, 0.25, 0.6, color=D); ink('TAKE-UP', rx, -10.4, 0.25, 0.6, color=D)
+    ink('CAB IR RECORDER', 0, 10.45, 0.25, 0.85, track=0.3, color=D)
+    ink('FULL TRACK  .  ONE CAPTURE, EVERY RATE', 0, 9.05, 0.25, 0.52, track=0.2, color=D, w=24.0)
     # the keys: the shelf's illuminated pushbuttons, only for real actions; a red jewel for record
     keys = [('CHECK LEVELS', -15.0, False, 6.2), ('CAPTURE', -6.6, True, 5.4), ('STOP', 1.6, False, 3.8)]
     ky = -10.4
@@ -336,7 +341,7 @@ def piece_reel(prog):
     bzl.location = (j, ky, 0.25); bzl.data.materials.append(jw)
     lens = mat('reclens', srgb('#5a0a06'), rough=0.3, coat=0.5, coat_rough=0.03, spec=0.4, emit=srgb('#ff3a22'), emit_strength=3.0)
     o = lathe('jl', [(0.56, 0.2), (0.56, 0.34), (0.45, 0.4), (0.25, 0.45), (0.0, 0.47)], 96); o.location = (j, ky, 0.25); o.data.materials.append(lens)
-    ink('REC', j, ky + 1.3, 0.25, 0.26, color=D)
+    ink('REC', j, ky + 1.5, 0.25, 0.52, color=D)
     # the meter bridge's place on the right (the app's own VU modules sit here; shown as a blank engraved label)
     name = 'tape-reel-%02d' % int(round(prog * 100))
     if os.environ.get('DETAIL'):
@@ -597,7 +602,8 @@ def piece_cart(prog):
     ph.location = (sx0 - lw / 2 + 0.25 + (lw - 0.5) * prog, sy0 - 0.15 - lh / 2 + 1.02 / 1.9 * lh, 0)
     ph.data.materials.append(mat('phm', srgb('#d01a10'), rough=0.5, emit=srgb('#ff2010'), emit_strength=0.6))
     D_ = '#cfc9bd'
-    ink('PLAY / RECORD', sx0 - sw / 2 + 1.6, sy0 + sh / 2 + 0.55, 0.0, 0.26, color=D_)
+    # (11-11) the cart is drawn at 16.9 pt a cm: no capital under MIN_CAP_PT (0.36 cm)
+    ink('PLAY / RECORD', sx0 - sw / 2 + 2.0, sy0 + sh / 2 + 0.6, 0.0, 0.38, color=D_)
     # the keys: square lens pushbuttons in chrome-edged bezels, under the slot
     ky = -3.3; ks = 2.5
     for txt, kx, base, glow, lit in (('CHECK', -16.0, '#c88a30', '#ffa030', False), ('RECORD', -10.4, '#5e0a05', '#ff1a08', True),
@@ -610,13 +616,13 @@ def piece_cart(prog):
         if lit:
             L = bpy.data.lights.new('kg', 'POINT'); L.energy = 0.35; L.color = srgb(glow); L.shadow_soft_size = 0.8
             g = bpy.data.objects.new('kg', L); s.collection.objects.link(g); g.location = (kx, ky, 1.3)
-        ink(txt, kx, ky - ks / 2 - 0.62, 0.0, 0.3, color=D_)
+        ink(txt, kx, ky - ks / 2 - 0.68, 0.0, 0.38, color=D_)
     # the lamps: READY and the two cues, flush LEDs in a row right of the slot
     for i, (txt, col, on) in enumerate((('READY', '#40e070', True), ('CUE 1', '#ffb030', True), ('CUE 2', '#ffb030', True))):
         lx, ly = 1.2 + i * 2.5, 2.4
         cyl('ledbz', 0.36, 0.0, 0.12, lx, ly, 48, blk)
         cyl('led', 0.24, 0.0, 0.2, lx, ly, 48, led_mat('led' + txt, col, on))
-        ink(txt, lx, ly - 0.85, 0.0, 0.24, color=D_)
+        ink(txt, lx, ly - 0.9, 0.0, 0.38, color=D_)
     # the timer: four digits (M:SS) behind a red filter, time left in the take
     left = int(round(190 * (1 - prog))); digits = '%d%02d' % (left // 60, left % 60)
     tx, tyy, tw, th = 3.7, -2.6, 7.4, 2.6
@@ -633,10 +639,10 @@ def piece_cart(prog):
     for dy in (0.32, -0.32): cyl('colon', 0.08, 0.05, 0.07, xs[1] - 0.25, tyy + dy, 16, on_m)
     filt = rbox('tfilt', tw - 0.5, th - 0.5, 0.04, 0.16, 0.0); filt.location = (tx, tyy, 0)
     filt.data.materials.append(mat('tfilt', srgb('#e0a090'), rough=0.04, transm=1.0, ior=1.1, spec=0.35))
-    ink('TIME LEFT', tx, tyy - th / 2 - 0.5, 0.0, 0.24, color=D_)
+    ink('TIME LEFT', tx, tyy - th / 2 - 0.55, 0.0, 0.38, color=D_)
     # the title, engraved and filled
-    ink('AMP CAPTURE CART', 15.6, 0.9, 0.0, 0.48, track=0.3, color=D_)
-    ink('NAM  .  TRAINING SIGNAL v3', 15.6, -0.2, 0.0, 0.24, track=0.2, color='#a8a298')
+    ink('AMP CAPTURE CART', 15.6, 1.0, 0.0, 0.62, track=0.3, color=D_)
+    ink('NAM  .  TRAINING SIGNAL v3', 15.6, -0.3, 0.0, 0.38, track=0.2, color='#a8a298')
     name = 'tape-cart-%02d' % int(round(prog * 100))
     TK.shoot(s, cam, name, W_, H_)
 
