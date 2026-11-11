@@ -1194,23 +1194,23 @@ def nam_module(mo):
     yb = NMH / 2 - 1.65
     bgw, bgh = bargraph(pl, 0.0, yb, mo['db'], mo['name'])
     yp = yb - bgh / 2 - 1.15 - 1.4
-    pw_, ph_ = 6.6, 2.2
-    zd = red_window(pl, -1.6, yp, pw_, ph_, mo['name'])
+    pw_, ph_ = 6.3, 2.2
+    zd = red_window(pl, -1.85, yp, pw_, ph_, mo['name'])
     chamfer(pl, 0.015, 2); TK.flat_faces(pl)
     pl.data.materials.append(K.anodised('nmod-' + mo['name'], base='#2e2e30'))
     small_screws([(sx * (MW / 2 - 0.45), sy * (NMH / 2 - 0.45)) for sx in (-1, 1) for sy in (-1, 1)], seed=K.seed_of(mo['name']) % 7)
     on_m = led_m('dseg-on', '#ff3418', True, 5.0); off_m = led_m('dseg-off', '#ff3418', False, off='#1a0605')
-    led_digits(-1.6, yp, '%5s' % mo['peak'], 1.4, zd, on_m, off_m)
+    led_digits(-1.85, yp, '%5s' % mo['peak'], 1.4, zd, on_m, off_m)
     # the scale under the bars
     n, pp = BAR['n'], BAR['pitch']
     for db in (-40, -20, -12, -8, -4, 0):
         i = (db + 40) / 2 - 0.5
         x = -(n - 1) * pp / 2 + i * pp
         engrave(str(db), max(-(n - 1) * pp / 2, min((n - 1) * pp / 2, x)), yb - bgh / 2 - 0.5, 0.38, track=0.06)
-    engrave('PEAK  dBFS', -1.6, yp - ph_ / 2 - 0.9, 0.44, track=0.14)
+    engrave('PEAK  dBFS', -1.85, yp - ph_ / 2 - 0.9, 0.44, track=0.14)
     # the lamps: a 2 x 2 block right of the digits
     for i, (lab, col) in enumerate(NLAMPS):
-        lx = 3.15 + (i % 2) * 1.95; ly = yp + 0.62 - (i // 2) * 1.55
+        lx = 2.85 + (i % 2) * 1.7; ly = yp + 0.62 - (i // 2) * 1.55
         flush_led(lx, ly, col, lab in mo['lamps'])
         engrave(lab, lx, ly - 0.62, 0.38, track=0.1)
     ys = -NMH / 2 + 0.55 + K.SCRIB['h'] / 2
