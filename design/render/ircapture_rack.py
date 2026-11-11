@@ -370,6 +370,11 @@ def paper_mat(name, img_path, rough=0.7):
     ti = nt.nodes.new('ShaderNodeTexImage'); ti.image = bpy.data.images.load(img_path); ti.extension = 'EXTEND'
     nt.links.new(tc.outputs['UV'], ti.inputs['Vector']); nt.links.new(ti.outputs['Color'], b.inputs['Base Color'])
     add_bump(m, noise(nt, obj_coords(nt), 0.25, 3.0, 0.5), 0.25, 0.02)       # the sheet not quite flat
+    # (11-11, the second proof: paper came out a little grey under the white light) a faint self-lit share of its own
+    # colour, as ircapture_tape.img_plane's labels: not visible as a glow
+    k = float(os.environ.get('IRC_PAPER_LIFT', '0.22'))
+    if k > 0:
+        nt.links.new(ti.outputs['Color'], b.inputs['Emission Color']); b.inputs['Emission Strength'].default_value = k
     return m
 
 
@@ -839,12 +844,491 @@ def unit_cheeks():
     json.dump(LAY, open(os.path.join(OUT, 'rack-cheeks.json'), 'w'), indent=1)
 
 
+# ---------------------------------------------------------------------------------------------------------------------
+# the third proof (11-11, evening): the chart panel, the pre-flight sheet, the cart machine and the NAM meters
+#
+# Paper: drawn here as pictures (for the app: line drawings on paper and the typing drawn in code, the paper and its frame
+# rendered). Every sheet sits in a card frame, as the take sheet does. The NAM side is the solid-state family: graphite
+# anodised plates, flush LEDs, red seven-segment LED digits behind a red filter, an LED bargraph behind smoked glass.
+
+def age_paper(im, rng, tint=(1.0, 0.98, 0.93)):
+    """take_sheet's paper: tooth, a soft blotchiness, the edges a little darker and warmer."""
+    a = np.asarray(im, np.float32); H, W = a.shape[:2]
+    tooth = np.asarray(Image.fromarray((rng.random((H, W)) * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(1.0)), np.float32) / 255
+    a *= (0.975 + 0.05 * tooth)[..., None]
+    blot = np.asarray(Image.fromarray((rng.random((H // 8, W // 8)) * 255).astype(np.uint8)).resize((W, H), Image.BICUBIC)
+                      .filter(ImageFilter.GaussianBlur(40)), np.float32) / 255
+    a *= (0.96 + 0.08 * blot)[..., None]
+    yy_, xx_ = np.mgrid[0:H, 0:W]
+    e = np.maximum(np.abs(xx_ - W / 2) / (W / 2), np.abs(yy_ - H / 2) / (H / 2))
+    age = np.clip((e - 0.8) / 0.2, 0, 1) ** 1.8
+    a = a * (1 - 0.09 * age[..., None]) * np.array(tint)[None, None, :] ** age[..., None]
+    return Image.fromarray(np.clip(a, 0, 255).astype(np.uint8))
+
+
+class Pen:
+    """Drawing on a sheet in cm: px a cm, y down from the sheet's top."""
+    def __init__(self, w, h, px, paper, seed):
+        self.px = px; self.W, self.H = int(w * px), int(h * px)
+        self.im = Image.new('RGB', (self.W, self.H), paper); self.d = ImageDraw.Draw(self.im)
+        self.rng = np.random.default_rng(seed)
+
+    def c(self, v): return int(round(v * self.px))
+    def p(self, x, y): return (self.c(x), self.c(y))
+
+    def font(self, name, cm):
+        return ImageFont.truetype(name if name.startswith('/') else os.path.join(FONTS, name), max(6, int(cm * self.px)))
+
+    def spaced(self, x, y, text, font, fill, track=0.1, anchor='l'):
+        tr = track * font.size; xx = self.c(x)
+        wsum = sum(font.getlength(ch) for ch in text) + tr * (len(text) - 1)
+        if anchor == 'r': xx -= wsum
+        if anchor == 'm': xx -= wsum / 2
+        bb = font.getbbox('H'); yy = self.c(y) - (bb[1] + bb[3]) / 2
+        for ch in text:
+            self.d.text((xx, yy), ch, font=font, fill=fill); xx += font.getlength(ch) + tr
+
+    def typed(self, x, y, text, font, ink=(34, 32, 44)):
+        adv = font.getlength('M'); xx = self.c(x); bb = font.getbbox('H'); y0 = self.c(y) - (bb[1] + bb[3]) / 2
+        for ch in text:
+            dy = self.rng.normal(0, 0.012 * self.px); dens = int(np.clip(self.rng.normal(0, 14), -30, 30))
+            self.d.text((xx, y0 + dy), ch, font=font, fill=tuple(int(np.clip(v + dens, 0, 255)) for v in ink)); xx += adv
+        return x + len(text) * adv / self.px
+
+    def line(self, pts, fill, w, wobble=0.0):
+        q = [(self.c(x) + (self.rng.normal(0, wobble * self.px) if wobble else 0),
+              self.c(y) + (self.rng.normal(0, wobble * self.px) if wobble else 0)) for x, y in pts]
+        self.d.line(q, fill=fill, width=max(1, self.c(w)), joint='curve')
+
+    def pencil(self, pts, fill, w, n=3, jit=0.03):
+        """A soft pencil stroke: a few overlapping passes, uneven."""
+        for k in range(n):
+            col = tuple(int(c * self.rng.uniform(0.9, 1.06)) for c in fill)
+            self.line([(x + self.rng.normal(0, jit), y + self.rng.normal(0, jit)) for x, y in pts], col, w * self.rng.uniform(0.7, 1.0))
+
+    def arrow(self, x0, y0, x1, y1, fill, w=0.04, head=0.32):
+        self.line([(x0, y0), (x1, y1)], fill, w)
+        a = math.atan2(y1 - y0, x1 - x0)
+        for s in (1, -1):
+            b = a + math.pi - s * 0.42
+            self.line([(x1, y1), (x1 + head * math.cos(b), y1 + head * math.sin(b))], fill, w)
+
+    def box(self, x0, y0, x1, y1, fill, w=0.05, r=0.25):
+        self.d.rounded_rectangle([self.c(x0), self.c(y0), self.c(x1), self.c(y1)], radius=self.c(r), outline=fill, width=max(1, self.c(w)))
+
+
+def wiring_drawing(path, w, h, px=110):
+    """Cab IR's hook-up, inked on graph paper: interface, amp (into its FX return), cab, two mics, the 20 dB pad from the
+    speaker terminals, the monitors crossed out. A pencilled note where people go wrong."""
+    P_ = Pen(w, h, px, (241, 237, 222), 11); d = P_.d
+    g1, g2 = (190, 210, 204), (160, 190, 184)
+    for i in range(int(w / 0.5) + 1):
+        x = i * 0.5; d.line([P_.p(x, 0), P_.p(x, h)], fill=g2 if i % 5 == 0 else g1, width=1)
+    for i in range(int(h / 0.5) + 1):
+        y = i * 0.5; d.line([P_.p(0, y), P_.p(w, y)], fill=g2 if i % 5 == 0 else g1, width=1)
+    ink = (36, 34, 48); ox = (104, 30, 24); grey = (92, 90, 96)
+    fL = P_.font('BarlowSemiCondensed-700-normal.ttf', 0.62); fS = P_.font('BarlowSemiCondensed-600-normal.ttf', 0.5)
+    lab = lambda x, y, t, f=fL, a='m', col=ink: P_.spaced(x, y, t, f, col, 0.12, a)
+    # the interface
+    P_.box(1.5, 4.5, 8.0, 15.5, ink, 0.07); lab(4.75, 5.4, 'INTERFACE')
+    ports = [('OUT 1', 7.0), ('IN 1', 9.5), ('IN 2', 11.0), ('IN 8', 13.6)]
+    for t, y in ports:
+        d.ellipse([P_.c(7.55), P_.c(y - 0.22), P_.c(8.0 + 0.0), P_.c(y + 0.22)], outline=ink, width=max(1, P_.c(0.05)))
+        lab(7.2, y, t, fS, 'r')
+    # the amp, into its FX return
+    P_.box(11.5, 2.5, 18.0, 6.5, ink, 0.07); lab(14.75, 3.4, 'AMP')
+    lab(12.0, 4.6, 'FX RETURN', fS, 'l'); lab(17.6, 5.6, 'SPEAKER', fS, 'r')
+    P_.arrow(8.0, 7.0, 10.0, 7.0, ink); P_.line([(10.0, 7.0), (10.0, 4.6), (11.45, 4.6)], ink, 0.04); P_.arrow(11.0, 4.6, 11.5, 4.6, ink)
+    # the speaker line to the cab
+    P_.line([(18.0, 5.6), (20.4, 5.6)], ink, 0.07)
+    # the cab: a box, a cone
+    P_.box(20.4, 2.5, 25.0, 12.5, ink, 0.07, 0.15); lab(22.7, 3.3, 'CAB')
+    for r_, wd in ((1.7, 0.06), (0.55, 0.05)):
+        d.ellipse([P_.c(22.7 - r_), P_.c(8.0 - r_), P_.c(22.7 + r_), P_.c(8.0 + r_)], outline=ink, width=max(1, P_.c(wd)))
+    # the mics in front of the cab, their cables back to inputs 1 and 2
+    for (mx, my, t, iy) in ((19.0, 8.3, 'MIC 1', 9.5), (19.0, 11.6, 'MIC 2', 11.0)):
+        d.rounded_rectangle([P_.c(mx - 1.3), P_.c(my - 0.35), P_.c(mx), P_.c(my + 0.35)], radius=P_.c(0.3), outline=ink, width=max(1, P_.c(0.05)))
+        lab(mx - 0.65, my - 0.95, t, fS)
+        P_.line([(mx - 1.3, my), (mx - 2.2, my), (mx - 2.2, iy), (8.5, iy)], ink, 0.04); P_.arrow(9.0, iy, 8.05, iy, ink)
+    # the reference: the speaker terminals through the pad to input 8 (dashed: optional)
+    def dash(pts):
+        for (xa, ya), (xb, yb) in zip(pts, pts[1:]):
+            L = math.hypot(xb - xa, yb - ya); n = max(1, int(L / 0.45))
+            for k in range(0, n, 2):
+                t0, t1 = k / n, min(1, (k + 1) / n)
+                P_.line([(xa + (xb - xa) * t0, ya + (yb - ya) * t0), (xa + (xb - xa) * t1, ya + (yb - ya) * t1)], ink, 0.04)
+    d.ellipse([P_.c(19.1), P_.c(5.45), P_.c(19.4), P_.c(5.75)], fill=ink)
+    dash([(19.25, 5.75), (19.25, 14.1), (16.6, 14.1)]); dash([(11.4, 14.1), (8.6, 14.1), (8.6, 13.6), (8.1, 13.6)])
+    P_.box(11.5, 13.0, 16.5, 15.2, ink, 0.06); lab(14.0, 13.8, '20 dB PAD'); lab(14.0, 14.6, 'OPTIONAL', fS, col=grey)
+    lab(16.9, 14.85, 'SPEAKER TERMINALS', fS, 'l', grey)
+    # the monitors, crossed out
+    P_.box(2.0, 16.6, 4.4, 19.2, ink, 0.05, 0.12)
+    for r_ in (0.6, 0.22): d.ellipse([P_.c(3.2 - r_), P_.c(18.2 - r_), P_.c(3.2 + r_), P_.c(18.2 + r_)], outline=ink, width=max(1, P_.c(0.04)))
+    P_.pencil([(1.6, 16.3), (4.8, 19.5)], (150, 40, 34), 0.09); P_.pencil([(4.8, 16.3), (1.6, 19.5)], (150, 40, 34), 0.09)
+    lab(5.0, 17.9, 'MONITORS OFF', fL, 'l')
+    # the pencilled warning at the amp's input
+    pen = (88, 86, 92)
+    fM = P_.font('SwellMarker-400-normal.ttf', 0.62)
+    d.text((P_.c(8.4), P_.c(0.55)), 'FX return, not the guitar input!', font=fM, fill=pen)
+    P_.pencil([(12.4, 1.55), (12.1, 2.35), (12.0, 4.0)], pen, 0.05, 2)
+    # the title block
+    P_.box(17.6, h - 3.0, w - 0.8, h - 0.8, ox, 0.06, 0.05)
+    P_.spaced(17.9, h - 2.35, 'CAB IR  HOOK-UP', P_.font('BarlowSemiCondensed-700-normal.ttf', 0.62), ox, 0.14)
+    P_.spaced(17.9, h - 1.4, 'DWG 1  ·  REF OPTIONAL', P_.font('BarlowSemiCondensed-600-normal.ttf', 0.45), ox, 0.14)
+    age_paper(P_.im, P_.rng).save(path)
+
+
+def instruction_card(path, w, h, px=110):
+    """The card beside the drawing: what to do before CHECK LEVELS, typed on a manila card under a printed heading."""
+    P_ = Pen(w, h, px, (232, 214, 172), 12)
+    ox = (104, 30, 24); rule = (150, 120, 104)
+    P_.spaced(1.0, 1.25, 'BEFORE YOU START', P_.font('BarlowSemiCondensed-700-normal.ttf', 0.72), ox, 0.14)
+    P_.d.line([P_.p(1.0, 2.0), P_.p(w - 1.0, 2.0)], fill=ox, width=P_.c(0.06))
+    ft = P_.font(TYPED, 0.6)
+    lines = [('1.', 'Mute the studio monitors.'),
+             ('2.', 'Out 1 to the amp\'s FX return'), ('', 'or power amp in. Not the'), ('', 'guitar input.'),
+             ('3.', 'Amp master low to start.'),
+             ('4.', 'Mics to the inputs. Throw'), ('', 'each one to MIC.'),
+             ('5.', 'Optional: the speaker'), ('', 'terminals through the 20 dB'), ('', 'pad to a line input. Throw'), ('', 'it to REF.'),
+             ('6.', 'Warm a tube amp up for'), ('', '20 minutes.')]
+    y = 3.1
+    for num, t in lines:
+        if num and y > 3.2: y += 0.3
+        if num: P_.typed(1.0, y, num, ft)
+        P_.typed(1.9, y, t, ft); y += 0.92
+    age_paper(P_.im, P_.rng, (1.0, 0.97, 0.9)).save(path)
+
+
+def preflight_sheet(path, w, h, px=110):
+    """The pre-flight list: a printed form typed in, ticked in pencil, the noisy room ringed in red pencil."""
+    P_ = Pen(w, h, px, (246, 234, 200), 13); d = P_.d
+    ox = (104, 30, 24); rule = (150, 120, 104)
+    fh = P_.font('BarlowSemiCondensed-700-normal.ttf', 0.8); fl = P_.font('BarlowSemiCondensed-600-normal.ttf', 0.48)
+    ft = P_.font(TYPED, 0.66)
+    m = 1.3
+    P_.spaced(m, 1.05, 'BEFORE CAPTURE', fh, ox, 0.14)
+    P_.spaced(w - m, 1.15, 'PRE-FLIGHT', fl, ox, 0.16, 'r')
+    d.line([P_.p(m, 1.85), P_.p(w - m, 1.85)], fill=ox, width=P_.c(0.07))
+    d.line([P_.p(m, 1.98), P_.p(w - m, 1.98)], fill=ox, width=max(1, P_.c(0.02)))
+    cols = [('ITEM', 0.0), ('READING', 8.6), ('OK', 34.6)]
+    for t, x in cols: P_.spaced(m + x + 0.1, 2.65, t, fl, rule, 0.14)
+    rows = [('Mics', '2: SM57, R121', True), ('Reference', 'Input 8', True), ('Sample rate', '96 kHz', True),
+            ('Levels', 'All inputs OK', True), ('Sweep level', '-12 dBFS, set automatically', True),
+            ('Room noise', 'Room at -38 dBFS: noisy', False)]
+    rh = 1.42; y0 = 3.75
+    for i, (a, b, ok) in enumerate(rows):
+        y = y0 + i * rh
+        P_.typed(m + 0.1, y, a, ft); P_.typed(m + 8.7, y, b, ft)
+        d.line([P_.p(m, y + 0.72), P_.p(w - m, y + 0.72)], fill=rule, width=max(1, P_.c(0.02)))
+        tx = m + 35.1
+        if ok:
+            j = P_.rng.normal(0, 0.06, 4)
+            P_.pencil([(tx + j[0], y + j[1]), (tx + 0.35, y + 0.4), (tx + 1.15 + j[2], y - 0.55 + j[3])], (70, 68, 74), 0.07)
+    for x in (8.6, 34.6): d.line([P_.p(m + x - 0.25, 2.2), P_.p(m + x - 0.25, y0 + len(rows) * rh - 0.7)], fill=rule, width=max(1, P_.c(0.02)))
+    # the red-pencil ring round the noisy line, and its note
+    y = y0 + 5 * rh; red = (176, 40, 34)
+    pts = []
+    for k in range(80):
+        t = 2 * math.pi * k / 79 * 1.08 - 0.3
+        pts.append((m + 18.3 + 10.4 * math.cos(t), y + 0.03 + 0.78 * math.sin(t)))
+    P_.pencil(pts, red, 0.07, 3, 0.02)
+    fM = P_.font('SwellMarker-400-normal.ttf', 0.62)
+    d.text((P_.c(m + 29.4), P_.c(y - 0.55)), 'fridge? fan?', font=fM, fill=red)
+    age_paper(P_.im, P_.rng).save(path)
+
+
+def card_frame(sw, sh, ysh, xsh=0.0, name='cardframe'):
+    """take sheet's frame: a folded steel channel over the sheet's top and bottom edges, a screw at each end."""
+    cm_ = SG.black_cast(name)
+    for sy in (1, -1):
+        ch = rbox('cframe', sw + 1.6, 0.9, 0.22, 0.0, 0.08, roll=0.05); ch.location = (xsh, ysh + sy * (sh / 2 + 0.1), 0)
+        chamfer(ch, 0.012, 1); ch.data.materials.append(cm_)
+    small_screws([(xsh + sx * (sw / 2 + 0.45), ysh + sy * (sh / 2 + 0.1)) for sx in (-1, 1) for sy in (-1, 1)], r=0.17)
+
+
+def unit_chart():
+    """6U: the chart panel. The hook-up drawing and the card beside it, each in its card frame."""
+    K.set_seed('rack-chart')
+    s, cam, h = unit_scene(6)
+    backing(h)
+    rack_panel(6, 'bronze', 'chart')
+    dw, dh, cw_, chh = 26.0, 20.0, 14.6, 20.0
+    gap_ = 2.2
+    xd = -(dw + gap_ + cw_) / 2 + dw / 2; xc = xd + dw / 2 + gap_ + cw_ / 2
+    ysh = 0.9
+    fd = os.path.join(OUT, 'wiring-print.png'); wiring_drawing(fd, dw, dh)
+    fc = os.path.join(OUT, 'card-print.png'); instruction_card(fc, cw_, chh)
+    with moved(xd, ysh, 0): sheet(dw, dh, fd, 'wiring', curl=0.25)
+    with moved(xc, ysh, 0): sheet(cw_, chh, fc, 'card', curl=0.0)
+    card_frame(dw, dh, ysh, xd, 'cf1'); card_frame(cw_, chh, ysh, xc, 'cf2')
+    engrave('HOOK-UP', -dw / 2 + xd + 2.0, -h / 2 + 1.25, 0.5)
+    shoot(s, cam, 'unit-chart', PW, h)
+
+
+def unit_preflight():
+    """4U: the pre-flight list in its card frame."""
+    K.set_seed('rack-preflight')
+    s, cam, h = unit_scene(4)
+    backing(h)
+    rack_panel(4, 'bronze', 'preflight')
+    sw, sh = 40.0, 12.8
+    ysh = 0.55
+    fp = os.path.join(OUT, 'preflight-print.png'); preflight_sheet(fp, sw, sh)
+    with moved(0, ysh, 0): sheet(sw, sh, fp, 'preflight', curl=0.25)
+    card_frame(sw, sh, ysh)
+    engrave('PRE-FLIGHT', -sw / 2 + 2.2, -h / 2 + 1.1, 0.5)
+    shoot(s, cam, 'unit-preflight', PW, h)
+
+
+# the solid-state parts
+
+def led_m(name, col, on, k=4.0, off='#100a08'):
+    return mat(name, srgb(col if on else off), rough=0.3, coat=0.5, coat_rough=0.05,
+               emit=srgb(col) if on else None, emit_strength=k if on else 0.0)
+
+
+SEG7 = {'0': 'abcdef', '1': 'bc', '2': 'abdeg', '3': 'abcdg', '4': 'bcfg', '5': 'acdfg', '6': 'acdefg', '7': 'abc',
+        '8': 'abcdefg', '9': 'abcdfg', '-': 'g', ' ': ''}
+
+
+def led_digits(x, y, text, hgt, z, on_m, off_m, pitch=None):
+    """Red seven-segment LED digits (the cart timer's family), every segment present, unlit ones dark; '.' lights the
+    point after the digit before it. Returns the cells' total width."""
+    cells = []
+    for ch in text:
+        if ch == '.' and cells: cells[-1][1] = True
+        else: cells.append([ch, False])
+    pitch = pitch or hgt * 0.74
+    w = hgt * 0.5; t = hgt * 0.12; sl = math.tan(math.radians(8))
+    x0 = x - pitch * (len(cells) - 1) / 2
+    for i, (ch, dp) in enumerate(cells):
+        cx = x0 + i * pitch
+        segs = {'a': (0, hgt / 2, True), 'g': (0, 0, True), 'd': (0, -hgt / 2, True),
+                'f': (-w / 2, hgt / 4, False), 'b': (w / 2, hgt / 4, False), 'e': (-w / 2, -hgt / 4, False), 'c': (w / 2, -hgt / 4, False)}
+        for k_, (sx, sy, horiz) in segs.items():
+            sw_, sh_ = (w - t, t) if horiz else (t, hgt / 2 - t)
+            o = rbox('seg', sw_, sh_, 0.02, z, t * 0.45)
+            o.location = (cx + sx + sy * sl, y + sy, 0)
+            if not horiz:
+                for v in o.data.vertices: v.co.x += v.co.y * sl
+            o.data.materials.append(on_m if k_ in SEG7.get(ch, '') else off_m)
+        o = rbox('dp', t * 1.1, t * 1.1, 0.02, z, t * 0.5); o.location = (cx + w / 2 + t * 1.4 - hgt / 2 * sl, y - hgt / 2, 0)
+        o.data.materials.append(on_m if dp else off_m)
+    return pitch * len(cells)
+
+
+def red_window(plate, cx, cy, ww, wh, name):
+    """A black bezelled window with a red filter over a dark back: the LED digits sit in it."""
+    ho = rbox('rwh', ww, wh, T + 2, -T - 1, 0.08); ho.location = (cx, cy, 0)
+    bpy.context.view_layer.update(); cut(plate, ho)
+    bz = rbox('rwbz', ww + 0.8, wh + 0.8, 0.16, 0.0, 0.14, roll=0.05); bz.location = (cx, cy, 0)
+    cut(bz, prism('rwbh', [(px + cx, py + cy, pz) for px, py, pz in _rring(ww / 2, wh / 2, 0.08, 0.0, 0, n_arc=8)], -2, 2))
+    chamfer(bz, 0.015, 2); bz.data.materials.append(SG.black_cast('rwbz' + name))
+    bk = rbox('rwback', ww, wh, 0.05, -0.75, 0.0); bk.location = (cx, cy, 0)
+    bk.data.materials.append(mat('rwback', srgb('#0a0605'), rough=0.7))
+    f = rbox('rwfilt', ww + 0.1, wh + 0.1, 0.05, -0.1, 0.0); f.location = (cx, cy, 0)
+    f.data.materials.append(mat('rwfilt', srgb('#d02a18'), rough=0.06, transm=1.0, ior=1.0, spec=0.0))
+    f.visible_shadow = False; GLASS.append(f)
+    return -0.7          # the digits' z
+
+
+def flush_led(x, y, col, on, r=0.26):
+    """A flush 5 mm LED in a black collar."""
+    T_ = _tape()
+    T_.cyl('ledcol', r + 0.14, 0.0, 0.1, x, y, 48, SG.black_cast('ledcol'))
+    dark = {'green': '#0c2010', 'amber': '#2a1606', 'red': '#2a0806', 'white': '#24201a'}[col]
+    hot = {'green': '#38f070', 'amber': '#ffa028', 'red': '#ff2a14', 'white': '#fff0d0'}[col]
+    T_.cyl('led', r, 0.0, 0.18, x, y, 48, led_m('led' + col + str(on), hot, on, 3.5, dark))
+
+
+BAR = dict(n=20, w=0.34, h=1.25, pitch=0.465)
+
+
+def bar_colour(i):
+    return 'green' if i < 17 else ('amber' if i < 19 else 'red')
+
+
+def bargraph(plate, cx, cy, level_db, name):
+    """The NAM level: twenty LED bars, -40 to 0 dBFS in 2 dB steps, behind smoked glass in a black bezel."""
+    n, bw, bh, pp = BAR['n'], BAR['w'], BAR['h'], BAR['pitch']
+    ww, wh = n * pp + 0.5, bh + 0.7
+    ho = rbox('bgh', ww, wh, T + 2, -T - 1, 0.08); ho.location = (cx, cy, 0)
+    bpy.context.view_layer.update(); cut(plate, ho)
+    bz = rbox('bgbz', ww + 0.8, wh + 0.8, 0.16, 0.0, 0.14, roll=0.05); bz.location = (cx, cy, 0)
+    cut(bz, prism('bgbh', [(px + cx, py + cy, pz) for px, py, pz in _rring(ww / 2, wh / 2, 0.08, 0.0, 0, n_arc=8)], -2, 2))
+    chamfer(bz, 0.015, 2); bz.data.materials.append(SG.black_cast('bgbz' + name))
+    bk = rbox('bgback', ww, wh, 0.05, -0.75, 0.0); bk.location = (cx, cy, 0)
+    bk.data.materials.append(mat('bgback', srgb('#070707'), rough=0.7))
+    lit = int(max(0, min(n, round((level_db + 40) / 2))))
+    ms = {}
+    for i in range(n):
+        c = bar_colour(i); on = i < lit
+        key_ = (c, on)
+        if key_ not in ms:
+            hot = {'green': '#38f070', 'amber': '#ffa028', 'red': '#ff2a14'}[c]
+            dark = {'green': '#08140a', 'amber': '#160c04', 'red': '#180504'}[c]
+            ms[key_] = led_m('bar%s%d' % key_, hot, on, 3.0, dark)
+        o = rbox('bar', bw, bh, 0.06, -0.7, 0.03); o.location = (cx - (n - 1) * pp / 2 + i * pp, cy, 0)
+        o.data.materials.append(ms[key_])
+    g = rbox('smoke', ww + 0.1, wh + 0.1, 0.05, -0.1, 0.0); g.location = (cx, cy, 0)
+    g.data.materials.append(mat('smoke', srgb('#6a665e'), rough=0.05, transm=1.0, ior=1.0, spec=0.0))
+    g.visible_shadow = False; GLASS.append(g)
+    return ww + 0.8, wh + 0.8
+
+
+NAM_MODS = [dict(name='LINE OUT', v='a', db=-8.4, peak='-8.2', lamps=('OK',)),
+            dict(name='SM57 CAP EDGE', v='b', db=-7.6, peak='-7.4', lamps=('OK',)),
+            dict(name='R121 CENTER', v='c', db=-21.0, peak='-20.6', lamps=('LOW',)),
+            None]
+NLAMPS = [('LOW', 'amber'), ('OK', 'green'), ('HIGH', 'amber'), ('CLIP', 'red')]
+NMH = 12.6
+
+
+def nam_module(mo):
+    K.set_seed('rack-nmod-' + (mo['name'] if mo else 'blank'))
+    pl = rbox('nplate', MW, NMH, MZ, -MZ, 0.18, roll=0.05)
+    if mo is None:                      # a blank filler plate in the empty slot
+        chamfer(pl, 0.015, 2); TK.flat_faces(pl); pl.data.materials.append(K.anodised('nblank', base='#2a2a2c'))
+        small_screws([(sx * (MW / 2 - 0.45), sy * (NMH / 2 - 0.45)) for sx in (-1, 1) for sy in (-1, 1)], seed=5)
+        return
+    yb = NMH / 2 - 1.65
+    bgw, bgh = bargraph(pl, 0.0, yb, mo['db'], mo['name'])
+    yp = yb - bgh / 2 - 1.15 - 1.4
+    pw_, ph_ = 6.6, 2.2
+    zd = red_window(pl, -1.6, yp, pw_, ph_, mo['name'])
+    chamfer(pl, 0.015, 2); TK.flat_faces(pl)
+    pl.data.materials.append(K.anodised('nmod-' + mo['name'], base='#2e2e30'))
+    small_screws([(sx * (MW / 2 - 0.45), sy * (NMH / 2 - 0.45)) for sx in (-1, 1) for sy in (-1, 1)], seed=K.seed_of(mo['name']) % 7)
+    on_m = led_m('dseg-on', '#ff3418', True, 5.0); off_m = led_m('dseg-off', '#ff3418', False, off='#1a0605')
+    led_digits(-1.6, yp, '%5s' % mo['peak'], 1.4, zd, on_m, off_m)
+    # the scale under the bars
+    n, pp = BAR['n'], BAR['pitch']
+    for db in (-40, -20, -12, -8, -4, 0):
+        i = (db + 40) / 2 - 0.5
+        x = -(n - 1) * pp / 2 + i * pp
+        engrave(str(db), max(-(n - 1) * pp / 2, min((n - 1) * pp / 2, x)), yb - bgh / 2 - 0.5, 0.38, track=0.06)
+    engrave('PEAK  dBFS', -1.6, yp - ph_ / 2 - 0.9, 0.44, track=0.14)
+    # the lamps: a 2 x 2 block right of the digits
+    for i, (lab, col) in enumerate(NLAMPS):
+        lx = 3.15 + (i % 2) * 1.95; ly = yp + 0.62 - (i // 2) * 1.55
+        flush_led(lx, ly, col, lab in mo['lamps'])
+        engrave(lab, lx, ly - 0.62, 0.38, track=0.1)
+    ys = -NMH / 2 + 0.55 + K.SCRIB['h'] / 2
+    with moved(0, ys, 0): strip(mo['v'], 10.2, mo['name'], mo['name'])
+
+
+def unit_nammeters():
+    """3U: the NAM meter bridge: three channel modules (LED bargraph, red LED peak, LED lamps, scribble strip) and a
+    blank plate in the fourth slot."""
+    K.set_seed('rack-nmeters')
+    s, cam, h = unit_scene(3)
+    backing(h)
+    fr, hh = rack_panel(3, 'alu', 'nbridge')
+    op = rbox('fopen', 4 * MW + 0.1, NMH - 0.6, 4, -2, 0.1); bpy.context.view_layer.update(); cut(fr, op)
+    fr.data.materials.append(K.anodised('nbridge', base='#232325'))
+    for i, mo in enumerate(NAM_MODS):
+        with moved((i - 1.5) * (MW + 0.06), 0, MZ): nam_module(mo)
+    finish_glass()
+    shoot(s, cam, 'unit-nammeters', PW, h)
+
+
+def dome_lens(name, base, glow, lit):
+    """A domed square lens: frosted resin; lit, brightest in the middle and falling off to the edges (no flat block)."""
+    m = mat(name, srgb(base), rough=0.32, coat=0.6, coat_rough=0.06, spec=0.45)
+    nt = m.node_tree; b = nt.nodes['Principled BSDF']; co = obj_coords(nt)
+    add_bump(m, noise(nt, co, 160.0, 2.0, 0.5), 0.1, 0.001)
+    if lit:
+        b.inputs['Emission Color'].default_value = (*srgb(glow), 1)
+        ln = node(nt, 'ShaderNodeVectorMath', operation='LENGTH'); nt.links.new(co, ln.inputs[0])
+        st = node(nt, 'ShaderNodeMapRange', **{'From Min': 0.0, 'From Max': 1.5, 'To Min': 1.6, 'To Max': 0.35})
+        st.interpolation_type = 'SMOOTHSTEP'; nt.links.new(ln.outputs['Value'], st.inputs['Value'])
+        nt.links.new(st.outputs['Result'], b.inputs['Emission Strength'])
+    surface_wear(m, smudge=0.5, scuff=0.25)
+    return m
+
+
+def unit_cart():
+    """3U: the cart machine (Amp NAM's recorder), graphite anodised. The cart in its slot with the signal's map on its
+    label; domed lit keys CHECK / RECORD / STOP; READY and the two cue LEDs; the red LED timer (time left)."""
+    T_ = _tape()
+    prog = float(os.environ.get('IRC_CART_PROG', '0.4'))
+    K.set_seed('rack-cart')
+    s, cam, h = unit_scene(3)
+    backing(h)
+    pl, ph = rack_panel(3, 'alu', 'cart')
+    blk = SG.black_cast('bc')
+    sx0, sy0, sw, sh = -9.6, 2.35, 16.2, 3.1
+    cut(pl, prism('slot', [(x + sx0, y + sy0, z) for x, y, z in _rring(sw / 2, sh / 2, 0.25, 0.0, 0, n_arc=8)], -2, 2))
+    # the timer's window
+    tx, tyy = 5.2, -1.9
+    zd = red_window(pl, tx, tyy, 6.6, 2.4, 'timer')
+    pl.data.materials.append(K.anodised('cartface', base='#2a2a2c'))
+    throat = rbox('throat', sw - 0.1, sh - 0.1, 0.1, -2.6, 0.2); throat.location = (sx0, sy0, 0)
+    throat.data.materials.append(mat('throat', srgb('#0d0c0b'), rough=0.85))
+    cw_, ch_ = 15.2, 2.45
+    shell = rbox('cart', cw_, ch_, 4.0, -2.6, 0.18, roll=0.04); shell.location = (sx0, sy0 - 0.15, 0)
+    shm = mat('cartshell', srgb('#2b2927'), rough=0.42, coat=0.25, coat_rough=0.25)
+    add_bump(shm, noise(shm.node_tree, obj_coords(shm.node_tree), 90.0, 2.0, 0.5), 0.08, 0.001); surface_wear(shm, dust=0.4, smudge=0.5, scuff=0.5)
+    shell.data.materials.append(grimy(shm, dirt='#3a3228', amount=0.35, dist=0.05))
+    for gx in (-1, 1):
+        for i in range(4):
+            gr = rbox('grip', 0.06, ch_ - 0.7, 0.05, 1.4, 0.02); gr.location = (sx0 + gx * (cw_ / 2 - 0.45 - i * 0.16), sy0 - 0.15, 0)
+            gr.data.materials.append(shm)
+    lw, lh = 12.6, 1.9
+    T_.HERE = os.path.dirname(os.path.abspath(__file__))       # the label's map: reference/nam_v3_map.json in this repo
+    T_.img_plane('cartlabel', T_.cart_label_tex(lw, lh, 110), lw, lh, sx0, sy0 - 0.15, 1.402)
+    phd = rbox('phead', 0.06, 0.95, 0.01, 1.404, 0.0)
+    phd.location = (sx0 - lw / 2 + 0.25 + (lw - 0.5) * prog, sy0 - 0.15 - lh / 2 + 1.02 / 1.9 * lh, 0)
+    phd.data.materials.append(mat('phm', srgb('#d01a10'), rough=0.5, emit=srgb('#ff2010'), emit_strength=0.6))
+    # the keys: domed square lenses in black bezels, their names engraved under them
+    ky = -3.0; ks = 2.3
+    for lab, kx, base, glow, lit in (('CHECK', -15.2, '#b07a2c', '#ffa030', False), ('RECORD', -9.6, '#5a0c06', '#ff2a10', True),
+                                     ('STOP', -4.0, '#c6bfae', '#fff0d0', False)):
+        bz = rbox('kbz', ks + 0.55, ks + 0.55, 0.22, 0.0, 0.22, roll=0.06); bz.location = (kx, ky, 0)
+        cut(bz, prism('kh', [(x + kx, y + ky, z) for x, y, z in _rring(ks / 2 + 0.04, ks / 2 + 0.04, 0.16, 0.0, 0, n_arc=8)], -2, 2))
+        chamfer(bz, 0.02, 2); bz.data.materials.append(blk)
+        # (first test) a deep roll creased the lens corner to corner: a shallow roll, flat faces, and the dome left to
+        # the lens's light falling off to its edges
+        cap = rbox('lens', ks, ks, 0.5, -0.1, 0.16, roll=0.06); TK.flat_faces(cap); cap.location = (kx, ky, 0)
+        lm = dome_lens('lens' + lab, base, glow, lit); cap.data.materials.append(lm)
+        # the dome: a cushion over the lens's top, smooth, so the light lies on it as a soft highlight
+        a_ = ks / 2 - 0.05
+        bpy.ops.mesh.primitive_grid_add(x_subdivisions=48, y_subdivisions=48, size=2 * a_, location=(kx, ky, 0.4))
+        dm = bpy.context.active_object; dm.name = 'dome'
+        for v in dm.data.vertices:
+            u_, w_ = v.co.x / a_, v.co.y / a_
+            v.co.z = 0.24 * max(0.0, 1 - u_ ** 4) * max(0.0, 1 - w_ ** 4)
+        bpy.ops.object.shade_smooth(); dm.data.materials.append(lm)
+        if lit:
+            Lk = bpy.data.lights.new('kg', 'POINT'); Lk.energy = 0.3; Lk.color = srgb(glow); Lk.shadow_soft_size = 0.8
+            g = bpy.data.objects.new('kg', Lk); s.collection.objects.link(g); g.location = (kx, ky, 1.4)
+        engrave(lab, kx, ky - ks / 2 - 0.75, 0.44, track=0.14)
+    # READY and the cues, right of the slot
+    for i, (lab, col, on) in enumerate((('READY', 'green', True), ('CUE 1', 'amber', True), ('CUE 2', 'amber', True))):
+        lx = 1.4 + i * 2.6
+        flush_led(lx, 3.1, col, on); engrave(lab, lx, 2.25, 0.4, track=0.1)
+    # the timer: time left in the take, M:SS
+    left = int(round(190 * (1 - prog)))
+    on_m = led_m('tseg-on', '#ff3418', True, 5.0); off_m = led_m('tseg-off', '#ff3418', False, off='#1a0605')
+    hgt = 1.5; pp = hgt * 0.74
+    led_digits(tx - 1.75, tyy, '%d' % (left // 60), hgt, zd, on_m, off_m)
+    led_digits(tx + 0.75, tyy, '%02d' % (left % 60), hgt, zd, on_m, off_m)
+    for dy in (0.33, -0.33):
+        o = rbox('colon', 0.18, 0.18, 0.02, zd, 0.09); o.location = (tx - 0.95 + dy * 0.14, tyy + dy, 0); o.data.materials.append(on_m)
+    engrave('TIME LEFT', tx, tyy - 1.2 - 0.85, 0.44, track=0.14)
+    engrave('CARTRIDGE', 16.0, 0.9, 0.62, track=0.2)
+    engrave('NAM SIGNAL', 16.0, -0.45, 0.44, track=0.2, color='#a8a298')
+    finish_glass()
+    shoot(s, cam, 'unit-cart', PW, h, {'prog': prog})
+
+
 UNITS = {'step': unit_step, 'patch': unit_patch, 'meters': unit_meters, 'gap': unit_gap, 'deck': unit_deck,
-         'results': unit_results, 'cheeks': unit_cheeks}
+         'results': unit_results, 'cheeks': unit_cheeks, 'chart': unit_chart, 'preflight': unit_preflight,
+         'nammeters': unit_nammeters, 'cart': unit_cart}
 
 
 def main():
-    todo = [u for u in UNITS if u not in ('cheeks', 'deck')] if WHAT == 'all' else WHAT.split(',')
+    todo = ['step', 'patch', 'meters', 'gap', 'results'] if WHAT == 'all' else WHAT.split(',')
     for u in todo:
         t = time.time(); UNITS[u](); print('unit', u, '%.0fs' % (time.time() - t), flush=True)
 

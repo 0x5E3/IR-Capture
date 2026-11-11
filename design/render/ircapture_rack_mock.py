@@ -14,7 +14,7 @@ WPT = 920; W = WPT * 2
 lay = {}
 for f in os.listdir(RD):
     if f.startswith('rack-') and f.endswith('.json'): lay.update(json.load(open(os.path.join(RD, f)))['out'])
-UN = {'step': 1, 'patch': 2, 'meters': 5, 'gap': 1, 'deck': 8, 'results': 6}
+UN = {'step': 1, 'patch': 2, 'meters': 5, 'gap': 1, 'deck': 8, 'results': 6, 'chart': 6, 'preflight': 4, 'nammeters': 3, 'cart': 3}
 
 # the shelf strip from the old screenshot (the 11-04 shelf from above, 8 pt a cm: context only)
 top = None; shelf = None
