@@ -118,39 +118,68 @@ struct ContentView: View {
         .onAppear { runAutomation() }
     }
 
+    @ViewBuilder var steps: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            if m.job == .nam {
+                NAMJob()
+                if let r = m.namResult { NAMResultsView(r: r).id("namresults") }
+            } else {
+                CabJob()
+                if let r = m.result { ResultsView(r: r).id("results") }
+            }
+        }
+    }
+
     @ViewBuilder var page: some View {
         VStack(spacing: 0) {
             Shelf()
-            StageOpening {
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 18) {
-                            if m.job == .nam {
-                                NAMJob()
-                                if let r = m.namResult { NAMResultsView(r: r).id("namresults") }
-                            } else {
-                                CabJob()
-                                if let r = m.result { ResultsView(r: r).id("results") }
-                            }
-                        }
-                        .padding(22).frame(maxWidth: 900, alignment: .leading).frame(maxWidth: .infinity)
+            if RackKit.shared != nil {
+                // (Phase 7a) the rack bay standing against the wall: the units scroll, the wall and the shelf stay
+                scroller {
+                    steps
+                        .padding(.bottom, 18)
+                        .inRackBay()
+                        .padding(.top, 10).padding(.bottom, 48)
+                        .frame(maxWidth: .infinity)
                         .environment(\.swellTheme, m.job == .nam ? .nam : .cab)
-                    }
-                    .clipped()     // (under View › Page Size's scale the scroll view's own clip runs short; this one holds)
-                    .onChange(of: m.result?.folder) { _ in withAnimation { proxy.scrollTo("results", anchor: .top) } }
-                    .task {
-                        // CI hook: open scrolled to the tape machine (screenshot-deck.png, screenshot-cart.png).
-                        guard ProcessInfo.processInfo.arguments.contains("--scroll-to-machine") else { return }
-                        try? await Task.sleep(nanoseconds: 1_500_000_000)
-                        proxy.scrollTo("machine", anchor: .top)
-                    }
-                    .onChange(of: m.namResult?.folder) { _ in withAnimation { proxy.scrollTo("namresults", anchor: .top) } }
                 }
+                .overlay(alignment: .top) {
+                    // the shelf's shadow on the wall
+                    LinearGradient(colors: [Color.black.opacity(0.5), Color.black.opacity(0.14), .clear], startPoint: .top, endPoint: .bottom)
+                        .frame(height: 30).allowsHitTesting(false).accessibilityHidden(true)
+                }
+            } else {
+                StageOpening {
+                    scroller {
+                        steps
+                            .padding(22).frame(maxWidth: 900, alignment: .leading).frame(maxWidth: .infinity)
+                            .environment(\.swellTheme, m.job == .nam ? .nam : .cab)
+                    }
+                }
+                .padding(.horizontal, 24).padding(.bottom, 22)
             }
-            .padding(.horizontal, 24).padding(.bottom, 22)
         }
         .background(WorkshopWall())
         .workshopDefaults()
+    }
+
+    /// The page's scroll view, with its hooks (scroll to the results, CI's scroll to the machine).
+    @ViewBuilder func scroller<C: View>(@ViewBuilder _ content: () -> C) -> some View {
+        let c = content()
+        ScrollViewReader { proxy in
+            ScrollView {
+                c
+            }
+            .clipped()     // (under View › Page Size's scale the scroll view's own clip runs short; this one holds)
+            .onChange(of: m.result?.folder) { _ in withAnimation { proxy.scrollTo("results", anchor: .top) } }
+            .task {
+                // CI hook: open scrolled to the tape machine (screenshot-deck.png, screenshot-cart.png).
+                guard ProcessInfo.processInfo.arguments.contains("--scroll-to-machine") else { return }
+                try? await Task.sleep(nanoseconds: 1_500_000_000)
+                proxy.scrollTo("machine", anchor: .top)
+            }
+            .onChange(of: m.namResult?.folder) { _ in withAnimation { proxy.scrollTo("namresults", anchor: .top) } }
+        }
     }
 
     /// CI hooks: process the simulated recordings, render the diagrams, or open a given view.
@@ -299,6 +328,8 @@ enum GearPreview {
                 Button("Remove") {}.buttonStyle(KeyButtonStyle(key: "Remove", size: 10)).disabled(true)
             }
             JobStepper(steps: [("Connect", true), ("Set levels", true), ("Capture", false), ("Results", false)])
+            Engraved("The rack bay's step strip: two steps done, the third current", size: 12)
+            RackStepStrip(steps: [("Connect", true), ("Set levels", true), ("Capture", false), ("Results", false)])
             HStack(alignment: .top, spacing: 16) {
                 Checklist(items: ["A manila card.", "Its second line, for the look of it."], style: PaperStyle(stock: .manila, ring: true))
                     .frame(width: 250)
@@ -314,6 +345,7 @@ enum GearPreview {
         let nam = VStack(alignment: .leading, spacing: 18) {
             Engraved("Amp (NAM): graphite panel, LED lamps, LED-ladder meters", size: 12)
             JobStepper(steps: [("Signal", true), ("Connect", true), ("Set levels", false), ("Record", false), ("Upload", false)])
+            RackStepStrip(steps: [("Signal", true), ("Connect", true), ("Set levels", false), ("Record", false), ("Upload", false)])
             if let c = TapePieces.cart {
                 Engraved("Amp NAM: the cart machine, 74 s into the take (playhead, timer, READY and CUE lamps, RECORD lit)", size: 12)
                 ScaledMachine(size: c.size, outline: c.outline) {

@@ -1,0 +1,227 @@
+{
+ "pxPerPoint": 3.0,
+ "ptPerCm": 14.0,
+ "uPt": 62.23,
+ "units": {
+  "step-cab": {
+   "picture": "rack-step-cab",
+   "u": 1,
+   "size": [
+    685.333,
+    72.0
+   ],
+   "panel": [
+    4.9,
+    4.89,
+    675.533,
+    62.22
+   ],
+   "layers": {
+    "l0-green": {
+     "picture": "rack-step-cab-l0-green",
+     "rect": [
+      48.0,
+      8.0,
+      56.0,
+      56.0
+     ]
+    },
+    "l0-amber": {
+     "picture": "rack-step-cab-l0-amber",
+     "rect": [
+      48.0,
+      8.0,
+      56.0,
+      56.0
+     ]
+    },
+    "l1-green": {
+     "picture": "rack-step-cab-l1-green",
+     "rect": [
+      192.0,
+      8.0,
+      56.0,
+      56.0
+     ]
+    },
+    "l1-amber": {
+     "picture": "rack-step-cab-l1-amber",
+     "rect": [
+      192.0,
+      8.0,
+      56.0,
+      56.0
+     ]
+    },
+    "l2-green": {
+     "picture": "rack-step-cab-l2-green",
+     "rect": [
+      333.333,
+      8.0,
+      56.0,
+      56.0
+     ]
+    },
+    "l2-amber": {
+     "picture": "rack-step-cab-l2-amber",
+     "rect": [
+      333.333,
+      8.0,
+      56.0,
+      56.0
+     ]
+    },
+    "l3-green": {
+     "picture": "rack-step-cab-l3-green",
+     "rect": [
+      477.333,
+      8.0,
+      56.0,
+      56.0
+     ]
+    },
+    "l3-amber": {
+     "picture": "rack-step-cab-l3-amber",
+     "rect": [
+      477.333,
+      8.0,
+      56.0,
+      56.0
+     ]
+    }
+   },
+   "lampXcm": [
+    -19.0,
+    -8.8,
+    1.3999999999999986,
+    11.599999999999998
+   ]
+  },
+  "step-nam": {
+   "picture": "rack-step-nam",
+   "u": 1,
+   "size": [
+    685.333,
+    72.0
+   ],
+   "panel": [
+    4.9,
+    4.89,
+    675.533,
+    62.22
+   ],
+   "layers": {
+    "l0-green": {
+     "picture": "rack-step-nam-l0-green",
+     "rect": [
+      53.333,
+      21.333,
+      29.333,
+      29.333
+     ]
+    },
+    "l0-amber": {
+     "picture": "rack-step-nam-l0-amber",
+     "rect": [
+      53.333,
+      21.333,
+      29.333,
+      29.333
+     ]
+    },
+    "l1-green": {
+     "picture": "rack-step-nam-l1-green",
+     "rect": [
+      173.333,
+      21.333,
+      26.667,
+      29.333
+     ]
+    },
+    "l1-amber": {
+     "picture": "rack-step-nam-l1-amber",
+     "rect": [
+      173.333,
+      21.333,
+      26.667,
+      29.333
+     ]
+    },
+    "l2-green": {
+     "picture": "rack-step-nam-l2-green",
+     "rect": [
+      290.667,
+      21.333,
+      29.333,
+      29.333
+     ]
+    },
+    "l2-amber": {
+     "picture": "rack-step-nam-l2-amber",
+     "rect": [
+      290.667,
+      21.333,
+      29.333,
+      29.333
+     ]
+    },
+    "l3-green": {
+     "picture": "rack-step-nam-l3-green",
+     "rect": [
+      408.0,
+      21.333,
+      29.333,
+      29.333
+     ]
+    },
+    "l3-amber": {
+     "picture": "rack-step-nam-l3-amber",
+     "rect": [
+      408.0,
+      21.333,
+      29.333,
+      29.333
+     ]
+    },
+    "l4-green": {
+     "picture": "rack-step-nam-l4-green",
+     "rect": [
+      528.0,
+      21.333,
+      26.667,
+      29.333
+     ]
+    },
+    "l4-amber": {
+     "picture": "rack-step-nam-l4-amber",
+     "rect": [
+      528.0,
+      21.333,
+      26.667,
+      29.333
+     ]
+    }
+   }
+  }
+ },
+ "cheeks": {
+  "v": {
+   "picture": "rack-cheek-v",
+   "size": [
+    64.0,
+    2100.0
+   ],
+   "boardLeft": 12.6,
+   "boardWidth": 26.6
+  },
+  "h": {
+   "picture": "rack-cheek-h",
+   "size": [
+    784.0,
+    64.0
+   ],
+   "boardTop": 12.6,
+   "boardBottom": 39.2
+  }
+ }
+}

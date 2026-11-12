@@ -15,7 +15,7 @@ struct NAMJob: View {
                 NAMLogicSteps()
             } else {
                 let connected = m.device != nil && !m.namRows.filter(\.use).isEmpty
-                JobStepper(steps: [("Signal", m.namSignal != nil), ("Connect", connected), ("Set levels", !m.namMeters.isEmpty && m.namMeters.allSatisfy { !$0.clipped }),
+                RackStepStrip(steps: [("Signal", m.namSignal != nil), ("Connect", connected), ("Set levels", !m.namMeters.isEmpty && m.namMeters.allSatisfy { !$0.clipped }),
                                    ("Record", m.namResult != nil), ("Upload", false)])
                 NAMDirectSteps()
                 HStack(alignment: .center, spacing: 10) {

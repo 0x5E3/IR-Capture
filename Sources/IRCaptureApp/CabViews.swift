@@ -18,7 +18,7 @@ struct CabJob: View {
                 }
                 CabImportSteps()
             } else {
-                JobStepper(steps: [("Connect", connected), ("Set levels", levelsDone), ("Capture", m.result != nil), ("Results", m.result != nil)])
+                RackStepStrip(steps: [("Connect", connected), ("Set levels", levelsDone), ("Capture", m.result != nil), ("Results", m.result != nil)])
                 CabConnectStep(done: connected)
                 if let d = TapePieces.deck {
                     // Phase 7: the reel deck replaces the Set levels and Capture panels. The capture's name and files

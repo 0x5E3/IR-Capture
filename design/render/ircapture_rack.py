@@ -1132,13 +1132,13 @@ def red_window(plate, cx, cy, ww, wh, name):
     return -0.7          # the digits' z
 
 
-def flush_led(x, y, col, on, r=0.26):
-    """A flush 5 mm LED in a black collar."""
+def flush_led(x, y, col, on, r=0.26, k=3.5):
+    """A flush 5 mm LED in a black collar. k: the lit emission (under AgX a strong one washes to white)."""
     T_ = _tape()
     T_.cyl('ledcol', r + 0.14, 0.0, 0.1, x, y, 48, SG.black_cast('ledcol'))
     dark = {'green': '#0c2010', 'amber': '#2a1606', 'red': '#2a0806', 'white': '#24201a'}[col]
     hot = {'green': '#38f070', 'amber': '#ffa028', 'red': '#ff2a14', 'white': '#fff0d0'}[col]
-    T_.cyl('led', r, 0.0, 0.18, x, y, 48, led_m('led' + col + str(on), hot, on, 3.5, dark))
+    T_.cyl('led', r, 0.0, 0.18, x, y, 48, led_m('led' + col + str(on) + str(k), hot, on, k, dark))
 
 
 BAR = dict(n=20, w=0.34, h=1.25, pitch=0.465)

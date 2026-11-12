@@ -627,7 +627,8 @@ struct MeterBridge<Content: View>: View {
     @ViewBuilder let content: Content
     static func compact(_ n: Int) -> Bool { false }
     var body: some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 198), spacing: 12, alignment: .topLeading), count: 4),
+        // (Phase 7a) in the rack bay (676 pt) three to a row until the channel module is built as a rack unit
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 198), spacing: 12, alignment: .topLeading)],
                   alignment: .leading, spacing: 12) {
             content
         }
