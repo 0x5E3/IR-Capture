@@ -1132,12 +1132,31 @@ def red_window(plate, cx, cy, ww, wh, name):
     return -0.7          # the digits' z
 
 
-def flush_led(x, y, col, on, r=0.26, k=3.5):
+def flush_led(x, y, col, on, r=0.26, k=3.5, sat=False):
     """A flush 5 mm LED in a black collar. k: the lit emission (under AgX a strong one washes to white)."""
     T_ = _tape()
     T_.cyl('ledcol', r + 0.14, 0.0, 0.1, x, y, 48, SG.black_cast('ledcol'))
     dark = {'green': '#0c2010', 'amber': '#2a1606', 'red': '#2a0806', 'white': '#24201a'}[col]
     hot = {'green': '#38f070', 'amber': '#ffa028', 'red': '#ff2a14', 'white': '#fff0d0'}[col]
+    if sat:
+        # (11-11 late, Lowell: the NAM strip's LEDs "a little pastel") under the Standard view a lit colour with any red
+        # and blue in it clips to a pale tint, and a lens whose base is the hot colour adds the studio's white light on
+        # top. Saturated: the emission nearly a primary, the lens's own colour dark, its coat thinner.
+        # Blender 5's Standard view also rolls bright values off toward white, so the emission is kept low (k about
+        # 0.5 to 0.8), hotter in the middle of the lens than at its rim, as a diffused 5 mm LED.
+        hot = {'green': '#08ff26', 'amber': '#ff8a00', 'red': '#ff1000', 'white': '#fff0d0'}[col]
+        m = mat('ledS' + col + str(on) + str(k), srgb(dark), rough=0.32, coat=0.3, coat_rough=0.08,
+                emit=srgb(hot) if on else None, emit_strength=k if on else 0.0)
+        if on:
+            nt = m.node_tree; b = nt.nodes['Principled BSDF']; co = obj_coords(nt)
+            sep = node(nt, 'ShaderNodeSeparateXYZ'); nt.links.new(co, sep.inputs[0])
+            cx = node(nt, 'ShaderNodeCombineXYZ'); nt.links.new(sep.outputs['X'], cx.inputs['X']); nt.links.new(sep.outputs['Y'], cx.inputs['Y'])
+            ln = node(nt, 'ShaderNodeVectorMath', operation='LENGTH'); nt.links.new(cx.outputs[0], ln.inputs[0])
+            st = node(nt, 'ShaderNodeMapRange', **{'From Min': 0.0, 'From Max': r, 'To Min': 1.45 * k, 'To Max': 0.6 * k})
+            st.interpolation_type = 'SMOOTHSTEP'; nt.links.new(ln.outputs['Value'], st.inputs['Value'])
+            nt.links.new(st.outputs['Result'], b.inputs['Emission Strength'])
+        T_.cyl('led', r, 0.0, 0.18, x, y, 48, m)
+        return
     T_.cyl('led', r, 0.0, 0.18, x, y, 48, led_m('led' + col + str(on) + str(k), hot, on, k, dark))
 
 

@@ -330,6 +330,17 @@ enum GearPreview {
             JobStepper(steps: [("Connect", true), ("Set levels", true), ("Capture", false), ("Results", false)])
             Engraved("The rack bay's step strip: two steps done, the third current", size: 12)
             RackStepStrip(steps: [("Connect", true), ("Set levels", true), ("Capture", false), ("Results", false)])
+            if RackMeterBridge.available {
+                Engraved("The meter bridge: three inputs in a level check (OK; 9 dB low; clipping with distortion), a blank plate in the fourth slot", size: 12)
+                RackMeterBridge(channels: [
+                    RackChannel(id: 0, name: "SM57 cap edge", vu: -0.4, peak: -6.4, lamps: [1], eye: (0.9, true), spoken: "level OK"),
+                    RackChannel(id: 1, name: "R121 center", vu: -9, peak: -15.0, lamps: [0], eye: (0.55, true), spoken: "9 dB low"),
+                    RackChannel(id: 2, name: "Room 3 m", vu: 3.3, peak: -0.1, lamps: [2, 3, 4], eye: (0.2, true), spoken: "clipping"),
+                ])
+                Engraved("Before the level check: four inputs named, the meters at rest", size: 12)
+                RackMeterBridge(channels: [RackChannel(id: 0, name: "SM57"), RackChannel(id: 1, name: "R121 6 in center, 15 deg off axis"),
+                                           RackChannel(id: 2, name: "MD421"), RackChannel(id: 7, name: "Reference")])
+            }
             HStack(alignment: .top, spacing: 16) {
                 Checklist(items: ["A manila card.", "Its second line, for the look of it."], style: PaperStyle(stock: .manila, ring: true))
                     .frame(width: 250)
@@ -432,8 +443,12 @@ struct Shelf: View {
                     .accessibilityHidden(true)
                     if GasKit.display("line") != nil {
                         // (11-11) the status on the bench's VFD: the status, the interface (shortened to fit), the rate
-                        VFDStatusLine(text: vfdLine(left: st.1, middle: m.device?.name ?? "No interface",
-                                                    right: m.device == nil ? "" : rateText, n: VFDStatusLine.n))
+                        // (Phase 7a) during the Cab IR level check, the advice for the input that most needs it
+                        let advice = m.job == .cab && m.levelRunning && RackMeterBridge.available ? m.levelGuidance : nil
+                        let left = advice ?? st.1
+                        let room = left.count + rateText.count + 1 <= VFDStatusLine.n
+                        VFDStatusLine(text: vfdLine(left: left, middle: advice == nil ? (m.device?.name ?? "No interface") : "",
+                                                    right: m.device == nil || !room ? "" : rateText, n: VFDStatusLine.n))
                             .help(rig)
                     } else {
                         GlassWindow(size: 13) {

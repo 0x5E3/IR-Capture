@@ -1,5 +1,6 @@
 #if os(macOS)
 import SwiftUI
+import IRCaptureCore
 
 // Rack.swift: the rack bay (Phase 7a, the visual audit of 2026-11-11; Lowell approved the three proofs).
 //
@@ -26,6 +27,37 @@ struct RackKit: Decodable {
         let size: [CGFloat]          // the picture, pt
         let panel: [CGFloat]         // the unit's slot in the picture: x, y, width, height (pt)
         let layers: [String: Layer]
+        let meters: Meters?          // the meter bridge's own parts
+    }
+    /// The meter bridge (5U): four channel modules. Places are in the base picture (pt).
+    struct Meters: Decodable {
+        struct Module: Decodable {
+            let gas: [CGFloat]       // the gas digits' face (x, y, w, h): the cells, as irc-gas.json's "cells"
+            let gasN: Int
+            let vuPivot: [CGFloat]   // the needle's pivot (under the window's lower edge)
+            let vuWindow: [CGFloat]  // the VU's window: the needle is seen only in it
+            let eye: [CGFloat]       // the eye's centre
+            let strip: [CGFloat]     // the scribble strip (the tape)
+            let lamps: [[CGFloat]]   // each lamp's centre
+        }
+        struct Eye: Decodable {
+            let picture: String      // the states' sheet: warm0, warm1, warm2, x00 … x55, perRow to a row
+            let perRow: Int
+            let states: [String]
+            let cell: [CGFloat]      // a cell (pt)
+            let center: [CGFloat]    // the eye's centre in a cell
+            let bore: CGFloat
+        }
+        struct Needle: Decodable {
+            let picture: String
+            let size: [CGFloat]
+            let pivot: [CGFloat]     // in the needle's picture
+        }
+        let lamps: [String]
+        let vuTable: [[Double]]      // VU, degrees from vertical (clockwise positive)
+        let modules: [Module]
+        let eye: Eye
+        let needle: Needle
     }
     struct Layer: Decodable {
         let picture: String
@@ -54,7 +86,8 @@ struct RackKit: Decodable {
     /// A unit is drawn only when its base and every layer are in the kit.
     static func ready(_ key: String) -> (RackKit, Unit)? {
         guard let k = shared, let u = k.units[key] else { return nil }
-        let files = [u.picture] + u.layers.values.map(\.picture)
+        var files = [u.picture] + u.layers.values.map(\.picture)
+        if let m = u.meters { files += [m.eye.picture, m.needle.picture] }
         guard files.allSatisfy({ SwellPictures.shared.cgImage($0 + ".webp") != nil }) else { return nil }
         return (k, u)
     }
@@ -153,6 +186,10 @@ struct RackUnitPicture: View {
     let unit: RackKit.Unit
     var on: Set<String> = []
     var filament = true
+    /// Layers the caller draws itself (in `overlay`), not switched here.
+    var own: (String) -> Bool = { _ in false }
+    /// Drawn over the picture, in the picture's points (origin its top left).
+    var overlay: AnyView? = nil
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var body: some View {
         let p = unit.panel
@@ -160,7 +197,7 @@ struct RackUnitPicture: View {
             if let base = SwellPictures.shared.image(unit.picture, pxPerPoint: kit.pxPerPoint) {
                 Image(nsImage: base).resizable().interpolation(.high).frame(width: unit.size[0], height: unit.size[1])
             }
-            ForEach(unit.layers.keys.sorted(), id: \.self) { k in
+            ForEach(unit.layers.keys.sorted().filter { !own($0) }, id: \.self) { k in
                 if let l = unit.layers[k], let img = SwellPictures.shared.image(l.picture, pxPerPoint: kit.pxPerPoint) {
                     let lit = on.contains(k)
                     Image(nsImage: img).resizable().interpolation(.high)
@@ -170,6 +207,7 @@ struct RackUnitPicture: View {
                         .animation(filament && !reduceMotion ? SwellMotion.filament(lit) : nil, value: lit)
                 }
             }
+            if let overlay { overlay }
         }
         .frame(width: unit.size[0], height: unit.size[1], alignment: .topLeading)
         .offset(x: -p[0], y: -p[1])
@@ -201,6 +239,237 @@ struct RackStepStrip: View {
         } else {
             JobStepper(steps: steps)
         }
+    }
+}
+
+// ------------------------------------------------------------------ the meter bridge (5U)
+/// One input on the meter bridge, as its module shows it.
+struct RackChannel: Identifiable {
+    let id: Int
+    let name: String
+    /// Peak minus target (0 VU is the target); nil rests the needle.
+    var vu: Double? = nil
+    /// The peak in dBFS for the gas digits; nil leaves them dark.
+    var peak: Double? = nil
+    /// The lamps lit: 0 LOW, 1 OK, 2 HIGH, 3 CLIP, 4 DIST.
+    var lamps: Set<Int> = []
+    var eye: (closure: Double?, lit: Bool) = (nil, false)
+    /// For VoiceOver: the module's state in words.
+    var spoken: String = "no reading"
+}
+
+/// The meter bridge (5U, design/render/ircapture_rack_layers.py `meters`): a frame holding four channel modules, one
+/// for each input in use; a slot with no input holds a blank filler plate. Each module: IR Capture's VU (its lamp warms
+/// with the power clock; the needle on the VU spring), the peak on gas digits lit by the app on the render's geometry,
+/// the noise eye, the lamp row LOW · OK · HIGH · CLIP · DIST (jewels: filaments), the mic's name on its scribble strip.
+/// More than four inputs: a second bridge under the first.
+struct RackMeterBridge: View {
+    let channels: [RackChannel]
+    @ObservedObject private var clock = PowerClock.shared
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    static var available: Bool { RackKit.ready("meters")?.1.meters != nil }
+
+    var body: some View {
+        if let r = RackKit.ready("meters"), let mt = r.1.meters {
+            let kit = r.0, u = r.1
+            let n = min(channels.count, mt.modules.count)
+            let on = lit(n: n, slots: mt.modules.count)
+            RackUnitPicture(kit: kit, unit: u, on: on, own: { $0.hasSuffix("-vu") },
+                            overlay: AnyView(modules(kit: kit, u: u, mt: mt, n: n)))
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Level meters")
+                .accessibilityValue(channels.prefix(n).map { "\($0.name): \($0.spoken)" }.joined(separator: ". "))
+        }
+    }
+
+    /// The layers shown: each slot past the inputs a blank plate, each lit lamp.
+    func lit(n: Int, slots: Int) -> Set<String> {
+        var on = Set<String>()
+        for i in 0..<slots where i >= n { on.insert("b\(i)") }
+        for i in 0..<n { for k in channels[i].lamps { on.insert("m\(i)-l\(k)") } }
+        return on
+    }
+
+    @ViewBuilder func modules(kit: RackKit, u: RackKit.Unit, mt: RackKit.Meters, n: Int) -> some View {
+        ZStack(alignment: .topLeading) {
+            // the VU lamps, warming with the power clock
+            TimelineView(.animation(paused: !clock.warming || reduceMotion)) { ctx in
+                let glow = reduceMotion ? 1 : clock.lampGlow(at: ctx.date)
+                ZStack(alignment: .topLeading) {
+                    ForEach(0..<n, id: \.self) { i in
+                        if let l = u.layers["m\(i)-vu"], let img = SwellPictures.shared.image(l.picture, pxPerPoint: kit.pxPerPoint) {
+                            Image(nsImage: img).resizable().interpolation(.high)
+                                .frame(width: l.rect[2], height: l.rect[3]).offset(x: l.rect[0], y: l.rect[1])
+                                .opacity(glow)
+                        }
+                    }
+                }
+                .frame(width: u.size[0], height: u.size[1], alignment: .topLeading)
+            }
+            ForEach(0..<n, id: \.self) { i in
+                let md = mt.modules[i], ch = channels[i]
+                RackNeedle(kit: kit, mt: mt, md: md, size: u.size, vu: ch.vu)
+                if let p = ch.peak {
+                    SegCanvas(text: GasDigits.text(p, n: md.gasN),
+                              d: GasKit.Display(file: "", pt: u.size, px_per_pt: kit.pxPerPoint, bezel: [0, 0, u.size[0], u.size[1]],
+                                                cells: md.gas, n: md.gasN, mtx: nil, pitch: 1.3, slant: 8))
+                        .frame(width: u.size[0], height: u.size[1])
+                }
+                if ch.eye.lit {
+                    RackEye(kit: kit, eye: mt.eye, closure: ch.eye.closure)
+                        .offset(x: md.eye[0] - mt.eye.center[0], y: md.eye[1] - mt.eye.center[1])
+                }
+                RackStripName(name: ch.name, strip: md.strip, tilt: i % 2 == 0 ? -0.5 : 0.5)
+            }
+        }
+        .frame(width: u.size[0], height: u.size[1], alignment: .topLeading)
+    }
+}
+
+/// A VU's needle: the rendered needle turned about its pivot on the VU spring, its shadow on the card, seen only
+/// through the window.
+private struct RackNeedle: View {
+    let kit: RackKit
+    let mt: RackKit.Meters
+    let md: RackKit.Meters.Module
+    let size: [CGFloat]
+    let vu: Double?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    var angle: Double {
+        let t = mt.vuTable.filter { $0.count == 2 }.map { ($0[0], $0[1]) }
+        return VUMeter.angle(vu, table: t)
+    }
+    var body: some View {
+        let N = mt.needle, w = md.vuWindow
+        let anchor = UnitPoint(x: N.pivot[0] / N.size[0], y: N.pivot[1] / N.size[1])
+        let x = md.vuPivot[0] - N.pivot[0], y = md.vuPivot[1] - N.pivot[1]
+        let a = angle
+        if let img = SwellPictures.shared.image(N.picture, pxPerPoint: kit.pxPerPoint) {
+            ZStack(alignment: .topLeading) {
+                // its shadow on the card: down and right of it (the light is up and to the left)
+                Image(nsImage: img).resizable().interpolation(.high).frame(width: N.size[0], height: N.size[1])
+                    .colorMultiply(.black).opacity(0.34).blur(radius: 0.8)
+                    .rotationEffect(.degrees(a), anchor: anchor)
+                    .offset(x: x + 0.7, y: y + 1.0)
+                Image(nsImage: img).resizable().interpolation(.high).frame(width: N.size[0], height: N.size[1])
+                    .rotationEffect(.degrees(a), anchor: anchor)
+                    .offset(x: x, y: y)
+            }
+            .animation(reduceMotion ? nil : SwellMotion.vuSpring, value: a)
+            .frame(width: size[0], height: size[1], alignment: .topLeading)
+            .mask(alignment: .topLeading) {
+                Rectangle().frame(width: w[2], height: w[3]).offset(x: w[0], y: w[1])
+            }
+        }
+    }
+}
+
+/// The noise eye of a module: the bore's states from the sheet (module 0's eye, the same tube in every module), the two
+/// frames round the exact closure summed as MagicEye does; the tube's glow comes up with the power clock.
+private struct RackEye: View {
+    let kit: RackKit
+    let eye: RackKit.Meters.Eye
+    let closure: Double?
+    @ObservedObject private var clock = PowerClock.shared
+    @State private var shown = 0.0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    var target: Double { max(0, min(Double(eye.states.count - 4), (closure ?? 0) * Double(eye.states.count - 4))) }
+    func cell(_ i: Int) -> NSImage? {
+        let w = (eye.cell[0] * kit.pxPerPoint).rounded(), h = (eye.cell[1] * kit.pxPerPoint).rounded()
+        let r = CGRect(x: CGFloat(i % eye.perRow) * w, y: CGFloat(i / eye.perRow) * h, width: w, height: h)
+        return SwellPictures.shared.sprite(eye.picture + ".webp", rect: r, pxPerPoint: kit.pxPerPoint)
+    }
+    var body: some View {
+        TimelineView(.animation(paused: !clock.warming || reduceMotion)) { ctx in
+            let glow = reduceMotion ? 1 : clock.eyeGlow(at: ctx.date)
+            ZStack(alignment: .topLeading) {
+                if glow < 1, let w = cell(2) {
+                    Image(nsImage: w).resizable().interpolation(.high).opacity(min(1, glow * 3) * (1 - glow))
+                }
+                MagicEye.EyeFrames(x: reduceMotion ? target.rounded() : target) { n in cell(n) }
+                    .animation(reduceMotion ? nil : SwellMotion.eye(closing: target > shown), value: target)
+                    .opacity(glow)
+            }
+            .frame(width: eye.cell[0], height: eye.cell[1], alignment: .topLeading)
+        }
+        .onChange(of: target) { shown = $0 }
+        .onAppear { shown = target }
+    }
+}
+
+/// The mic's name hand-lettered on a module's scribble strip (the tape is in the base picture).
+private struct RackStripName: View {
+    let name: String
+    let strip: [CGFloat]
+    let tilt: Double
+    var body: some View {
+        let inset: CGFloat = 10.5                       // 0.75 cm, as the render letters it
+        let avail = strip[2] - 2 * inset
+        let fit = MarkerFit.fit(name, avail: avail)
+        Text(name).font(.swellMarker(fit.size)).lineLimit(fit.lines).lineSpacing(-3)
+            .foregroundColor(MarkerFit.ink.opacity(0.92))
+            .frame(width: avail, height: strip[3] - 2, alignment: .leading)
+            .rotationEffect(.degrees(tilt))
+            .offset(x: strip[0] + inset, y: strip[1] + 1)
+            .accessibilityHidden(true)
+    }
+}
+
+/// The meter bridges for the inputs in use, four to a bridge. Without the bridge's pictures, nothing (the caller keeps
+/// the old meters).
+struct RackMeterBay: View {
+    @EnvironmentObject var m: AppModel
+    var body: some View {
+        let ch = m.meterChannels
+        let groups = stride(from: 0, to: max(ch.count, 1), by: 4).map { Array(ch[min($0, ch.count)..<min($0 + 4, ch.count)]) }
+        VStack(spacing: 0) {
+            ForEach(Array(groups.enumerated()), id: \.offset) { _, g in RackMeterBridge(channels: g) }
+        }
+    }
+}
+
+extension AppModel {
+    /// Each input in use (mic or reference), in the interface's order, with its latest level reading.
+    var meterChannels: [RackChannel] {
+        inputs.filter { $0.role != .off }.sorted { $0.id < $1.id }.map { row in
+            let r = levelReadings.first { $0.channel == row.id }
+            var c = RackChannel(id: row.id, name: row.role == .mic ? row.name : label(for: row.id))
+            c.eye = (nil, levelRunning)
+            guard let r else { return c }
+            c.peak = r.peakDBFS
+            let noSignal = r.peakDBFS < -60
+            c.vu = noSignal ? nil : -r.changeDB
+            let d = r.changeDB
+            if noSignal || d > 3 { c.lamps.insert(0) } else if d < -3 { c.lamps.insert(2) } else if !r.clipped { c.lamps.insert(1) }
+            if r.clipped { c.lamps.insert(3) }
+            if row.role != .ref && max(r.h2, r.h3) > -40 { c.lamps.insert(4) }
+            if let n = noise[r.channel] {
+                c.eye = (noSignal ? 0 : max(0, min(1, (r.peakDBFS - n - 20) / 40)), true)
+            }
+            let words = [r.clipped ? "clipping" : nil, noSignal ? "no signal" : abs(d) <= 3 ? "level OK" : String(format: "%+.0f dB from the target", -d),
+                         c.lamps.contains(4) ? "distortion" : nil].compactMap { $0 }
+            c.spoken = words.joined(separator: ", ") + String(format: ", peak %.1f dBFS", r.peakDBFS)
+            return c
+        }
+    }
+
+    /// The level check's advice for the input that most needs it, for the shelf's VFD (the sentence that stood under
+    /// each meter): clipping first, then no signal, then the largest correction, then distortion.
+    var levelGuidance: String? {
+        let rs = levelReadings
+        guard !rs.isEmpty else { return nil }
+        func short(_ s: String) -> String {
+            if s.hasPrefix("Input ") { return "IN " + s.dropFirst(6) }
+            return String((s.split(separator: " ").first.map(String.init) ?? s).prefix(9)).uppercased()
+        }
+        if let r = rs.first(where: \.clipped) { return "CLIP  TURN \(short(r.label)) DOWN" }
+        if let r = rs.first(where: { $0.peakDBFS < -60 }) { return "CHECK \(short(r.label)) CABLE" }
+        if let r = rs.filter({ $0.label != "Reference" && abs($0.changeDB) > 3 }).max(by: { abs($0.changeDB) < abs($1.changeDB) }) {
+            return "TURN \(short(r.label)) \(r.changeDB > 0 ? "UP" : "DOWN") \(Int(abs(r.changeDB).rounded())) DB"
+        }
+        if rs.contains(where: { $0.label != "Reference" && max($0.h2, $0.h3) > -30 }) { return "LOWER THE AMP VOLUME" }
+        return "LEVELS OK"
     }
 }
 

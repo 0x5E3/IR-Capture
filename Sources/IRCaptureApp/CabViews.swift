@@ -24,6 +24,8 @@ struct CabJob: View {
                     // Phase 7: the reel deck replaces the Set levels and Capture panels. The capture's name and files
                     // come first, the guidance beside the deck, the meters under it.
                     CabFilesStep()
+                    // (Phase 7a) the meter bridge: a 5U rack unit, one channel module for each input in use
+                    if RackMeterBridge.available { RackMeterBay() }
                     HStack(alignment: .top, spacing: 16) {
                         Checklist(items: levelSteps, style: PaperStyle(stock: .manila, ring: true))
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -32,7 +34,7 @@ struct CabJob: View {
                     .id("machine")
                     ReelDeck(d: d).padding(.top, 4)
                     CabDeckStatus()
-                    if !m.levelReadings.isEmpty { LevelTable(readings: m.levelReadings) }
+                    if !RackMeterBridge.available && !m.levelReadings.isEmpty { LevelTable(readings: m.levelReadings) }
                 } else {
                     CabLevelStep(done: levelsDone)
                     CabCaptureStep()

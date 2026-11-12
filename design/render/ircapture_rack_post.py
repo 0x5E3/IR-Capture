@@ -40,17 +40,22 @@ def save(im, name):
     im.save(os.path.join(PIC, name + '.webp'))
 
 
-def layer(base, crop_path, box):
+def layer(base, crop_path, box, whole=False):
     """The pixels of a live state that differ from the base: a mask from the difference, opened out and feathered, the
-    layer cut to the mask's box. Returns (RGBA picture, box in the base's pixels) or None when nothing changed."""
+    layer cut to the mask's box. Returns (RGBA picture, box in the base's pixels) or None when nothing changed.
+    whole: the crop entire (a part that replaces everything in its box, as a blank plate over a module: where the two
+    happen to match the difference is under the threshold, and the module behind would show through)."""
     lyr = Image.open(crop_path).convert('RGBA')
     x0, y0 = box[0], box[1]
     b = np.asarray(base.crop((x0, y0, x0 + lyr.size[0], y0 + lyr.size[1])), dtype=np.float32)
     a = np.asarray(lyr, dtype=np.float32)
-    d = np.abs(a[..., :3] - b[..., :3]).max(axis=2)
-    m = np.clip((d - 3.0) / 9.0, 0, 1)                    # under 3 of 255: render noise; full from 12
-    mi = Image.fromarray((m * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(7)).filter(ImageFilter.GaussianBlur(2.5))
-    m = np.asarray(mi, dtype=np.float32) / 255.0
+    if whole:
+        m = np.ones(a.shape[:2], np.float32)
+    else:
+        d = np.abs(a[..., :3] - b[..., :3]).max(axis=2)
+        m = np.clip((d - 3.0) / 9.0, 0, 1)                    # under 3 of 255: render noise; full from 12
+        mi = Image.fromarray((m * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(7)).filter(ImageFilter.GaussianBlur(2.5))
+        m = np.asarray(mi, dtype=np.float32) / 255.0
     # the crop's own edge: the denoiser saw only the crop, so its outer rows may differ from the base; fade them out
     e = 4
     ramp = np.ones_like(m)
@@ -67,6 +72,49 @@ def layer(base, crop_path, box):
     return im, (x0 + bx0, y0 + by0, bx1 - bx0, by1 - by0)
 
 
+def rect(a):
+    """(x0, y0, x1, y1) px to [x, y, w, h] pt."""
+    x0, x1 = sorted((a[0], a[2])); y0, y1 = sorted((a[1], a[3]))
+    return [pt(x0), pt(y0), pt(x1 - x0), pt(y1 - y0)]
+
+
+def meters(L):
+    """The meter bridge's own parts: each module's places (pt in the base picture), the eye's states as one sheet (the
+    bore of module 0's eye, the same at every module), the needle alone."""
+    M = L['meters']
+    out = {'lamps': M['lamps'], 'vuTable': M['vuTable'], 'modules': []}
+    for m in M['modules']:
+        out['modules'].append({'gas': rect(m['gas']), 'gasN': m['gasN'], 'vuPivot': [pt(v) for v in m['vuPivot']],
+                               'vuWindow': rect(m['vuWindow']), 'eye': [pt(v) for v in m['eye']], 'strip': rect(m['strip']),
+                               'lamps': [[pt(v) for v in p] for p in m['lamps']]})
+    # the eye: each state's crop cut to the bore (a circle, its edge feathered a pixel), twelve to a row
+    E = L['eye']
+    bx = E['box_px']; side = (bx[2] - bx[0], bx[3] - bx[1])
+    cx, cy = E['center'][0] - bx[0], E['center'][1] - bx[1]
+    rad = E['bore_cm'] * PXCM
+    yy, xx = np.mgrid[0:side[1], 0:side[0]].astype(np.float32)
+    circ = np.clip(rad + 0.5 - np.hypot(xx + 0.5 - cx, yy + 0.5 - cy), 0, 1)
+    n = len(E['pictures']); per = 12; rows = -(-n // per)
+    sheet = Image.new('RGBA', (per * side[0], rows * side[1]), (0, 0, 0, 0))
+    for i, nm in enumerate(E['pictures']):
+        im = Image.open(os.path.join(RD, nm + '.png')).convert('RGBA')
+        a = np.asarray(im, dtype=np.float32).copy(); a[..., 3] *= circ
+        sheet.paste(Image.fromarray(a.astype(np.uint8), 'RGBA'), ((i % per) * side[0], (i // per) * side[1]))
+    save(sheet, 'rack-meters-eye')
+    out['eye'] = {'picture': 'rack-meters-eye', 'perRow': per, 'states': E['states'], 'cell': [pt(side[0]), pt(side[1])],
+                  'center': [pt(cx), pt(cy)], 'bore': pt(rad)}
+    # the needle: its own alpha (rendered alone), cut tight; the pivot in that picture
+    N = L['needle']
+    im = Image.open(os.path.join(RD, N['picture'] + '.png')).convert('RGBA')
+    bb = im.getchannel('A').point(lambda v: 255 if v > 2 else 0).getbbox()
+    im = im.crop(bb); save(im, 'rack-meters-needle')
+    px0, py0 = N['box_px'][0] + bb[0], N['box_px'][1] + bb[1]
+    out['needle'] = {'picture': 'rack-meters-needle', 'size': [pt(im.size[0]), pt(im.size[1])],
+                     'pivot': [pt(N['pivot'][0] - px0), pt(N['pivot'][1] - py0)]}
+    print('  meters: %d modules, eye %d states, needle %s' % (len(out['modules']), n, im.size))
+    return out
+
+
 for key, L in lay.get('units', {}).items():
     base = Image.open(os.path.join(RD, L['picture'] + '.png')).convert('RGBA')
     save(base, L['picture'])
@@ -74,13 +122,14 @@ for key, L in lay.get('units', {}).items():
     u = {'picture': L['picture'], 'u': L['u'], 'size': [pt(base.size[0]), pt(base.size[1])],
          'panel': [pt(tl[0]), pt(tl[1]), pt(br[0] - tl[0]), pt(br[1] - tl[1])], 'layers': {}}
     for lk, LL in L.get('layers', {}).items():
-        r = layer(base, os.path.join(RD, LL['picture'] + '.png'), LL['box_px'])
+        r = layer(base, os.path.join(RD, LL['picture'] + '.png'), LL['box_px'], whole=key == 'meters' and lk.startswith('b'))
         if r is None:
             print('  %s %s: no change from the base' % (key, lk)); continue
         im, (x, y, w, h) = r
         save(im, LL['picture'])
         u['layers'][lk] = {'picture': LL['picture'], 'rect': [pt(x), pt(y), pt(w), pt(h)]}
     if 'lamp_x_cm' in L: u['lampXcm'] = L['lamp_x_cm']
+    if 'meters' in L: u['meters'] = meters(L)
     J['units'][key] = u
     print(key, base.size, len(u['layers']), 'layers')
 

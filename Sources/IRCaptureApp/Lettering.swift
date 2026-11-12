@@ -354,7 +354,7 @@ struct GasDigits: View {
     }
 }
 
-private struct SegCanvas: View {
+struct SegCanvas: View {
     let text: String
     let d: GasKit.Display
     struct Seg { let a: CGPoint; let b: CGPoint; let dot: Bool; let k: Double }

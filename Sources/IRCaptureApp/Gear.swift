@@ -743,7 +743,7 @@ struct MagicEye: View {
 
     /// The frames below and above x, summed: (1 - w) of frame floor(x) plus w of the next, in an isolated group.
     /// Frame n of a sheet: 3 + the step (0 … 2 are the warm-up).
-    private struct EyeFrames: View, Animatable {
+    struct EyeFrames: View, Animatable {
         var x: Double
         let picture: (Int) -> NSImage?
         var animatableData: Double { get { x } set { x = newValue } }
