@@ -116,6 +116,8 @@ struct NAMDirectSteps: View {
                 Step(title: "Capture name", subtitle: "Name the capture after the amp and its settings.", done: !m.namName.isEmpty) {
                     NAMNameRow()
                 }
+                // the rack bay: the meter bridge stands over the cart (the proof's order)
+                if RackNAMMeterBridge.available { RackNAMMeterBay().id("machine") }
                 HStack(alignment: .top, spacing: 16) {
                     Checklist(items: [
                         "Warm the amp up for about 20 minutes. Wear ear protection for full chain captures.",
@@ -125,7 +127,7 @@ struct NAMDirectSteps: View {
                         "Click Record. The full training signal (3 minutes 10 seconds) is played and all inputs are recorded.",
                     ], style: PaperStyle(stock: .manila, ring: true))
                 }
-                .id("machine")
+                .id(RackNAMMeterBridge.available ? "checklist" : "machine")
                 CartMachine(c: c).padding(.top, 4)
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(spacing: 12) {
@@ -139,7 +141,7 @@ struct NAMDirectSteps: View {
                     if let e = m.namLevelError { ErrorNote(e) }
                     if let e = m.namError { ErrorNote(e) }
                 }
-                if !m.namMeters.isEmpty { NAMMeterTable(meters: m.namMeters) }
+                if !m.namMeters.isEmpty && !RackNAMMeterBridge.available { NAMMeterTable(meters: m.namMeters) }
                 Note("After recording, the files are aligned, verified and saved in a folder for upload to TONE3000. The unprocessed recording is kept in a “raw recording” subfolder.")
             } else {
             Step(n: 3, title: "Set levels", subtitle: "The loudest 6 seconds of the training signal are looped for setting each input.") {

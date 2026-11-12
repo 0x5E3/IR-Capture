@@ -10,6 +10,7 @@
 #   step-nam   1U graphite anodised, five flush LEDs: SIGNAL, CONNECT, SET LEVELS, RECORD, UPLOAD (the NAM rack's family)
 #   meters     5U meter bridge          results    7U take sheet, typed by the app
 #   chart      6U hook-up drawing and card (whole)          preflight  4U BEFORE CAPTURE, typed by the app
+#   patch      2U eight toggles MIC / OFF / REF            nammeters  3U NAM meter bridge (bars, LED digits, LEDs)
 #
 #   FONTS_DIR=Resources/SwellKit/fonts IRC_LIQUID_RELIEF=0.7 ~/bvenv/bin/python design/render/ircapture_rack_layers.py \
 #       <out> <unit[,unit]> [px/cm] [samples]
@@ -713,8 +714,240 @@ def unit_patch():
             _save()
 
 
+# ---------------------------------------------------------------------------------------------------------------------
+# the NAM meter bridge (3U): the third proof's unit_nammeters, built once with its live parts switchable
+#
+# Four graphite channel modules in a graphite frame. Each: twenty LED bars, -40 to 0 dBFS in 2 dB steps (green to -6,
+# amber to -2, red) behind smoked glass; the peak on four red seven-segment LED cells behind a red filter; LOW / OK /
+# HIGH / CLIP as flush LEDs; the scribble strip. The LEDs are the saturated kind (flush_led's sat, the NAM step strip's):
+# the emission nearly a primary, hotter in the middle of each bar or segment than at its edge.
+#   base        every bar, segment and LED dark, the strips blank
+#   m<i>-bars   module i's twenty bars all lit: the app shows the bars up to the level (and the peak-hold bar) through
+#               a mask of their columns, as a real bargraph lights a run of bars
+#   m<i>-dig    module i's cells with every segment and point lit: the app shows the lit segments through a mask of
+#               their outlines (`cells` in irc-rack.json), as the gas digits are lit on the render's geometry
+#   m<i>-l<k>   module i's LED k (LOW OK HIGH CLIP)
+#   b<i>        a blank filler plate in slot i (taken whole by the post)
+
+NBAR = dict(n=20, w=0.34, h=1.25, pitch=0.465)
+NDIG = dict(n=4, hgt=1.4, x=-1.85, win=(6.3, 2.2))
+NAM_SLOTS = [('N1', 'a'), ('N2', 'b'), ('N3', 'c'), ('N4', 'd')]
+NAM_LED_K = float(os.environ.get('IRC_NAM_LED_K', '0.6'))      # the flush LEDs (as the NAM step strip)
+NAM_BAR_K = float(os.environ.get('IRC_NAM_BAR_K', '4.2'))      # the bars: behind smoked glass
+NAM_DIG_K = float(os.environ.get('IRC_NAM_DIG_K', '1.6'))      # the digits: behind the red filter
+SAT_HOT = {'green': '#08ff26', 'amber': '#ff8a00', 'red': '#ff1000'}
+SAT_DARK = {'green': '#07120a', 'amber': '#150b04', 'red': '#170504'}
+
+
+def _sat_mat(name, col, on, k, rx, ry):
+    """A saturated LED's diffuser (flush_led's sat, for a bar or a segment rx x ry cm half-sizes): dark resin; lit, the
+    emission nearly a primary, 1.35 k at the middle falling to 0.55 k at the edges, a faint mottle in the diffuser."""
+    m = R.mat(name, R.srgb(SAT_DARK[col]), rough=0.3, coat=0.3, coat_rough=0.08,
+              emit=R.srgb(SAT_HOT[col]) if on else None, emit_strength=k if on else 0.0)
+    if on:
+        nt = m.node_tree; b = nt.nodes['Principled BSDF']; co = R.obj_coords(nt)
+        sep = R.node(nt, 'ShaderNodeSeparateXYZ'); nt.links.new(co, sep.inputs[0])
+        dx = R.node(nt, 'ShaderNodeMath', operation='DIVIDE'); nt.links.new(sep.outputs['X'], dx.inputs[0]); dx.inputs[1].default_value = rx
+        dy = R.node(nt, 'ShaderNodeMath', operation='DIVIDE'); nt.links.new(sep.outputs['Y'], dy.inputs[0]); dy.inputs[1].default_value = ry
+        cxy = R.node(nt, 'ShaderNodeCombineXYZ'); nt.links.new(dx.outputs[0], cxy.inputs['X']); nt.links.new(dy.outputs[0], cxy.inputs['Y'])
+        ln = R.node(nt, 'ShaderNodeVectorMath', operation='LENGTH'); nt.links.new(cxy.outputs[0], ln.inputs[0])
+        st = R.node(nt, 'ShaderNodeMapRange', **{'From Min': 0.0, 'From Max': 1.0, 'To Min': 1.35 * k, 'To Max': 0.55 * k})
+        st.interpolation_type = 'SMOOTHSTEP'; nt.links.new(ln.outputs['Value'], st.inputs['Value'])
+        mt = R.node(nt, 'ShaderNodeMapRange', **{'From Min': 0.3, 'From Max': 0.7, 'To Min': 0.9, 'To Max': 1.08})
+        nt.links.new(R.noise(nt, co, 90.0, 2.0, 0.5), mt.inputs['Value'])
+        mm = R.node(nt, 'ShaderNodeMath', operation='MULTIPLY'); nt.links.new(st.outputs['Result'], mm.inputs[0]); nt.links.new(mt.outputs['Result'], mm.inputs[1])
+        nt.links.new(mm.outputs[0], b.inputs['Emission Strength'])
+    return m
+
+
+def _nam_bars(plate, cx, cy, name):
+    """bargraph() with its bars switchable: returns (bars [(object, lit material, dark material, x)], window w, h)."""
+    n, bw, bh, pp = NBAR['n'], NBAR['w'], NBAR['h'], NBAR['pitch']
+    ww, wh = n * pp + 0.5, bh + 0.7
+    ho = R.rbox('bgh', ww, wh, R.T + 2, -R.T - 1, 0.08); ho.location = (cx, cy, 0)
+    bpy.context.view_layer.update(); R.cut(plate, ho)
+    bz = R.rbox('bgbz', ww + 0.8, wh + 0.8, 0.16, 0.0, 0.14, roll=0.05); bz.location = (cx, cy, 0)
+    R.cut(bz, R.prism('bgbh', [(px + cx, py + cy, pz) for px, py, pz in R._rring(ww / 2, wh / 2, 0.08, 0.0, 0, n_arc=8)], -2, 2))
+    R.chamfer(bz, 0.015, 2); bz.data.materials.append(R.SG.black_cast('bgbz' + name))
+    bk = R.rbox('bgback', ww, wh, 0.05, -0.75, 0.0); bk.location = (cx, cy, 0)
+    bk.data.materials.append(R.mat('bgback', R.srgb('#070707'), rough=0.7))
+    ms = {}
+    bars = []
+    for i in range(n):
+        c = R.bar_colour(i)
+        if c not in ms:
+            ms[c] = (_sat_mat('nbar-on-' + c, c, True, NAM_BAR_K, bw / 2, bh / 2), _sat_mat('nbar-off-' + c, c, False, 0, bw / 2, bh / 2))
+        o = R.rbox('bar', bw, bh, 0.06, -0.7, 0.03); x = cx - (n - 1) * pp / 2 + i * pp; o.location = (x, cy, 0)
+        o.data.materials.append(ms[c][1])
+        bars.append((o, ms[c][0], ms[c][1], x))
+    g = R.rbox('smoke', ww + 0.1, wh + 0.1, 0.05, -0.1, 0.0); g.location = (cx, cy, 0)
+    g.data.materials.append(R.mat('smoke', R.srgb('#6a665e'), rough=0.05, transm=1.0, ior=1.0, spec=0.0))
+    g.visible_shadow = False; R.GLASS.append(g)
+    return bars, ww + 0.8, wh + 0.8
+
+
+def _nam_cells(cx, cy, z, on_m, off_m):
+    """led_digits() with every segment kept: four cells, all segments dark. Returns the segments [(object, outline)]
+    (outline: the segment's corners in world cm) and each cell's segments by name (a..g, p)."""
+    hgt = NDIG['hgt']; n = NDIG['n']
+    pitch = hgt * 0.74; w = hgt * 0.5; t = hgt * 0.12; sl = R.math.tan(R.math.radians(8))
+    x0 = cx - pitch * (n - 1) / 2
+    segs, cells = [], []
+    for i in range(n):
+        x_ = x0 + i * pitch
+        cell = {}
+        geo = {'a': (0, hgt / 2, True), 'g': (0, 0, True), 'd': (0, -hgt / 2, True),
+               'f': (-w / 2, hgt / 4, False), 'b': (w / 2, hgt / 4, False), 'e': (-w / 2, -hgt / 4, False), 'c': (w / 2, -hgt / 4, False)}
+        for k_, (sx, sy, horiz) in geo.items():
+            sw_, sh_ = (w - t, t) if horiz else (t, hgt / 2 - t)
+            o = R.rbox('seg', sw_, sh_, 0.02, z, t * 0.45)
+            ox_, oy_ = x_ + sx + sy * sl, cy + sy
+            o.location = (ox_, oy_, 0)
+            corners = [(-sw_ / 2, -sh_ / 2), (sw_ / 2, -sh_ / 2), (sw_ / 2, sh_ / 2), (-sw_ / 2, sh_ / 2)]
+            if not horiz:
+                for v in o.data.vertices: v.co.x += v.co.y * sl
+                corners = [(px + py * sl, py) for px, py in corners]
+            o.data.materials.append(off_m)
+            cell[k_] = len(segs); segs.append((o, [(ox_ + px, oy_ + py) for px, py in corners]))
+        s_ = t * 1.1; px_, py_ = x_ + w / 2 + t * 1.4 - hgt / 2 * sl, cy - hgt / 2
+        o = R.rbox('dp', s_, s_, 0.02, z, t * 0.5); o.location = (px_, py_, 0)
+        o.data.materials.append(off_m)
+        cell['p'] = len(segs); segs.append((o, [(px_ - s_ / 2, py_ - s_ / 2), (px_ + s_ / 2, py_ - s_ / 2), (px_ + s_ / 2, py_ + s_ / 2), (px_ - s_ / 2, py_ + s_ / 2)]))
+        cells.append(cell)
+    return segs, cells
+
+
+def _nam_module(name, v, ox):
+    """ircapture_rack.nam_module at rest, its live parts kept."""
+    MW, MZ, NMH = R.MW, R.MZ, R.NMH
+    K.set_seed('rack-nmod-' + name)
+    before = set(bpy.data.objects)
+    with R.moved(ox, 0, MZ):
+        pl = R.rbox('nplate', MW, NMH, MZ, -MZ, 0.18, roll=0.05)
+        yb = NMH / 2 - 1.65
+        bars, bgw, bgh = _nam_bars(pl, 0.0, yb, name)
+        yp = yb - bgh / 2 - 1.15 - 1.4
+        pw_, ph_ = NDIG['win']
+        zd = R.red_window(pl, NDIG['x'], yp, pw_, ph_, name)
+        R.chamfer(pl, 0.015, 2); TK.flat_faces(pl)
+        pl.data.materials.append(K.anodised('nmod-' + name, base='#2e2e30'))
+        R.small_screws([(sx * (MW / 2 - 0.45), sy * (NMH / 2 - 0.45)) for sx in (-1, 1) for sy in (-1, 1)], seed=K.seed_of(name) % 7)
+        t = NDIG['hgt'] * 0.12
+        on_m = _sat_mat('dseg-on', 'red', True, NAM_DIG_K, t / 2, t / 2)
+        off_m = R.mat('dseg-off', R.srgb('#1a0605'), rough=0.3, coat=0.5, coat_rough=0.05)
+        segs, cells = _nam_cells(NDIG['x'], yp, zd, on_m, off_m)
+        n, pp = NBAR['n'], NBAR['pitch']
+        for db in (-40, -20, -12, -8, -4, 0):
+            i = (db + 40) / 2 - 0.5
+            x = -(n - 1) * pp / 2 + i * pp
+            R.engrave(str(db), max(-(n - 1) * pp / 2, min((n - 1) * pp / 2, x)), yb - bgh / 2 - 0.5, 0.38, track=0.06)
+        R.engrave('PEAK  dBFS', NDIG['x'], yp - ph_ / 2 - 0.9, 0.44, track=0.14)
+        leds = []
+        for i, (lab, col) in enumerate(R.NLAMPS):
+            lx = 2.85 + (i % 2) * 1.7; ly = yp + 0.62 - (i // 2) * 1.55
+            b0 = set(bpy.data.objects)
+            R.flush_led(lx, ly, col, True, k=NAM_LED_K, sat=True)
+            lens = [o for o in _new_since(b0) if o.name.startswith('led') and not o.name.startswith('ledcol')][0]
+            hot = lens.data.materials[0]
+            dark = R.mat('ledS%s-dark' % col, R.srgb({'green': '#0c2010', 'amber': '#2a1606', 'red': '#2a0806'}[col]),
+                         rough=0.32, coat=0.3, coat_rough=0.08)
+            lens.data.materials[0] = dark
+            leds.append(dict(lens=lens, hot=hot, dark=dark, x=ox + lx, y=ly))
+            R.engrave(lab, lx, ly - 0.62, 0.38, track=0.1)
+        ys = -NMH / 2 + 0.55 + K.SCRIB['h'] / 2
+        with R.moved(0, ys, 0): R.strip(v, 10.2, '', name)
+    return dict(x=ox, bars=[(o, a, b, x + ox) for o, a, b, x in bars], yb=yb, bar_h=NBAR['h'],
+                segs=[(o, [(px + ox, py) for px, py in pts]) for o, pts in segs], cells=cells, on_m=on_m, off_m=off_m,
+                yp=yp, leds=leds, ys=ys, strip_len=10.2, objs=_new_since(before))
+
+
+def _nam_blank(name, ox):
+    K.set_seed('rack-nblank-' + name)
+    b0 = set(bpy.data.objects)
+    with R.moved(ox, 0, R.MZ):
+        pl = R.rbox('nplate', R.MW, R.NMH, R.MZ, -R.MZ, 0.18, roll=0.05)
+        R.chamfer(pl, 0.015, 2); TK.flat_faces(pl); pl.data.materials.append(K.anodised('nblank-' + name, base='#2a2a2c'))
+        R.small_screws([(sx * (R.MW / 2 - 0.45), sy * (R.NMH / 2 - 0.45)) for sx in (-1, 1) for sy in (-1, 1)], seed=K.seed_of(name) % 7 + 2)
+    bl = _new_since(b0)
+    for o in bl: o.hide_render = True
+    return bl
+
+
+def build_nammeters():
+    K.set_seed('rack-nmeters')
+    s, cam, h = R.unit_scene(3)
+    R.backing(h)
+    fr, hh = R.rack_panel(3, 'alu', 'nbridge')
+    op = R.rbox('fopen', 4 * R.MW + 0.1, R.NMH - 0.6, 4, -2, 0.1); bpy.context.view_layer.update(); R.cut(fr, op)
+    fr.data.materials.append(K.anodised('nbridge', base='#232325'))
+    mods, blanks = [], []
+    for i, (nm, v) in enumerate(NAM_SLOTS):
+        ox = (i - 1.5) * (R.MW + 0.06)
+        mods.append(_nam_module(nm, v, ox))
+        blanks.append(_nam_blank(nm, ox))
+    R.finish_glass()
+    return s, cam, h, mods, blanks
+
+
+def _nam_light(m_, what, on):
+    if what == 'bars':
+        for o, hot, dark, _ in m_['bars']: o.data.materials[0] = hot if on else dark
+    elif what == 'dig':
+        for o, _ in m_['segs']: o.data.materials[0] = m_['on_m'] if on else m_['off_m']
+
+
+def unit_nammeters():
+    s, cam, h, mods, blanks = build_nammeters()
+    if os.environ.get('IRC_NAM_TEST'):                         # every live part lit, for judging the brightness
+        for m_ in mods:
+            _nam_light(m_, 'bars', True); _nam_light(m_, 'dig', True)
+            for Ld in m_['leds']: Ld['lens'].data.materials[0] = Ld['hot']
+        shoot_base(s, cam, 'rack-nammeters-test', R.PW, h); return
+    L = shoot_base(s, cam, 'rack-nammeters', R.PW, h)
+    L['u'] = 3; L['layers'] = {}
+    LAY['units']['nammeters'] = L; _save()
+    P_ = lambda x, y: TK.proj(s, cam, (x, y, 0.0))
+    info = []
+    for m_ in mods:
+        bw2, bh2 = NBAR['pitch'] / 2, m_['bar_h'] / 2
+        bars = []
+        for _, _, _, x in m_['bars']:
+            a, b = P_(x - bw2, m_['yb'] + bh2), P_(x + bw2, m_['yb'] - bh2)
+            bars.append([a[0], a[1], b[0], b[1]])
+        segs = [[P_(px, py) for px, py in pts] for _, pts in m_['segs']]
+        sa = P_(m_['x'] - m_['strip_len'] / 2, m_['ys'] + K.SCRIB['h'] / 2); sb = P_(m_['x'] + m_['strip_len'] / 2, m_['ys'] - K.SCRIB['h'] / 2)
+        info.append(dict(bars=bars, segs=segs, cells=m_['cells'], leds=[P_(Ld['x'], Ld['y']) for Ld in m_['leds']],
+                         strip=[sa[0], sa[1], sb[0], sb[1]]))
+    L['nammeters'] = dict(modules=info, lamps=[l for l, _ in R.NLAMPS], db0=-40.0, dbStep=2.0,
+                          colours=[R.bar_colour(i) for i in range(NBAR['n'])])
+    _save()
+    bw = (NBAR['n'] * NBAR['pitch'] + 0.5) / 2 + 0.6
+    for i, m_ in enumerate(mods):
+        _nam_light(m_, 'bars', True)
+        L['layers']['m%d-bars' % i] = shoot_crop(s, cam, 'rack-nammeters-m%d-bars' % i, box_px(s, cam, m_['x'], m_['yb'], bw, 1.6))
+        _nam_light(m_, 'bars', False); _save()
+        _nam_light(m_, 'dig', True)
+        L['layers']['m%d-dig' % i] = shoot_crop(s, cam, 'rack-nammeters-m%d-dig' % i,
+                                                box_px(s, cam, m_['x'] + NDIG['x'], m_['yp'], NDIG['win'][0] / 2 + 0.3, NDIG['win'][1] / 2 + 0.3))
+        _nam_light(m_, 'dig', False); _save()
+        for k, Ld in enumerate(m_['leds']):
+            Ld['lens'].data.materials[0] = Ld['hot']
+            L['layers']['m%d-l%d' % (i, k)] = shoot_crop(s, cam, 'rack-nammeters-m%d-l%d' % (i, k), box_px(s, cam, Ld['x'], Ld['y'], 0.9, 0.9))
+            Ld['lens'].data.materials[0] = Ld['dark']; _save()
+    for i, m_ in enumerate(mods):
+        hidden = []
+        for o in m_['objs']:
+            if not o.hide_render: o.hide_render = True; hidden.append(o)
+        for o in blanks[i]: o.hide_render = False
+        L['layers']['b%d' % i] = shoot_crop(s, cam, 'rack-nammeters-b%d' % i, box_px(s, cam, m_['x'], 0.0, R.MW / 2 + 0.6, R.NMH / 2 + 0.6))
+        for o in blanks[i]: o.hide_render = True
+        for o in hidden: o.hide_render = False
+        _save()
+
+
 UNITS = {'step-cab': unit_step_cab, 'step-nam': unit_step_nam, 'cheeks': unit_cheeks, 'meters': unit_meters,
-         'results': unit_results, 'chart': unit_chart, 'preflight': unit_preflight, 'patch': unit_patch}
+         'results': unit_results, 'chart': unit_chart, 'preflight': unit_preflight, 'patch': unit_patch,
+         'nammeters': unit_nammeters}
 
 
 if __name__ == '__main__':

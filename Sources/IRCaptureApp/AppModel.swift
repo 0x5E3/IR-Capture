@@ -113,6 +113,8 @@ struct NAMMeter: Identifiable {
     var label: String
     var peakDB: Double     // highest peak over the last few seconds
     var clipped: Bool
+    /// The level for the LED bargraph (dBFS): each reading's peak, falling back at 12 dB a second (display only).
+    var levelDB: Double = -120
 }
 
 struct NAMSummary {
@@ -290,6 +292,7 @@ final class AppModel: ObservableObject {
     @Published var namMeters: [NAMMeter] = []
     private var namMeterHistory: [Int: [Float]] = [:]
     private var namClipped: Set<Int> = []
+    private var namBarLevel: [Int: Double] = [:]
     private var namLevelTask: Task<Void, Never>?
     /// CI only: replaces the interface with a simulated one (fixed latency and gain per input).
     var simulateIO = false
@@ -1197,12 +1200,17 @@ final class AppModel: ObservableObject {
             namMeterHistory[r.id] = h
             if p >= 0.999 { namClipped.insert(r.id) }
             let pk = h.max() ?? 0
-            out.append(NAMMeter(id: r.id, label: r.name, peakDB: pk > 0 ? 20 * log10(Double(pk)) : -120, clipped: namClipped.contains(r.id)))
+            // the bargraph: fast up, 0.6 dB a reading back (12 dB a second at 50 ms readings), as an LED peak meter falls
+            let now = p > 0 ? 20 * log10(Double(p)) : -120
+            let bar = max(now, (namBarLevel[r.id] ?? -120) - 0.6)
+            namBarLevel[r.id] = bar
+            out.append(NAMMeter(id: r.id, label: r.name, peakDB: pk > 0 ? 20 * log10(Double(pk)) : -120, clipped: namClipped.contains(r.id),
+                                levelDB: bar))
         }
         namMeters = out
     }
 
-    private func resetNAMMeters() { namMeterHistory = [:]; namClipped = []; namMeters = [] }
+    private func resetNAMMeters() { namMeterHistory = [:]; namClipped = []; namBarLevel = [:]; namMeters = [] }
 
     func toggleNAMLevelCheck() {
         if namLevelRunning { stopLevelChecks(); return }

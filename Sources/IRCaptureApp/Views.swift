@@ -415,6 +415,16 @@ enum GearPreview {
                     }
                 }
             }
+            if RackNAMMeterBridge.available {
+                Engraved("The NAM meter bridge: three inputs in a level check (OK; 12 dB low; clipped), a blank plate in the fourth slot", size: 12)
+                RackNAMMeterBridge(channels: [
+                    RackNAMChannel.reading(id: 0, name: "Line out", peak: -8.2, level: -9.6, clipped: false),
+                    RackNAMChannel.reading(id: 1, name: "SM57 cap edge", peak: -20.6, level: -23.1, clipped: false),
+                    RackNAMChannel.reading(id: 2, name: "R121", peak: -0.2, level: -1.4, clipped: true),
+                ])
+                Engraved("Before the level check: two inputs set to Use, the meters dark", size: 12)
+                RackNAMMeterBridge(channels: [RackNAMChannel(id: 0, name: "Suhr line out"), RackNAMChannel(id: 1, name: "SM57")])
+            }
             NAMMeterTable(meters: [NAMMeter(id: 0, label: "Suhr", peakDB: -8.2, clipped: false), NAMMeter(id: 1, label: "SM57", peakDB: -19.5, clipped: false),
                                    NAMMeter(id: 2, label: "R121", peakDB: -0.2, clipped: true)])
             WiringDiagram(wiring: .namAmp).onPaper(padding: 14, style: .drawing)

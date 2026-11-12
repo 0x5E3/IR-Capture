@@ -168,7 +168,7 @@ for key, L in lay.get('units', {}).items():
     u = {'picture': L['picture'], 'u': L['u'], 'size': [pt(base.size[0]), pt(base.size[1])],
          'panel': [pt(tl[0]), pt(tl[1]), pt(br[0] - tl[0]), pt(br[1] - tl[1])], 'layers': {}}
     for lk, LL in L.get('layers', {}).items():
-        r = layer(base, os.path.join(RD, LL['picture'] + '.png'), LL['box_px'], whole=key == 'meters' and lk.startswith('b'))
+        r = layer(base, os.path.join(RD, LL['picture'] + '.png'), LL['box_px'], whole=key in ('meters', 'nammeters') and lk.startswith('b'))
         if r is None:
             print('  %s %s: no change from the base' % (key, lk)); continue
         im, (x, y, w, h) = r
@@ -181,6 +181,15 @@ for key, L in lay.get('units', {}).items():
         Pa = L['patch']
         u['patch'] = {'n': Pa['n'], 'banks': Pa['banks'], 'toggles': [[pt(v) for v in p] for p in Pa['toggles']],
                       'rows': {k: pt(v) for k, v in Pa['rows'].items()}, 'column': pt(Pa['column'][1] - Pa['column'][0])}
+    if 'nammeters' in L:
+        Nm = L['nammeters']
+        u['nammeters'] = {'lamps': Nm['lamps'], 'db0': Nm['db0'], 'dbStep': Nm['dbStep'], 'colours': Nm['colours'],
+                          'modules': [{'bars': [rect(b) for b in m['bars']],
+                                       'segs': [[[pt(v) for v in p_] for p_ in sg] for sg in m['segs']],
+                                       'cells': [[c[k] for k in 'abcdefgp'] for c in m['cells']],
+                                       'leds': [[pt(v) for v in p_] for p_ in m['leds']], 'strip': rect(m['strip'])}
+                                      for m in Nm['modules']]}
+        print('  nammeters: %d modules' % len(u['nammeters']['modules']))
     if 'preflight' in L: u['preflight'] = {'sheet': rect(L['preflight']['sheet']), 'form': L['preflight']['form']}
     J['units'][key] = u
     print(key, base.size, len(u['layers']), 'layers')

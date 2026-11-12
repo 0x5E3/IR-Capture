@@ -31,6 +31,7 @@ struct RackKit: Decodable {
         let results: Results?        // the results unit's own parts
         let preflight: Preflight?    // the pre-flight unit's own parts
         let patch: Patch?            // the patch unit's own parts (RackPatch.swift)
+        let nammeters: NAMMeters?    // the NAM meter bridge's own parts (RackNAMMeters.swift)
     }
     /// The pre-flight (4U): BEFORE CAPTURE, a printed form with a ruled table (ITEM, READING, OK), typed by the app.
     struct Preflight: Decodable {
@@ -451,7 +452,7 @@ private struct RackEye: View {
 }
 
 /// The mic's name hand-lettered on a module's scribble strip (the tape is in the base picture).
-private struct RackStripName: View {
+struct RackStripName: View {
     let name: String
     let strip: [CGFloat]
     let tilt: Double
