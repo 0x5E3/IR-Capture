@@ -115,4 +115,5 @@ def cart():
     im.convert('RGB').save(OUTC); print('cart', im.size)
 
 
-deck(); cart()
+if 'deck' in J['units'] and 'deck' in J['units']['deck']: deck()
+if 'cart' in J['units'] and 'cart' in J['units']['cart']: cart()
