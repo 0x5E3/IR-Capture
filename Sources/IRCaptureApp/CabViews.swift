@@ -22,6 +22,9 @@ struct CabJob: View {
                 // (Phase 7a) the chart panel: the hook-up drawing and the card, in place of the Connect step's drawing
                 if RackChartUnit.available { RackChartUnit() }
                 CabConnectStep(done: connected)
+                // (Phase 7a) the patch unit: a three-way toggle for each input, in place of the inputs grid; under the
+                // Connect panel, since the interface is chosen there
+                RackPatchBay()
                 if let d = TapePieces.deck {
                     // Phase 7: the reel deck replaces the Set levels and Capture panels. The capture's name and files
                     // come first, the guidance beside the deck, the meters under it.
@@ -117,8 +120,11 @@ struct CabConnectStep: View {
     let done: Bool
     var body: some View {
         let chart = RackChartUnit.available
-        Step(n: 1, title: "Connect", subtitle: chart ? "Wire the rig as the hook-up drawing shows. Then set the use of each input."
-                                                     : "Wire the rig as shown. Then set the use of each input.", done: done) {
+        let patch = m.device.map { RackPatchBay.available && RackPatchBay.holds($0.inputChannels) } ?? false
+        Step(n: 1, title: "Connect",
+             subtitle: patch ? "Wire the rig as the hook-up drawing shows. Choose the interface. Then set each input switch below to MIC, OFF or REF, and write each mic name on its strip on the meters."
+                 : chart ? "Wire the rig as the hook-up drawing shows. Then set the use of each input."
+                         : "Wire the rig as shown. Then set the use of each input.", done: done) {
             if !chart { WiringDiagram(wiring: m.refSource == .none ? .cabNoRef : .cabRef).onPaper(padding: 14, style: .drawing) }
             if !chart { Checklist(items: [
                 "Interface output → amp FX return (power amp in) or clean power amp → cab. Do not use the guitar input. The preamp distorts the sweeps and the IR is incorrect.",
@@ -127,7 +133,7 @@ struct CabConnectStep: View {
             ]) }
             InterfaceRow(outputLabel: "Output to the amp", output: $m.outChannel)
             if m.device != nil {
-                InputsGrid()
+                if !patch { InputsGrid() }
                 IdleSignalChips()
                 ReferenceChooser()
                 CabAdvanced()

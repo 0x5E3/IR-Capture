@@ -341,6 +341,13 @@ enum GearPreview {
                 RackMeterBridge(channels: [RackChannel(id: 0, name: "SM57"), RackChannel(id: 1, name: "R121 6 in center, 15 deg off axis"),
                                            RackChannel(id: 2, name: "MD421"), RackChannel(id: 7, name: "Reference")])
             }
+            if let r = RackKit.ready("patch"), let p = r.1.patch {
+                let roles: [Int: Role] = [0: .mic, 1: .mic, 2: .mic, 5: .ref]
+                Engraved("The patch unit: a six-input interface, three mics and a reference, the two empty slots plugged", size: 12)
+                RackPatchUnit(kit: r.0, unit: r.1, patch: p, bank: 0, count: 6, role: { roles[$0] ?? .off }, set: { _, _ in })
+                Engraved("The second patch unit of an 18-input interface: inputs 9 to 16, input 12 a mic", size: 12)
+                RackPatchUnit(kit: r.0, unit: r.1, patch: p, bank: 1, count: 18, role: { $0 == 11 ? .mic : .off }, set: { _, _ in })
+            }
             if RackResultsUnit.available {
                 Engraved("The results unit: the take sheet typed for two mics and a reference, a distortion figure ringed, stamped CHECK NOTES", size: 12)
                 RackResultsUnit(sheet: TakeSheet(

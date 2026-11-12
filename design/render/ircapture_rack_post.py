@@ -177,6 +177,10 @@ for key, L in lay.get('units', {}).items():
     if 'lamp_x_cm' in L: u['lampXcm'] = L['lamp_x_cm']
     if 'meters' in L: u['meters'] = meters(L)
     if 'results' in L: u['results'] = results(L)
+    if 'patch' in L:
+        Pa = L['patch']
+        u['patch'] = {'n': Pa['n'], 'banks': Pa['banks'], 'toggles': [[pt(v) for v in p] for p in Pa['toggles']],
+                      'rows': {k: pt(v) for k, v in Pa['rows'].items()}, 'column': pt(Pa['column'][1] - Pa['column'][0])}
     if 'preflight' in L: u['preflight'] = {'sheet': rect(L['preflight']['sheet']), 'form': L['preflight']['form']}
     J['units'][key] = u
     print(key, base.size, len(u['layers']), 'layers')

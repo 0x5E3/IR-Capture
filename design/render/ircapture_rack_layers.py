@@ -631,8 +631,90 @@ def unit_preflight():
     LAY['units']['preflight'] = L; _save()
 
 
+# ---------------------------------------------------------------------------------------------------------------------
+# the patch unit (2U): the interface's inputs, a three-way bat toggle each (the first proof's unit_patch, approved):
+# MIC thrown up, OFF level, REF thrown down. Built once and shot in its states, as the meter bridge:
+#   base         inputs 1 to 8, every toggle level (OFF)
+#   t<i>-mic     toggle i thrown up            t<i>-ref    toggle i thrown down
+#   p<i>         slot i holding a black nylon hole plug in place of its toggle (an interface with fewer inputs)
+#   n<i>-b<k>    slot i's number engraved for bank k (k = 1..3: inputs 9 to 16, 17 to 24, 25 to 32), one unit a bank
+# Interfaces with more than 32 inputs keep the old inputs grid.
+
+PATCH_N, PATCH_BANKS = 8, 4
+PATCH_X0, PATCH_DX, PATCH_TY = -14.6, 4.75, -0.35
+PATCH_ROWS = {'mic': 0.85, 'off': -0.35, 'ref': -1.55}        # the legends' centres: where a click throws the toggle
+PATCH_THROW = {'mic': 1, 'off': 0, 'ref': -1}
+PATCH_DEG = float(os.environ.get('IRC_PATCH_DEG', '30'))          # the throw (the proof's 24 read weakly straight on)
+
+
+def _toggle(x, y, ch):
+    """ircapture_rack.toggle, its parts kept: the bat apart so it can be thrown between shots."""
+    with R.moved(x, y, 0):
+        nut = R.lathe('tnut', [(0.62, 0.0), (0.62, 0.16), (0.56, 0.2), (0.34, 0.2)], 6, smooth=False); nut.data.materials.append(ch)
+        nut.rotation_euler = (0, 0, R.math.radians(30 + 7 * (K.seed_of('tn%.1f' % x) % 5)))
+        col = R.lathe('tcol', [(0.36, 0.0), (0.36, 0.42), (0.3, 0.5), (0.16, 0.5)], 48); col.data.materials.append(ch)
+        bat = R.lathe('tbat', [(0.13, 0.0), (0.16, 0.6), (0.21, 1.4), (0.25, 1.85), (0.24, 2.05), (0.15, 2.18), (0.0, 2.2)], 48)
+        bat.data.materials.append(ch)
+        bat.location = (0, 0, 0.3)
+    return [nut, col], bat
+
+
+def _plug(x, y):
+    """A black nylon snap-in hole plug: a low dome on a thin flange."""
+    m = R.mat('plug', R.srgb('#0d0c0b'), rough=0.45, spec=0.35)
+    p = R.lathe('plug', [(0.58, 0.0), (0.58, 0.05), (0.52, 0.08), (0.45, 0.16), (0.3, 0.21), (0.0, 0.23)], 64)
+    p.location = (x, y, 0); p.data.materials.append(m)
+    p.hide_render = True
+    return p
+
+
+def unit_patch():
+    K.set_seed('rack-patch')
+    s, cam, h = R.unit_scene(2)
+    R.backing(h)
+    R.rack_panel(2, 'black', 'patch')
+    R.engrave('INPUTS', -19.4, 2.6, 0.5)
+    ch = R.SG.nickel('tgl', seed=4)
+    slots = []
+    for i in range(PATCH_N):
+        x = PATCH_X0 + i * PATCH_DX
+        fixed, bat = _toggle(x, PATCH_TY, ch)
+        nums = [R.engrave(str(k * PATCH_N + i + 1), x, 2.6, 0.62) for k in range(PATCH_BANKS)]
+        for o in nums[1:]: o.hide_render = True
+        R.engrave('MIC', x + 1.55, PATCH_ROWS['mic'], 0.44, track=0.12); R.engrave('OFF', x + 1.55, PATCH_ROWS['off'], 0.44, track=0.12)
+        R.engrave('REF', x + 1.55, PATCH_ROWS['ref'], 0.44, track=0.12)
+        slots.append(dict(x=x, fixed=fixed, bat=bat, nums=nums, plug=_plug(x, PATCH_TY)))
+    L = shoot_base(s, cam, 'rack-patch', R.PW, h)
+    L['u'] = 2; L['layers'] = {}
+    P_ = lambda x, y: TK.proj(s, cam, (x, y, 0.0))
+    L['patch'] = dict(n=PATCH_N, banks=PATCH_BANKS,
+                      toggles=[P_(sl['x'], PATCH_TY) for sl in slots],
+                      rows={k: P_(0, y)[1] for k, y in PATCH_ROWS.items()},
+                      column=[P_(-PATCH_DX / 2, 0)[0], P_(PATCH_DX / 2, 0)[0]])
+    LAY['units']['patch'] = L; _save()
+    for i, sl in enumerate(slots):
+        x = sl['x']
+        box = box_px(s, cam, x, PATCH_TY - 0.1, 1.4, 1.75)
+        for k in ('mic', 'ref'):
+            sl['bat'].rotation_euler = (R.math.radians(-PATCH_DEG * PATCH_THROW[k]), 0, 0)
+            L['layers']['t%d-%s' % (i, k)] = shoot_crop(s, cam, 'rack-patch-t%d-%s' % (i, k), box)
+            sl['bat'].rotation_euler = (0, 0, 0); _save()
+        for o in sl['fixed'] + [sl['bat']]: o.hide_render = True
+        sl['plug'].hide_render = False
+        L['layers']['p%d' % i] = shoot_crop(s, cam, 'rack-patch-p%d' % i, box)
+        sl['plug'].hide_render = True
+        for o in sl['fixed'] + [sl['bat']]: o.hide_render = False
+        _save()
+        nb = box_px(s, cam, x, 2.6, 0.9, 0.6)
+        for k in range(1, PATCH_BANKS):
+            sl['nums'][0].hide_render = True; sl['nums'][k].hide_render = False
+            L['layers']['n%d-b%d' % (i, k)] = shoot_crop(s, cam, 'rack-patch-n%d-b%d' % (i, k), nb)
+            sl['nums'][k].hide_render = True; sl['nums'][0].hide_render = False
+            _save()
+
+
 UNITS = {'step-cab': unit_step_cab, 'step-nam': unit_step_nam, 'cheeks': unit_cheeks, 'meters': unit_meters,
-         'results': unit_results, 'chart': unit_chart, 'preflight': unit_preflight}
+         'results': unit_results, 'chart': unit_chart, 'preflight': unit_preflight, 'patch': unit_patch}
 
 
 if __name__ == '__main__':

@@ -30,6 +30,7 @@ struct RackKit: Decodable {
         let meters: Meters?          // the meter bridge's own parts
         let results: Results?        // the results unit's own parts
         let preflight: Preflight?    // the pre-flight unit's own parts
+        let patch: Patch?            // the patch unit's own parts (RackPatch.swift)
     }
     /// The pre-flight (4U): BEFORE CAPTURE, a printed form with a ruled table (ITEM, READING, OK), typed by the app.
     struct Preflight: Decodable {
@@ -300,6 +301,8 @@ struct RackChannel: Identifiable {
 /// More than four inputs: a second bridge under the first.
 struct RackMeterBridge: View {
     let channels: [RackChannel]
+    /// A mic's name to write on its strip (typed into the tape); nil: the name as given, not editable.
+    var names: ((Int) -> Binding<String>?)? = nil
     @ObservedObject private var clock = PowerClock.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -310,11 +313,25 @@ struct RackMeterBridge: View {
             let kit = r.0, u = r.1
             let n = min(channels.count, mt.modules.count)
             let on = lit(n: n, slots: mt.modules.count)
-            RackUnitPicture(kit: kit, unit: u, on: on, own: { $0.hasSuffix("-vu") },
-                            overlay: AnyView(modules(kit: kit, u: u, mt: mt, n: n)))
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Level meters")
-                .accessibilityValue(channels.prefix(n).map { "\($0.name): \($0.spoken)" }.joined(separator: ". "))
+            ZStack(alignment: .topLeading) {
+                RackUnitPicture(kit: kit, unit: u, on: on, own: { $0.hasSuffix("-vu") },
+                                overlay: AnyView(modules(kit: kit, u: u, mt: mt, n: n)))
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("Level meters")
+                    .accessibilityValue(channels.prefix(n).map { "\($0.name): \($0.spoken)" }.joined(separator: ". "))
+                // the strips that take a name: typed into the tape, outside the picture (so VoiceOver reaches them)
+                ZStack(alignment: .topLeading) {
+                    ForEach(0..<n, id: \.self) { i in
+                        if let b = names?(channels[i].id) {
+                            RackStripField(name: b, strip: mt.modules[i].strip, tilt: i % 2 == 0 ? -0.5 : 0.5,
+                                           input: channels[i].id + 1)
+                        }
+                    }
+                }
+                .frame(width: u.size[0], height: u.size[1], alignment: .topLeading)
+                .offset(x: -u.panel[0], y: -u.panel[1])
+            }
+            .frame(width: kit.panelWidth, height: CGFloat(u.u) * kit.uPt, alignment: .topLeading)
         }
     }
 
@@ -355,7 +372,7 @@ struct RackMeterBridge: View {
                     RackEye(kit: kit, eye: mt.eye, closure: ch.eye.closure)
                         .offset(x: md.eye[0] - mt.eye.center[0], y: md.eye[1] - mt.eye.center[1])
                 }
-                RackStripName(name: ch.name, strip: md.strip, tilt: i % 2 == 0 ? -0.5 : 0.5)
+                if names?(ch.id) == nil { RackStripName(name: ch.name, strip: md.strip, tilt: i % 2 == 0 ? -0.5 : 0.5) }
             }
         }
         .frame(width: u.size[0], height: u.size[1], alignment: .topLeading)
@@ -451,15 +468,64 @@ private struct RackStripName: View {
     }
 }
 
+/// A mic's strip that takes its name: the name as written on the tape; while it is typed, the field itself (one line).
+/// The common names on the strip's context menu.
+private struct RackStripField: View {
+    @Binding var name: String
+    let strip: [CGFloat]
+    let tilt: Double
+    let input: Int
+    @FocusState private var focused: Bool
+    var body: some View {
+        let inset: CGFloat = 10.5
+        let avail = strip[2] - 2 * inset
+        let fit = MarkerFit.fit(name, avail: avail)
+        ZStack(alignment: .leading) {
+            if !focused {
+                if name.isEmpty {
+                    Text("Mic name").font(.swellMarker(13)).foregroundColor(MarkerFit.ink.opacity(0.28))
+                } else {
+                    Text(name).font(.swellMarker(fit.size)).lineLimit(fit.lines).lineSpacing(-3)
+                        .foregroundColor(MarkerFit.ink.opacity(0.92))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            TextField("", text: $name)
+                .textFieldStyle(.plain)
+                .font(.swellMarker(fit.lines == 2 ? 10.5 : fit.size))
+                .foregroundColor(MarkerFit.ink.opacity(0.92))
+                .focused($focused)
+                .opacity(focused ? 1 : 0.001)
+                .accessibilityLabel("Mic name, input \(input)")
+        }
+        .frame(width: avail, height: strip[3] - 2, alignment: .leading)
+        .contextMenu {
+            ForEach(commonMicNames, id: \.self) { n in Button(n) { name = n } }
+        }
+        .help("Enter the mic name. The name is used in the file names. Right-click for common names.")
+        .rotationEffect(.degrees(tilt))
+        .offset(x: strip[0] + inset, y: strip[1] + 1)
+    }
+}
+
 /// The meter bridges for the inputs in use, four to a bridge. Without the bridge's pictures, nothing (the caller keeps
 /// the old meters).
 struct RackMeterBay: View {
     @EnvironmentObject var m: AppModel
+    /// The name of a mic input (not the reference), for its strip.
+    func nameBinding(_ ch: Int) -> Binding<String>? {
+        guard let i = m.inputs.firstIndex(where: { $0.id == ch }), m.inputs[i].role == .mic else { return nil }
+        return Binding(get: { m.inputs.first { $0.id == ch }?.name ?? "" },
+                       set: { v in if let j = m.inputs.firstIndex(where: { $0.id == ch }) { m.inputs[j].name = v } })
+    }
     var body: some View {
         let ch = m.meterChannels
         let groups = stride(from: 0, to: max(ch.count, 1), by: 4).map { Array(ch[min($0, ch.count)..<min($0 + 4, ch.count)]) }
         VStack(spacing: 0) {
-            ForEach(Array(groups.enumerated()), id: \.offset) { _, g in RackMeterBridge(channels: g) }
+            ForEach(Array(groups.enumerated()), id: \.offset) { _, g in
+                // with the patch unit, the mic names are written here (the patch has no strips)
+                RackMeterBridge(channels: g, names: RackPatchBay.available ? { ch in nameBinding(ch) } : nil)
+            }
         }
     }
 }
