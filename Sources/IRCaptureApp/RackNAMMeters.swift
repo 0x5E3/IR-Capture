@@ -149,7 +149,7 @@ struct RackNAMMeterBridge: View {
 }
 
 /// A layer of a unit's picture shown only through a path (the picture's points).
-private struct MaskedLayer: View {
+struct MaskedLayer: View {
     let kit: RackKit
     let size: [CGFloat]
     let layer: RackKit.Layer

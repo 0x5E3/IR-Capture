@@ -161,6 +161,61 @@ def results(L):
     return out
 
 
+def centroid(a):
+    al = a[..., 3].astype(np.float64); ys, xs = np.mgrid[0:al.shape[0], 0:al.shape[1]]
+    t = al.sum()
+    return (float((xs * al).sum() / t), float((ys * al).sum() / t)) if t > 0 else (al.shape[1] / 2, al.shape[0] / 2)
+
+
+def deck(L):
+    """The reel deck's own parts. Its reel pictures were rendered alone (their own alpha), so they are saved whole, not
+    as a difference from the base: rear, rearshadow, pack, front, frontshadow at the reel's box; the 24 prong frames as one
+    sheet; the counter's ten figures as one sheet, each cut to its drum's window. The shadows' centres (for turning them)
+    from the solid flanges' shadows."""
+    Dk = L['deck']; S = L['solo']
+    cm = PT                                                  # pt a cm
+    out = {'reels': {}, 'keys': [{'id': k['id'], 'rect': rect(k['rect'])} for k in Dk['keys']]}
+    for key, r in Dk['reels'].items():
+        bx = r['box']
+        e = {'box': [pt(bx[0]), pt(bx[1]), pt(bx[2] - bx[0]), pt(bx[3] - bx[1])], 'c': [pt(v) for v in r['c']],
+             'r': round(r['r_cm'] * cm, 3), 'hub': round(r['hub_cm'] * cm, 3), 'packFull': round(r['full_cm'] * cm, 3),
+             'win': {'a0': r['win']['a0'], 'span': r['win']['span'], 'r0': round(r['win']['r0'] * cm, 3), 'r1': round(r['win']['r1'] * cm, 3)},
+             'roller': [pt(v) for v in r['roller']], 'rollerR': round(r['roller_r_cm'] * cm, 3)}
+        for lay_ in ('rear', 'rearshadow', 'pack', 'front', 'frontshadow'):
+            nm = 'rack-deck-%s-%s' % (key, lay_)
+            save(Image.open(os.path.join(RD, nm + '.png')).convert('RGBA'), nm)
+            e[lay_] = nm
+        for lay_ in ('rear', 'front'):
+            a = np.asarray(Image.open(os.path.join(RD, 'rack-deck-%s-%sshadow-solid.png' % (key, lay_))).convert('RGBA'))
+            cx, cy = centroid(a)
+            e[lay_ + 'ShadowC'] = [pt(bx[0] + cx), pt(bx[1] + cy)]
+        pb = r['prong_box']; n = r['frames']
+        frames = [Image.open(os.path.join(RD, 'rack-deck-%s-prong-%02d.png' % (key, i))).convert('RGBA') for i in range(n)]
+        sh = Image.new('RGBA', (frames[0].size[0] * n, frames[0].size[1]), (0, 0, 0, 0))
+        for i, f in enumerate(frames): sh.paste(f, (i * f.size[0], 0))
+        save(sh, 'rack-deck-%s-prongs' % key)
+        e['prongs'] = {'picture': 'rack-deck-%s-prongs' % key, 'frames': n, 'span': r['span'],
+                       'box': [pt(pb[0]), pt(pb[1]), pt(pb[2] - pb[0]), pt(pb[3] - pb[1])]}
+        out['reels'][key] = e
+    W = Dk['wheels']; c0 = W['crop']; r0 = W['rects'][0]
+    x0, y0 = int(round(r0[0] - c0[0])), int(round(r0[1] - c0[1])); x1, y1 = int(round(r0[2] - c0[0])), int(round(r0[3] - c0[1]))
+    figs = [Image.open(os.path.join(RD, 'rack-deck-wheel-%d.png' % d)).convert('RGBA').crop((x0, y0, x1, y1)) for d in range(10)]
+    sh = Image.new('RGBA', ((x1 - x0) * 10, y1 - y0))
+    for d, f in enumerate(figs): sh.paste(f, (d * (x1 - x0), 0))
+    save(sh, 'rack-deck-wheels')
+    out['wheels'] = {'picture': 'rack-deck-wheels', 'rects': [rect(q) for q in W['rects']]}
+    print('  deck: 2 reels, %d keys, counter %s' % (len(out['keys']), figs[0].size))
+    return out
+
+
+def cart(L):
+    C = L['cart']
+    out = {'label': rect(C['label']), 'keys': [{'id': k['id'], 'rect': rect(k['rect'])} for k in C['keys']],
+           'segs': [[[pt(v) for v in p_] for p_ in sg] for sg in C['segs']], 'cells': C['cells']}
+    print('  cart: label %s, %d keys, %d cells' % (out['label'], len(out['keys']), len(out['cells'])))
+    return out
+
+
 for key, L in lay.get('units', {}).items():
     base = Image.open(os.path.join(RD, L['picture'] + '.png')).convert('RGBA')
     save(base, L['picture'])
@@ -190,6 +245,8 @@ for key, L in lay.get('units', {}).items():
                                        'leds': [[pt(v) for v in p_] for p_ in m['leds']], 'strip': rect(m['strip'])}
                                       for m in Nm['modules']]}
         print('  nammeters: %d modules' % len(u['nammeters']['modules']))
+    if 'deck' in L: u['deck'] = deck(L)
+    if 'cart' in L: u['cart'] = cart(L)
     if 'preflight' in L: u['preflight'] = {'sheet': rect(L['preflight']['sheet']), 'form': L['preflight']['form']}
     J['units'][key] = u
     print(key, base.size, len(u['layers']), 'layers')

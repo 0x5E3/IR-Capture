@@ -32,6 +32,8 @@ struct RackKit: Decodable {
         let preflight: Preflight?    // the pre-flight unit's own parts
         let patch: Patch?            // the patch unit's own parts (RackPatch.swift)
         let nammeters: NAMMeters?    // the NAM meter bridge's own parts (RackNAMMeters.swift)
+        let deck: Deck?              // the reel deck's own parts (RackMachines.swift)
+        let cart: Cart?              // the cart machine's own parts (RackMachines.swift)
     }
     /// The pre-flight (4U): BEFORE CAPTURE, a printed form with a ruled table (ITEM, READING, OK), typed by the app.
     struct Preflight: Decodable {
@@ -125,6 +127,7 @@ struct RackKit: Decodable {
         var files = [u.picture] + u.layers.values.map(\.picture)
         if let m = u.meters { files += [m.eye.picture, m.needle.picture] }
         if let r = u.results { files += r.stamps.values.map(\.picture) }
+        if let d = u.deck { files += d.pictures }
         guard files.allSatisfy({ SwellPictures.shared.cgImage($0 + ".webp") != nil }) else { return nil }
         return (k, u)
     }

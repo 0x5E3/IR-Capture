@@ -11,6 +11,7 @@
 #   meters     5U meter bridge          results    7U take sheet, typed by the app
 #   chart      6U hook-up drawing and card (whole)          preflight  4U BEFORE CAPTURE, typed by the app
 #   patch      2U eight toggles MIC / OFF / REF            nammeters  3U NAM meter bridge (bars, LED digits, LEDs)
+#   deck       8U reel deck (reels in layers, counter, keys) cart       3U cart machine (keys, LEDs, timer, blank label)
 #
 #   FONTS_DIR=Resources/SwellKit/fonts IRC_LIQUID_RELIEF=0.7 ~/bvenv/bin/python design/render/ircapture_rack_layers.py \
 #       <out> <unit[,unit]> [px/cm] [samples]
@@ -945,9 +946,438 @@ def unit_nammeters():
         _save()
 
 
+
+# ---------------------------------------------------------------------------------------------------------------------
+# the reel deck (8U): the second proof's unit_deck (approved, "looks great"), split for the app
+#
+# Everything that stands still is the base; each reel is a stack of pictures rendered alone, as the 11-04 deck's
+# (ircapture_tape_layers.job_reel), here straight on so every circle is a circle:
+#   base               the plate, the turntables, the head block, guides, capstan, pinch roller, tension arms and their
+#                      rollers, the tape from roller to roller through the heads, the counter with blank drums, the keys
+#                      up, the REC jewel dark, the legends. No reels.
+#   <s|t>-rear         the rear flange as a solid disc (the app cuts its three windows with a turning mask)
+#   <s|t>-rearshadow   its shadow on the plate, windows at angle 0 (the app turns it about the shadow's own centre)
+#   <s|t>-pack         a full pack of wound tape (the app cuts it to the pack's radius)
+#   <s|t>-front        the front flange as a solid disc, the hub and the boss
+#   <s|t>-frontshadow  the front flange's, the hub's and the prongs' shadow on the pack's face
+#   <s|t>-prong-<i>    the three hold-down prongs and the boss, 24 frames over 120 degrees (their chrome highlights move)
+#   wheel-<d>          the counter's first drum showing d (an opaque crop of its window; the app lays one on each drum)
+#   k<i>-down, k<i>-lit, k<i>-litdown   CHECK LEVELS and CAPTURE (lit while they run), STOP (down only): diff layers
+#   rec                the REC jewel lit
+# A flange's tool marks and sheen are rings round its centre, so under a fixed light it keeps its highlights while it
+# turns: only the windows move. Each reel picture is rendered with the rest of the deck still in the scene but unseen
+# by the camera, so the metal still mirrors the plate. Shadows are rendered on catchers with only their casters.
+
+import math
+
+
+def _key_parts(lid, litable):
+    """ircapture_rack.key with every cap it can show: up and down, dark and (litable) lit, and its glow. Built at the
+    origin (wrap in R.moved). The caps share one seed, so each state shows the same wear."""
+    import ircapture_legends as LG
+    t0, s0, names = LG.LEGENDS[lid]
+    z = LG.SIZES[s0]; v = LG.variant(names[0]); look = K.KEY_LOOK[v]
+    hh = z['cap_h']; w = K.legend_width(t0, s0)
+    bz = TK.KEY['bezel'] * (1.3 if s0 == 'big' else 1.0); r = TK.KEY['r'] * (1.4 if s0 == 'big' else 1.0)
+    K.set_seed('legend-' + lid)
+    bez = R.rbox('kbezel', w + 2 * bz, hh + 2 * bz, 0.25, 0.0, r + bz * 0.6, roll=0.06)
+    bpy.context.view_layer.update()
+    R.cut(bez, R.prism('khole', R._rring((w + 0.06) / 2, (hh + 0.06) / 2, r, 0.0, 0, n_arc=8), -2, 2))
+    R.chamfer(bez, 0.02, 2); bez.data.materials.append(R.SG.black_cast('kbez'))
+    well = R.rbox('kwell', w + 0.1, hh + 0.1, 0.3, -0.3, 0.05); well.data.materials.append(R.mat('kwell', (0.01, 0.009, 0.008), rough=0.8))
+    caps = {}
+    for lit in ((False, True) if litable else (False,)):
+        for down in (False, True):
+            rng = K.set_seed('legend-' + lid)
+            cap = R.rbox('cap', w, hh, 0.3, 0.03 if down else 0.15, r, roll=0.07, seg=4); TK.flat_faces(cap)
+            cap.data.materials.append(K.cap_mat_blank(lit, 'cap-%s-%d%d' % (lid, lit, down), w, hh, look, rng, legend=(t0, z['cap_cm'])))
+            cap.hide_render = lit or down
+            caps[(lit, down)] = cap
+    glow = None
+    if litable:
+        Lg = bpy.data.lights.new('kglow', 'POINT'); Lg.energy = 0.3 * (1 - 0.15 * look.get('aged', 0.3)) * (w * hh) / (4.4 * 1.8)
+        Lg.color = R.srgb('#ffa040'); Lg.shadow_soft_size = 0.6 * max(1.0, w / 4.4)
+        glow = bpy.data.objects.new('kglow', Lg); bpy.context.scene.collection.objects.link(glow); glow.location = (0, 0, 1.05)
+        glow.hide_render = True
+    return dict(caps=caps, glow=glow, w=w + 2 * bz, h=hh + 2 * bz)
+
+
+def _key_state(k, lit, down):
+    for (l, d), c in k['caps'].items(): c.hide_render = not (l == lit and d == down)
+    if k['glow'] is not None:
+        k['glow'].hide_render = not lit
+        k['glow'].location.z = (0.03 if down else 0.15) + 0.9
+
+
+def _counter_blank(x, y, plate):
+    """ircapture_rack.counter with blank drums: the black bezel and four drum wheels. Returns its size and the drums' x."""
+    cw, chh = 6.2, 2.0
+    ho = R.rbox('cwin', cw + 0.1, chh + 0.1, R.T + 2, -R.T - 1, 0.1); ho.location = (x, y, 0)
+    bpy.context.view_layer.update(); R.cut(plate, ho)
+    bz = R.rbox('cbez', cw + 0.6, chh + 0.6, 0.3, 0.0, 0.3, roll=0.1); bz.location = (x, y, 0)
+    R.cut(bz, R.prism('chole', [(px + x, py + y, pz) for px, py, pz in R._rring(cw / 2, chh / 2, 0.15, 0.0, 0, n_arc=8)], -2, 2))
+    R.chamfer(bz, 0.02, 2); bz.data.materials.append(R.SG.black_cast('cbez'))
+    wm = R.mat('wheel', R.srgb('#141211'), rough=0.5, coat=0.2)
+    xs = []
+    for i in range(4):
+        dx = x - 2.25 + i * 1.5
+        bpy.ops.mesh.primitive_cylinder_add(radius=1.05, depth=1.25, vertices=64, location=(dx, y, -0.95))
+        dr = bpy.context.active_object; dr.name = 'drum'; dr.rotation_euler = (0, math.radians(90), 0)
+        dr.data.materials.append(wm); bpy.ops.object.shade_smooth()
+        xs.append(dx)
+    return cw + 0.6, chh + 0.6, xs
+
+
+def build_deck():
+    T_ = R._tape()
+    import ircapture_tape_layers as TL             # after R._tape(): its reel parts (flanges, pack, hub, prongs)
+    D_ = R.DECK
+    K.set_seed('rack-deck')
+    s, cam, h = R.unit_scene(D_['u'])
+    studio = set(s.objects)
+    R.backing(h)
+    pl, ph = R.rack_panel(D_['u'], 'alu', 'deck')
+    Dk = '#1e1a15'
+    ch = R.SG.chrome('chr', seed=3); blk = R.SG.black_cast('bc'); alu = R.spun_alu(); tp = R.wound_oxide()
+    rx, ry, ty = D_['rx'], D_['ry'], D_['ty']
+    hub, full = T_.REEL['hub'], T_.REEL['pack_full']
+    rmid = math.sqrt(hub * hub + (full * full - hub * hub) * 0.5)
+    hx = D_['heads']; cx_ = D_['cap']; gl, gr = D_['gl'], D_['gr']; trx, try_ = D_['tr']
+    zt0, zt1 = TL.ZP0, TL.ZP1
+    # everything below was laid out on the old deck's plate face at z = 0.25; here the panel's face is z = 0
+    with R.moved(0, 0, -0.25):
+        base = R.rbox('hbase', 22.0, 5.6, 0.6, 0.25, 0.4, roll=0.12); base.location = (-0.7, ty + 3.2, 0)
+        R.chamfer(base, 0.02, 2); base.data.materials.append(K.hammertone_fine(base='#191612', hi='#2e271e', name='hbase'))
+        hood = R.rbox('hood', 12.4, 2.4, 1.6, 0.85, 0.6, roll=0.35); hood.location = (hx[1], ty + 4.9, 0)
+        R.chamfer(hood, 0.02, 2); hood.data.materials.append(blk)
+        mu = T_.mu_metal()
+        for x in hx:
+            hd = R.rbox('head', 2.3, 2.4, 2.2, 0.85, 0.9, roll=0.2); hd.location = (x, ty + 1.2, 0); hd.data.materials.append(mu)
+            gap = R.rbox('gap', 0.05, 0.7, 0.02, 3.04, 0.0); gap.location = (x, ty + 0.4, 0)
+            gap.data.materials.append(R.mat('gapblk', R.srgb('#151210'), rough=0.5))
+            sh = R.rbox('shield', 2.8, 0.35, 2.4, 0.85, 0.12, roll=0.05); sh.location = (x, ty + 2.55, 0); sh.data.materials.append(ch)
+        for gx in (gl, gr):
+            T_.cyl('post', 0.55, 0.85, zt1 + 0.25, gx, ty + 0.55, 64, alu)
+            for z in (zt0 - 0.06, zt1 + 0.06): T_.cyl('pfl', 0.8, z - 0.05, z + 0.05, gx, ty + 0.55, 64, alu)
+        T_.cyl('capstan', 0.22, 0.85, zt1 + 0.4, cx_, ty + 0.22, 48, mu)
+        T_.cyl('pinch', 1.05, 0.9, zt1 + 0.25, cx_, ty - 1.07, 128, T_.black_rubber())
+        T_.cyl('pinchcap', 0.4, zt1 + 0.25, zt1 + 0.4, cx_, ty - 1.07, 64, alu)
+        for sx in (-1, 1):
+            ax, ay = sx * trx, try_
+            px_, py_ = sx * (trx + 2.0), try_ - 2.6
+            Ln = math.hypot(ax - px_, ay - py_); ang = math.atan2(ay - py_, ax - px_)
+            a = R.rbox('tarm', Ln + 0.7, 0.7, 0.3, 0.9, 0.3, roll=0.1)
+            a.location = ((ax + px_) / 2, (ay + py_) / 2, 0); a.rotation_euler = (0, 0, ang); a.data.materials.append(blk)
+            T_.cyl('tpiv', 0.6, 0.85, 1.4, px_, py_, 48, blk)
+            T_.cyl('troll', 0.7, 1.2, zt1 + 0.15, ax, ay, 64, alu)
+        # the tape from roller to roller through the heads (the spans to the packs are drawn by the app: they follow the
+        # packs' size)
+        circles = [((-rx, ry), rmid, -1), ((-trx, try_), 0.7, +1), ((gl, ty + 0.55), 0.55, +1)]
+        circles += [((x, ty + 0.9), 0.9, +1) for x in hx]
+        circles += [((cx_, ty + 0.22), 0.22, +1), ((gr, ty + 0.55), 0.55, +1), ((trx, try_), 0.7, +1), ((rx, ry), rmid, -1)]
+        path = T_.tape_path(circles)
+        tape = T_.ribbon('tape', path[1:-1], zt0, zt1, tp)
+        tape.modifiers['th'].thickness = 0.07; tape.modifiers['th'].offset = 0.0
+    with R.moved(0, 0, -0.25):
+        reels = {'s': TL.reel_parts(-rx, ry, alu, tp, ch, blk), 't': TL.reel_parts(rx, ry, alu, tp, ch, blk)}
+    for key, g in reels.items():
+        for k_, objs in g.items():
+            if k_ in ('turntable', 'pivot'): continue
+            for o in objs: o.hide_render = True
+    for word, x in zip(('ERASE', 'RECORD', 'PLAY'), hx): R.engrave(word, x, ty + 4.9, 0.44, z=2.2, track=0.12)
+    cw, chh, drums = _counter_blank(0.0, D_['cy'], pl)
+    R.engrave('SECONDS LEFT', 0.0, D_['cy'] - chh / 2 - 0.7, 0.44, track=0.14, color=Dk)
+    pl.data.materials.append(R.deck_alu())        # after the counter's window: gear_kit.cut() clears the materials
+    import ircapture_legends as LG
+    ky = D_['ky']
+    row = ['check', 'capture', 'rec', 'stop']
+    widths = [2 * D_['jewel_r'] + 0.6 if lid == 'rec' else K.legend_width(LG.LEGENDS[lid][0], 'std') + 2 * TK.KEY['bezel'] for lid in row]
+    gap_ = 0.7
+    x = -0.7 - (sum(widths) + gap_ * (len(row) - 1)) / 2
+    keys, rec = [], None
+    for lid, wk in zip(row, widths):
+        if lid == 'rec':
+            b0 = set(bpy.data.objects)
+            R.jewel(x + wk / 2, ky, 'red', True, r=D_['jewel_r'])
+            new = _new_since(b0)
+            lens = [o for o in new if o.name.startswith('jlens')][0]
+            light = [o for o in new if o.type == 'LIGHT'][0]
+            bsdf = lens.active_material.node_tree.nodes['Principled BSDF']
+            rec = dict(bsdf=bsdf, hot=tuple(bsdf.inputs['Emission Color'].default_value), light=light, x=x + wk / 2, y=ky)
+            _lamp(rec, False)
+            R.engrave('REC', x + wk / 2, ky + 1.55, 0.44, track=0.12, color=Dk)
+        else:
+            with R.moved(x + wk / 2, ky, 0): kp = _key_parts(lid, lid != 'stop')
+            kp.update(id=lid, x=x + wk / 2, y=ky); keys.append(kp)
+        x += wk + gap_
+    R.engrave('RECORDER', 19.0, ky, 0.62, color=Dk)
+    R.finish_glass()
+    c_plate = TK.catcher(0.002); c_pack = TK.catcher(zt1 - 0.25 + 0.002)
+    for c in (c_plate, c_pack): c.hide_render = True
+    return dict(s=s, cam=cam, h=h, studio=studio, reels=reels, keys=keys, rec=rec, drums=drums, cy=D_['cy'],
+                catchers=(c_plate, c_pack), rollers=[(-trx, try_), (trx, try_)], T_=T_, TL=TL)
+
+
+def _snapshot(s):
+    return {o: (o.hide_render, o.visible_camera) for o in s.objects if o.type in ('MESH', 'CURVE')}
+
+
+def _restore(snap):
+    for o, (hr, vc) in snap.items(): o.hide_render = hr; o.visible_camera = vc
+
+
+def _solo(s, studio, visible, context=(), catchers=()):
+    """visible: rendered and seen; context: rendered (reflections, shadows) but unseen by the camera; catchers: the
+    shadow catchers in use; every other mesh out of the render. The studio is left alone."""
+    vis, ctx, ca = set(visible), set(context), set(catchers)
+    for o in s.objects:
+        if o in studio or o.type not in ('MESH', 'CURVE'): continue
+        if o in vis or o in ca: o.hide_render = False; o.visible_camera = True
+        elif o in ctx: o.hide_render = False; o.visible_camera = False
+        else: o.hide_render = True
+
+
+def unit_deck():
+    B = build_deck()
+    s, cam, h, studio = B['s'], B['cam'], B['h'], B['studio']
+    L = shoot_base(s, cam, 'rack-deck', R.PW, h)
+    L['u'] = R.DECK['u']; L['layers'] = {}; L['solo'] = {}
+    LAY['units']['deck'] = L; _save()
+    P_ = lambda x, y: TK.proj(s, cam, (x, y, 0.0))
+    TL, T_ = B['TL'], B['T_']
+    RR = T_.REEL
+    info = {'reels': {}, 'keys': [], 'wheels': {}}
+    # the keys
+    for i, k in enumerate(B['keys']):
+        a, b = P_(k['x'] - k['w'] / 2, k['y'] + k['h'] / 2), P_(k['x'] + k['w'] / 2, k['y'] - k['h'] / 2)
+        info['keys'].append(dict(id=k['id'], rect=[a[0], a[1], b[0], b[1]]))
+        box = box_px(s, cam, k['x'], k['y'], k['w'] / 2 + 0.9, k['h'] / 2 + 0.9)
+        states = [('down', False, True)] + ([('lit', True, False), ('litdown', True, True)] if k['glow'] is not None else [])
+        for nm, lit, down in states:
+            _key_state(k, lit, down)
+            L['layers']['k%d-%s' % (i, nm)] = shoot_crop(s, cam, 'rack-deck-k%d-%s' % (i, nm), box)
+            _key_state(k, False, False); _save()
+    rc = B['rec']
+    _lamp(rc, True)
+    L['layers']['rec'] = shoot_crop(s, cam, 'rack-deck-rec', box_px(s, cam, rc['x'], rc['y'], 1.9, 1.9))
+    _lamp(rc, False); _save()
+    # the counter's figures on the first drum
+    cy, d0 = B['cy'], B['drums'][0]
+    wb = box_px(s, cam, d0, cy, 0.62, 1.0)
+    info['wheels'] = dict(rects=[[*P_(dx - 0.62, cy + 1.0), *P_(dx + 0.62, cy - 1.0)] for dx in B['drums']], crop=wb)
+    for d in range(10):
+        b0 = set(bpy.data.objects)
+        T_.ink(str(d), d0, cy, 0.12, 0.95, color='#ece6d6', kind='BarlowSemiCondensed-600-normal.ttf', track=0.0, w=1.2)
+        new = _new_since(b0)
+        L['solo']['wheel-%d' % d] = shoot_crop(s, cam, 'rack-deck-wheel-%d' % d, wb)
+        for o in new: bpy.data.objects.remove(o, do_unlink=True)
+        _save()
+    # the reels
+    snap = _snapshot(s)
+    static = [o for o, (hr, vc) in snap.items() if not hr and o not in studio]
+    c_plate, c_pack = B['catchers']
+    for key, (x, y), roller in (('s', (-R.DECK['rx'], R.DECK['ry']), B['rollers'][0]), ('t', (R.DECK['rx'], R.DECK['ry']), B['rollers'][1])):
+        g = B['reels'][key]
+        m = RR['R'] + 1.6
+        bx = box_px(s, cam, x, y, m, m)
+        pb = box_px(s, cam, x, y, 2.0, 2.0)
+        hubc = [o for o in g['hub'] if o.name.startswith('hub')]
+        boss = [o for o in g['hub'] if o.name.startswith('boss')]
+        info['reels'][key] = dict(box=bx, c=P_(x, y), r_cm=RR['R'], hub_cm=RR['hub'], full_cm=RR['pack_full'], win=TL.WIN,
+                                  roller=P_(*roller), roller_r_cm=0.7, prong_box=pb, frames=24, span=120)
+        jobs = [('rear', g['rear'], static, ()),
+                ('rearshadow', [], g['rearwin'], (c_plate,)),
+                ('rearshadow-solid', [], g['rear'], (c_plate,)),
+                ('pack', g['pack'], static + g['rear'], ()),
+                ('front', g['front'] + g['hub'], static + g['rear'] + g['pack'], ()),
+                ('frontshadow', [], g['frontwin'] + g['hub'] + g['prongs'], (c_pack,)),
+                ('frontshadow-solid', [], g['front'] + g['hub'], (c_pack,))]
+        for nm, vis, ctx, ca in jobs:
+            _solo(s, studio, vis, ctx, ca)
+            L['solo']['%s-%s' % (key, nm)] = shoot_crop(s, cam, 'rack-deck-%s-%s' % (key, nm), bx)
+            _restore(snap); _save()
+        # the prongs, turning clockwise as seen from the front (both reels turn that way playing forward)
+        for i in range(24):
+            g['pivot'].rotation_euler = (0, 0, math.radians(-120.0 * i / 24))
+            bpy.context.view_layer.update()
+            _solo(s, studio, g['prongs'] + boss, static + g['rear'] + g['pack'] + g['front'] + hubc)
+            L['solo']['%s-prong-%02d' % (key, i)] = shoot_crop(s, cam, 'rack-deck-%s-prong-%02d' % (key, i), pb)
+            _restore(snap)
+        g['pivot'].rotation_euler = (0, 0, 0); _save()
+        print('reel', key, flush=True)
+    L['deck'] = info
+    _save()
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# the cart machine (3U): the third proof's unit_cart (approved), split for the app
+#   base           the graphite face, the cartridge in its slot with a blank label (the app prints the signal's map and
+#                  the playhead on it), the keys out and dark, the LEDs dark, the timer's segments dark
+#   k<i>-down, k<i>-lit, k<i>-litdown   CHECK and RECORD (lit while they run), STOP (down only)
+#   l<i>           READY, CUE 1, CUE 2 lit (saturated flush LEDs, the NAM rack's)
+#   dig            every timer segment lit: the app shows the lit ones through a mask of their outlines (`segs`, `cells`)
+#   colon          the timer's colon lit
+# The timer's segments and the LEDs are the NAM meter bridge's saturated kind (the digits deep red, not pale).
+
+CART_KEYS = [('check', 'CHECK', -15.2, '#b07a2c', '#ffa030', True), ('record', 'RECORD', -9.6, '#5a0c06', '#ff2a10', True),
+             ('stop', 'STOP', -4.0, '#c6bfae', '#fff0d0', False)]
+CART_LEDS = [('READY', 'green'), ('CUE 1', 'amber'), ('CUE 2', 'amber')]
+CART_TIMER = dict(x=5.2, y=-1.9, win=(6.6, 2.4), hgt=1.5)
+CART_LABEL = dict(w=12.6, h=1.9)
+
+
+def _cart_key(kx, ky, ks, lab, base, glow, litable, s):
+    blk = R.SG.black_cast('bc')
+    bz = R.rbox('kbz', ks + 0.55, ks + 0.55, 0.22, 0.0, 0.22, roll=0.06); bz.location = (kx, ky, 0)
+    R.cut(bz, R.prism('kh', [(x + kx, y + ky, z) for x, y, z in R._rring(ks / 2 + 0.04, ks / 2 + 0.04, 0.16, 0.0, 0, n_arc=8)], -2, 2))
+    R.chamfer(bz, 0.02, 2); bz.data.materials.append(blk)
+    caps = {}
+    for lit in ((False, True) if litable else (False,)):
+        lm = R.dome_lens('lens%s%d' % (lab, lit), base, glow, lit)
+        for down in (False, True):
+            dz = -0.12 if down else 0.0
+            cap = R.rbox('lens', ks, ks, 0.5, -0.1 + dz, 0.16, roll=0.06); TK.flat_faces(cap); cap.location = (kx, ky, 0)
+            cap.data.materials.append(lm)
+            a_ = ks / 2 - 0.05
+            bpy.ops.mesh.primitive_grid_add(x_subdivisions=48, y_subdivisions=48, size=2 * a_, location=(kx, ky, 0.4 + dz))
+            dm = bpy.context.active_object; dm.name = 'dome'
+            for v in dm.data.vertices:
+                u_, w_ = v.co.x / a_, v.co.y / a_
+                v.co.z = 0.24 * max(0.0, 1 - u_ ** 4) * max(0.0, 1 - w_ ** 4)
+            bpy.ops.object.shade_smooth(); dm.data.materials.append(lm)
+            for o in (cap, dm): o.hide_render = lit or down
+            caps[(lit, down)] = [cap, dm]
+    g = None
+    if litable:
+        Lk = bpy.data.lights.new('kg', 'POINT'); Lk.energy = 0.3; Lk.color = R.srgb(glow); Lk.shadow_soft_size = 0.8
+        g = bpy.data.objects.new('kg', Lk); s.collection.objects.link(g); g.location = (kx, ky, 1.4); g.hide_render = True
+    R.engrave(lab, kx, ky - ks / 2 - 0.75, 0.44, track=0.14)
+    return dict(caps=caps, glow=g, x=kx, y=ky, w=ks + 0.55, h=ks + 0.55)
+
+
+def _cart_state(k, lit, down):
+    for (l, d), objs in k['caps'].items():
+        for o in objs: o.hide_render = not (l == lit and d == down)
+    if k['glow'] is not None:
+        k['glow'].hide_render = not lit; k['glow'].location.z = 1.4 - (0.12 if down else 0.0)
+
+
+def _seg_cells(xs, cy, z, hgt, on_m, off_m):
+    """Seven-segment cells (led_digits' geometry, no points), every segment dark. Returns the segments
+    [(object, outline in world cm)] and each cell's segments a..g as indices."""
+    w = hgt * 0.5; t = hgt * 0.12; sl = math.tan(math.radians(8))
+    segs, cells = [], []
+    for x_ in xs:
+        cell = {}
+        geo = {'a': (0, hgt / 2, True), 'g': (0, 0, True), 'd': (0, -hgt / 2, True),
+               'f': (-w / 2, hgt / 4, False), 'b': (w / 2, hgt / 4, False), 'e': (-w / 2, -hgt / 4, False), 'c': (w / 2, -hgt / 4, False)}
+        for k_, (sx, sy, horiz) in geo.items():
+            sw_, sh_ = (w - t, t) if horiz else (t, hgt / 2 - t)
+            o = R.rbox('seg', sw_, sh_, 0.02, z, t * 0.45)
+            ox_, oy_ = x_ + sx + sy * sl, cy + sy
+            o.location = (ox_, oy_, 0)
+            corners = [(-sw_ / 2, -sh_ / 2), (sw_ / 2, -sh_ / 2), (sw_ / 2, sh_ / 2), (-sw_ / 2, sh_ / 2)]
+            if not horiz:
+                for v in o.data.vertices: v.co.x += v.co.y * sl
+                corners = [(px + py * sl, py) for px, py in corners]
+            o.data.materials.append(off_m)
+            cell[k_] = len(segs); segs.append((o, [(ox_ + px, oy_ + py) for px, py in corners]))
+        cells.append(cell)
+    return segs, cells
+
+
+def unit_cart():
+    T_ = R._tape()
+    from PIL import Image
+    import numpy as np
+    K.set_seed('rack-cart')
+    s, cam, h = R.unit_scene(3)
+    R.backing(h)
+    pl, ph = R.rack_panel(3, 'alu', 'cart')
+    sx0, sy0, sw, sh = -9.6, 2.35, 16.2, 3.1
+    R.cut(pl, R.prism('slot', [(x + sx0, y + sy0, z) for x, y, z in R._rring(sw / 2, sh / 2, 0.25, 0.0, 0, n_arc=8)], -2, 2))
+    TM = CART_TIMER; tx, tyy = TM['x'], TM['y']
+    zd = R.red_window(pl, tx, tyy, TM['win'][0], TM['win'][1], 'timer')
+    pl.data.materials.append(K.anodised('cartface', base='#2a2a2c'))
+    throat = R.rbox('throat', sw - 0.1, sh - 0.1, 0.1, -2.6, 0.2); throat.location = (sx0, sy0, 0)
+    throat.data.materials.append(R.mat('throat', R.srgb('#0d0c0b'), rough=0.85))
+    cw_, ch_ = 15.2, 2.45
+    shell = R.rbox('cart', cw_, ch_, 4.0, -2.6, 0.18, roll=0.04); shell.location = (sx0, sy0 - 0.15, 0)
+    shm = R.mat('cartshell', R.srgb('#2b2927'), rough=0.42, coat=0.25, coat_rough=0.25)
+    R.add_bump(shm, R.noise(shm.node_tree, R.obj_coords(shm.node_tree), 90.0, 2.0, 0.5), 0.08, 0.001)
+    R.surface_wear(shm, dust=0.4, smudge=0.5, scuff=0.5)
+    shell.data.materials.append(R.grimy(shm, dirt='#3a3228', amount=0.35, dist=0.05))
+    for gx in (-1, 1):
+        for i in range(4):
+            gr_ = R.rbox('grip', 0.06, ch_ - 0.7, 0.05, 1.4, 0.02); gr_.location = (sx0 + gx * (cw_ / 2 - 0.45 - i * 0.16), sy0 - 0.15, 0)
+            gr_.data.materials.append(shm)
+    lw, lh = CART_LABEL['w'], CART_LABEL['h']
+    # the label blank: cream stock with its tooth (the app prints it)
+    px = 110
+    blank = R.age_paper(Image.new('RGB', (int(lw * px), int(lh * px)), (233, 224, 199)), np.random.default_rng(11))
+    T_.img_plane('cartlabel', np.asarray(blank, np.float32) / 255.0, lw, lh, sx0, sy0 - 0.15, 1.402)
+    ky = -3.0; ks = 2.3
+    keys = [_cart_key(kx, ky, ks, lab, base, glow, litable, s) for _, lab, kx, base, glow, litable in CART_KEYS]
+    leds = []
+    for i, (lab, col) in enumerate(CART_LEDS):
+        lx = 1.4 + i * 2.6
+        b0 = set(bpy.data.objects)
+        R.flush_led(lx, 3.1, col, True, k=NAM_LED_K, sat=True)
+        lens = [o for o in _new_since(b0) if o.name.startswith('led') and not o.name.startswith('ledcol')][0]
+        hot = lens.data.materials[0]
+        dark = R.mat('ledC%s-dark' % col, R.srgb({'green': '#0c2010', 'amber': '#2a1606', 'red': '#2a0806'}[col]),
+                     rough=0.32, coat=0.3, coat_rough=0.08)
+        lens.data.materials[0] = dark
+        leds.append(dict(lens=lens, hot=hot, dark=dark, x=lx, y=3.1))
+        R.engrave(lab, lx, 2.25, 0.4, track=0.1)
+    hgt = TM['hgt']; pp = hgt * 0.74; t = hgt * 0.12
+    on_m = _sat_mat('tseg-on', 'red', True, NAM_DIG_K, t / 2, t / 2)
+    off_m = R.mat('tseg-off', R.srgb('#1a0605'), rough=0.3, coat=0.5, coat_rough=0.05)
+    xs = [tx - 1.75, tx + 0.75 - pp / 2, tx + 0.75 + pp / 2]
+    segs, cells = _seg_cells(xs, tyy, zd, hgt, on_m, off_m)
+    colon = []
+    for dy in (0.33, -0.33):
+        o = R.rbox('colon', 0.18, 0.18, 0.02, zd, 0.09); o.location = (tx - 0.95 + dy * 0.14, tyy + dy, 0); o.data.materials.append(off_m)
+        colon.append(o)
+    R.engrave('TIME LEFT', tx, tyy - 1.2 - 0.85, 0.44, track=0.14)
+    R.engrave('CARTRIDGE', 16.0, 0.9, 0.62, track=0.2)
+    R.engrave('NAM SIGNAL', 16.0, -0.45, 0.44, track=0.2, color='#a8a298')
+    R.finish_glass()
+    L = shoot_base(s, cam, 'rack-cart', R.PW, h)
+    L['u'] = 3; L['layers'] = {}
+    LAY['units']['cart'] = L; _save()
+    P_ = lambda x, y: TK.proj(s, cam, (x, y, 0.0))
+    la, lb = P_(sx0 - lw / 2, sy0 - 0.15 + lh / 2), P_(sx0 + lw / 2, sy0 - 0.15 - lh / 2)
+    info = dict(label=[la[0], la[1], lb[0], lb[1]], keys=[], segs=[[P_(px, py) for px, py in pts] for _, pts in segs],
+                cells=[[c[k] for k in 'abcdefg'] for c in cells])
+    for i, (k, (kid, *_)) in enumerate(zip(keys, CART_KEYS)):
+        a, b = P_(k['x'] - k['w'] / 2, k['y'] + k['h'] / 2), P_(k['x'] + k['w'] / 2, k['y'] - k['h'] / 2)
+        info['keys'].append(dict(id=kid, rect=[a[0], a[1], b[0], b[1]]))
+    L['cart'] = info; _save()
+    for i, k in enumerate(keys):
+        box = box_px(s, cam, k['x'], k['y'], k['w'] / 2 + 0.9, k['h'] / 2 + 0.9)
+        states = [('down', False, True)] + ([('lit', True, False), ('litdown', True, True)] if k['glow'] is not None else [])
+        for nm, lit, down in states:
+            _cart_state(k, lit, down)
+            L['layers']['k%d-%s' % (i, nm)] = shoot_crop(s, cam, 'rack-cart-k%d-%s' % (i, nm), box)
+            _cart_state(k, False, False); _save()
+    for i, Ld in enumerate(leds):
+        Ld['lens'].data.materials[0] = Ld['hot']
+        L['layers']['l%d' % i] = shoot_crop(s, cam, 'rack-cart-l%d' % i, box_px(s, cam, Ld['x'], Ld['y'], 0.9, 0.9))
+        Ld['lens'].data.materials[0] = Ld['dark']; _save()
+    tb = box_px(s, cam, tx, tyy, TM['win'][0] / 2 + 0.3, TM['win'][1] / 2 + 0.3)
+    for o, _ in segs: o.data.materials[0] = on_m
+    L['layers']['dig'] = shoot_crop(s, cam, 'rack-cart-dig', tb)
+    for o, _ in segs: o.data.materials[0] = off_m
+    for o in colon: o.data.materials[0] = on_m
+    L['layers']['colon'] = shoot_crop(s, cam, 'rack-cart-colon', box_px(s, cam, tx - 0.95, tyy, 0.6, 0.9))
+    for o in colon: o.data.materials[0] = off_m
+    _save()
+
+
 UNITS = {'step-cab': unit_step_cab, 'step-nam': unit_step_nam, 'cheeks': unit_cheeks, 'meters': unit_meters,
          'results': unit_results, 'chart': unit_chart, 'preflight': unit_preflight, 'patch': unit_patch,
-         'nammeters': unit_nammeters}
+         'nammeters': unit_nammeters, 'deck': unit_deck, 'cart': unit_cart}
 
 
 if __name__ == '__main__':

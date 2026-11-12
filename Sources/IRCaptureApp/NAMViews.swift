@@ -111,13 +111,12 @@ struct NAMDirectSteps: View {
                 }
             }
 
-            if let c = TapePieces.cart {
+            if TapePieces.cart != nil || RackCart.available {
                 // Phase 7: the cart machine replaces the Set levels and Record panels.
                 Step(title: "Capture name", subtitle: "Name the capture after the amp and its settings.", done: !m.namName.isEmpty) {
                     NAMNameRow()
                 }
-                // the rack bay: the meter bridge stands over the cart (the proof's order)
-                if RackNAMMeterBridge.available { RackNAMMeterBay().id("machine") }
+                // the level steps first: the meter bridge and the cart stand together under them (the proof's order)
                 HStack(alignment: .top, spacing: 16) {
                     Checklist(items: [
                         "Warm the amp up for about 20 minutes. Wear ear protection for full chain captures.",
@@ -128,7 +127,10 @@ struct NAMDirectSteps: View {
                     ], style: PaperStyle(stock: .manila, ring: true))
                 }
                 .id(RackNAMMeterBridge.available ? "checklist" : "machine")
-                CartMachine(c: c).padding(.top, 4)
+                // the rack bay: the meter bridge stands over the cart (the proof's order)
+                if RackNAMMeterBridge.available { RackNAMMeterBay().id("machine") }
+                // (Phase 7a) the cart machine as a 3U rack unit; without its pictures, the 11-04 cart
+                if RackCart.available { RackCart() } else if let c = TapePieces.cart { CartMachine(c: c).padding(.top, 4) }
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(spacing: 12) {
                         if m.namLevelRunning { StatusLine(text: "Looping the loudest 6 seconds…", color: warnColor) }

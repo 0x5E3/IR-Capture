@@ -251,6 +251,20 @@ enum GearPreview {
                 MeterModule(label: "Room", vu: 4, dbfs: "−0.1 dBFS", clipped: true, advice: ("CLIP: turn down", badColor), eye: (0.2, true)) { EmptyView() }
                 MeterModule(label: "Reference", vu: nil, dbfs: "−72.0 dBFS", clipped: false, advice: ("No signal: check cable", badColor), eye: (nil, false)) { EmptyView() }
             }
+            if RackDeck.available, let r = RackKit.ready("deck"), let d = r.1.deck {
+                Engraved("The reel deck (8U): 37 % into a capture (reels turned, packs sized, counter, CAPTURE and REC lit)", size: 12)
+                RackDeckFace(kit: r.0, unit: r.1, deck: d, state: DeckState(phiS: 23, phiT: 71, p: 0.37, seconds: 27, recording: true)) {
+                    ForEach(Array(d.keys.enumerated()), id: \.offset) { i, k in
+                        RackMachineKey(kit: r.0, unit: r.1, index: i, rect: k.rect, label: k.id, lit: k.id == "capture") {}
+                    }
+                }
+                Engraved("The same deck idle: the tape on the supply reel, every key out", size: 12)
+                RackDeckFace(kit: r.0, unit: r.1, deck: d, state: DeckState(phiS: 0, phiT: 0, p: 0, seconds: 43, recording: false)) {
+                    ForEach(Array(d.keys.enumerated()), id: \.offset) { i, k in
+                        RackMachineKey(kit: r.0, unit: r.1, index: i, rect: k.rect, label: k.id) {}
+                    }
+                }
+            }
             if let d = TapePieces.deck {
                 Engraved("Cab IR: the reel deck, 37 % into a capture (reels turned, packs sized, counter, REC lit)", size: 12)
                 ScaledMachine(size: d.size, outline: d.outline) {
@@ -403,6 +417,14 @@ enum GearPreview {
             Engraved("Amp (NAM): graphite panel, LED lamps, LED-ladder meters", size: 12)
             JobStepper(steps: [("Signal", true), ("Connect", true), ("Set levels", false), ("Record", false), ("Upload", false)])
             RackStepStrip(steps: [("Signal", true), ("Connect", true), ("Set levels", false), ("Record", false), ("Upload", false)])
+            if RackCart.available, let r = RackKit.ready("cart"), let c = r.1.cart {
+                Engraved("The cart machine (3U): 74 s into the take (playhead, timer, READY and CUE LEDs, RECORD lit)", size: 12)
+                RackCartFace(kit: r.0, unit: r.1, cart: c, state: CartState(playhead: 74, secondsLeft: 116, ready: true, cues: true)) {
+                    ForEach(Array(c.keys.enumerated()), id: \.offset) { i, k in
+                        RackMachineKey(kit: r.0, unit: r.1, index: i, rect: k.rect, label: k.id, lit: k.id == "record", filament: false) {}
+                    }
+                }
+            }
             if let c = TapePieces.cart {
                 Engraved("Amp NAM: the cart machine, 74 s into the take (playhead, timer, READY and CUE lamps, RECORD lit)", size: 12)
                 ScaledMachine(size: c.size, outline: c.outline) {

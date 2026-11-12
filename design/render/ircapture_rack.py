@@ -652,8 +652,10 @@ def unit_results():
 # its REC jewel, STOP: the printed keys, nothing else that looks pressable), the drum counter between the reels. The
 # flanges are spun aluminium (an anisotropic sheen round the hub, so they shade with the light), the packs wound tape.
 
-DECK = dict(u=8, rx=11.6, ry=6.4, ty=-6.2, heads=(-4.5, -1.0, 2.5), cap=4.6, gl=-8.0, gr=6.8, tr=(9.4, -3.8),
-            ky=-13.0, cy=12.0)
+# (11-12, for the app) the reels, heads and counter 0.5 cm lower and the keys 0.5 cm higher: the band between the head
+# block and the keys was the deck's emptiest part (the second proof's weak points)
+DECK = dict(u=8, rx=11.6, ry=5.9, ty=-6.7, heads=(-4.5, -1.0, 2.5), cap=4.6, gl=-8.0, gr=6.8, tr=(9.4, -4.3),
+            ky=-12.5, cy=11.5, jewel_r=0.62)
 
 
 def _tape():
@@ -678,8 +680,9 @@ def spun_alu(name='spun'):
     add_bump(m, wv.outputs['Fac'], 0.06, 0.001)
     mix_into(m, 'Roughness', mul(nt, wv.outputs['Fac'], 0.4), 0.16, 'FLOAT')
     mix_into(m, 'Base Color', mul(nt, noise(nt, co, 0.35, 3.0, 0.55, lo=0.35, hi=0.75), 0.4), (*srgb('#9d978a'), 1))
-    surface_wear(m, dust=0.25, smudge=0.45, scuff=0.5)
-    return grimy(m, dirt='#3b3428', amount=0.35, dist=0.08)
+    # (11-12) lighter than the plate's wear: the scuffs and the grime in the rolled lip read as black specks round the rims
+    surface_wear(m, dust=0.25, smudge=0.45, scuff=0.25)
+    return grimy(m, dirt='#3b3428', amount=0.14, dist=0.05)
 
 
 def deck_alu(name='deckplate'):
@@ -793,7 +796,7 @@ def unit_deck(prog=None, rec=True):
             L = math.hypot(ax - px_, ay - py_); ang = math.atan2(ay - py_, ax - px_)
             a = rbox('tarm', L + 0.7, 0.7, 0.3, 0.9, 0.3, roll=0.1)          # on top of the head base
             a.location = ((ax + px_) / 2, (ay + py_) / 2, 0); a.rotation_euler = (0, 0, ang); a.data.materials.append(blk)
-            T_.cyl('tpiv', 0.6, 0.85, 1.4, px_, py_, 48, ni)
+            T_.cyl('tpiv', 0.6, 0.85, 1.4, px_, py_, 48, blk)       # (11-12) black: nickel read as white dots
             T_.cyl('troll', 0.7, 1.2, zt1 + 0.15, ax, ay, 64, alu)
         circles = [((-rx, ry), rs, -1), ((-trx, try_), 0.7, +1), ((gl, ty + 0.55), 0.55, +1)]
         circles += [((x, ty + 0.9), 0.9, +1) for x in hx]
@@ -813,12 +816,12 @@ def unit_deck(prog=None, rec=True):
     row = [('check', False), ('capture', rec), ('rec', rec), ('stop', False)]
     widths = []
     for lid, _ in row:
-        widths.append(1.6 if lid == 'rec' else K.legend_width(LG.LEGENDS[lid][0], 'std') + 2 * TK.KEY['bezel'])
+        widths.append(2 * DECK['jewel_r'] + 0.6 if lid == 'rec' else K.legend_width(LG.LEGENDS[lid][0], 'std') + 2 * TK.KEY['bezel'])
     gap_ = 0.7
     x = -0.7 - (sum(widths) + gap_ * (len(row) - 1)) / 2
     for (lid, lit), wk in zip(row, widths):
         if lid == 'rec':
-            jewel(x + wk / 2, ky, 'red', lit, r=0.5)
+            jewel(x + wk / 2, ky, 'red', lit, r=DECK['jewel_r'])
             engrave('REC', x + wk / 2, ky + 1.55, 0.44, track=0.12, color=D)
         else:
             with moved(x + wk / 2, ky, 0): key(lid, lit=lit)

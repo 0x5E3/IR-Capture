@@ -270,7 +270,7 @@ private struct ReelStack: View {
 
 /// The tangent from circle 1 to circle 2 (centres in screen points, radii in points; s = +1 counter-clockwise round
 /// it, -1 clockwise, as ircapture_tape.tape_path), worked in the reels' plane (y over the ellipse factor).
-private func tangent(_ c1s: CGPoint, _ r1: CGFloat, _ s1: CGFloat, _ c2s: CGPoint, _ r2: CGFloat, _ s2: CGFloat, ey: CGFloat) -> (CGPoint, CGPoint) {
+func tangent(_ c1s: CGPoint, _ r1: CGFloat, _ s1: CGFloat, _ c2s: CGPoint, _ r2: CGFloat, _ s2: CGFloat, ey: CGFloat) -> (CGPoint, CGPoint) {
     let c1 = CGPoint(x: c1s.x, y: -c1s.y / ey), c2 = CGPoint(x: c2s.x, y: -c2s.y / ey)
     let D = CGPoint(x: c2.x - c1.x, y: c2.y - c1.y)
     let dd = D.x * D.x + D.y * D.y, k = s2 * r2 - s1 * r1

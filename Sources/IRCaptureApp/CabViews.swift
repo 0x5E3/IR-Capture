@@ -25,7 +25,7 @@ struct CabJob: View {
                 // (Phase 7a) the patch unit: a three-way toggle for each input, in place of the inputs grid; under the
                 // Connect panel, since the interface is chosen there
                 RackPatchBay()
-                if let d = TapePieces.deck {
+                if TapePieces.deck != nil || RackDeck.available {
                     // Phase 7: the reel deck replaces the Set levels and Capture panels. The capture's name and files
                     // come first, the guidance beside the deck, the meters under it.
                     CabFilesStep()
@@ -33,16 +33,17 @@ struct CabJob: View {
                     if RackMeterBridge.available { RackMeterBay() }
                     if RackPreflightUnit.available {
                         // (Phase 7a) BEFORE CAPTURE, typed in; the level check's steps are on the chart panel's card
-                        RackPreflightUnit(lines: m.preflightSheet, sentences: m.preflight.map(\.text)).id("machine")
+                        RackPreflightUnit(lines: m.preflightSheet, sentences: m.preflight.map(\.text)).id(RackDeck.available ? "preflight" : "machine")
                     } else {
                         HStack(alignment: .top, spacing: 16) {
                             Checklist(items: levelSteps, style: PaperStyle(stock: .manila, ring: true))
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             PreflightList(items: m.preflight).frame(width: 300)
                         }
-                        .id("machine")
+                        .id(RackDeck.available ? "preflight" : "machine")
                     }
-                    ReelDeck(d: d).padding(.top, 4)
+                    // (Phase 7a) the reel deck as an 8U rack unit; without its pictures, the 11-04 deck
+                    if RackDeck.available { RackDeck().id("machine") } else if let d = TapePieces.deck { ReelDeck(d: d).padding(.top, 4) }
                     CabDeckStatus()
                     if !RackMeterBridge.available && !m.levelReadings.isEmpty { LevelTable(readings: m.levelReadings) }
                 } else {
