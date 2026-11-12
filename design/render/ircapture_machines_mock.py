@@ -88,6 +88,7 @@ def deck():
         i = int(round(phi / step)) % n
         sheet = pic(pr['picture']); fw = sheet.size[0] // n
         im = put(im, sheet.crop((i * fw, 0, (i + 1) * fw, sheet.size[1])), pr['box'][0], pr['box'][1])
+    if 'hood' in D: im = put(im, pic(D['hood']['picture']), D['hood']['rect'][0], D['hood']['rect'][1])
     W = D['wheels']; sheet = pic(W['picture']); fw = sheet.size[0] // 10
     for q, dg in zip(W['rects'], '0032'):
         f = sheet.crop((int(dg) * fw, 0, (int(dg) + 1) * fw, sheet.size[1])).resize((int(round(px(q[2]))), int(round(px(q[3])))), Image.LANCZOS)

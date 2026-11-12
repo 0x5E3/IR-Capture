@@ -16,6 +16,7 @@ import IRCaptureCore
 //   the front flange's shadow on the pack      turned
 //   the front flange, hub and boss             as the rear flange
 //   the three hold-down prongs                 24 rendered frames over 120 degrees
+// and over both reels the head hood, lifted off the base (it stands in front of the reels' lower inner edges).
 // The counter's figures are the first drum's ten crops, one laid on each drum. The keys are clear buttons over the
 // rendered keys; pressed and lit, their rendered states (diff layers) over them. REC is a filament.
 //
@@ -40,11 +41,14 @@ extension RackKit {
         }
         struct Key: Decodable { let id: String; let rect: [CGFloat] }
         struct Wheels: Decodable { let picture: String; let rects: [[CGFloat]] }
+        struct Hood: Decodable { let picture: String; let rect: [CGFloat] }
         let reels: [String: Reel]
         let keys: [Key]                  // in layer order: k0 CHECK LEVELS, k1 CAPTURE, k2 STOP
         let wheels: Wheels
+        let hood: Hood?                  // the head hood, lifted off the base: it stands in front of the reels
         var pictures: [String] {
             reels.values.flatMap { [$0.rear, $0.rearshadow, $0.pack, $0.front, $0.frontshadow, $0.prongs.picture] } + [wheels.picture]
+                + (hood.map { [$0.picture] } ?? [])
         }
     }
     struct Cart: Decodable {
@@ -268,6 +272,11 @@ struct RackDeckFace<Keys: View>: View {
                             overlay: AnyView(ZStack(alignment: .topLeading) {
                                 RackReel(kit: kit, reel: s, phi: state.phiS, packR: rs, tape: span(s, rs, true))
                                 RackReel(kit: kit, reel: t, phi: state.phiT, packR: rt, tape: span(t, rt, false))
+                                if let h = deck.hood, let img = SwellPictures.shared.image(h.picture, pxPerPoint: kit.pxPerPoint) {
+                                    Image(nsImage: img).resizable().interpolation(.high)
+                                        .frame(width: h.rect[2], height: h.rect[3]).offset(x: h.rect[0], y: h.rect[1])
+                                        .allowsHitTesting(false)
+                                }
                                 RackCounter(kit: kit, wheels: deck.wheels, value: state.seconds)
                             }
                             .frame(width: unit.size[0], height: unit.size[1], alignment: .topLeading)))

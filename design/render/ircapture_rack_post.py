@@ -7,7 +7,7 @@
 # irc-rack.json (points; origin each picture's top left). Lossless (webp_out). Units already in irc-rack.json and not in
 # this run are kept.
 import sys, os, json, glob
-from PIL import Image, ImageFilter
+from PIL import Image, ImageFilter, ImageDraw
 import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import webp_out  # noqa: F401  (every WEBP lossless)
@@ -167,6 +167,30 @@ def centroid(a):
     return (float((xs * al).sum() / t), float((ys * al).sum() / t)) if t > 0 else (al.shape[1] / 2, al.shape[0] / 2)
 
 
+def rim_mend(im, c, rpx, band_cm=1.0, drop=24.0, win=151):
+    """(11-12) The flanges' rolled lips render with black specks (the scuff bump on that tight curve: up to a third of
+    the lip's pixels near black at 42 px/cm, nothing like it on the flat face). Each ring of the lip, one pixel wide, is
+    walked round by angle; a pixel more than `drop` darker than the median of its `win` neighbours along the ring takes
+    that median's colour (its alpha is kept), twice over. Only the outer band_cm; the boss and the face are not touched."""
+    from scipy.ndimage import median_filter
+    a = np.asarray(im).astype(np.float32).copy()
+    h, w = a.shape[:2]; y, x = np.mgrid[:h, :w]
+    r = np.hypot(x - c[0], y - c[1]); th = np.arctan2(y - c[1], x - c[0])
+    band = (r >= rpx - band_cm * PXCM) & (a[..., 3] > 0)
+    rb = np.floor(r).astype(int); n = 0
+    for k in np.unique(rb[band]):
+        sel = np.nonzero(band & (rb == k))
+        if len(sel[0]) < win: continue
+        o = np.argsort(th[sel]); yy, xx = sel[0][o], sel[1][o]
+        for _ in range(2):                                   # twice: a long run of specks shifts the first median
+            px_ = a[yy, xx, :3]
+            med = np.stack([median_filter(px_[:, i], size=min(win, len(yy) // 2 * 2 - 1), mode='wrap') for i in range(3)], -1)
+            bad = px_.mean(-1) < med.mean(-1) - drop
+            a[yy[bad], xx[bad], :3] = med[bad]; n += int(bad.sum())
+    print('  rim mend: %d px' % n)
+    return Image.fromarray(np.clip(a, 0, 255).astype(np.uint8), 'RGBA')
+
+
 def deck(L):
     """The reel deck's own parts. Its reel pictures were rendered alone (their own alpha), so they are saved whole, not
     as a difference from the base: rear, rearshadow, pack, front, frontshadow at the reel's box; the 24 prong frames as one
@@ -183,7 +207,10 @@ def deck(L):
              'roller': [pt(v) for v in r['roller']], 'rollerR': round(r['roller_r_cm'] * cm, 3)}
         for lay_ in ('rear', 'rearshadow', 'pack', 'front', 'frontshadow'):
             nm = 'rack-deck-%s-%s' % (key, lay_)
-            save(Image.open(os.path.join(RD, nm + '.png')).convert('RGBA'), nm)
+            im = Image.open(os.path.join(RD, nm + '.png')).convert('RGBA')
+            if lay_ in ('rear', 'front'):
+                im = rim_mend(im, ((r['c'][0] - bx[0]), (r['c'][1] - bx[1])), r['r_cm'] * PXCM)
+            save(im, nm)
             e[lay_] = nm
         for lay_ in ('rear', 'front'):
             a = np.asarray(Image.open(os.path.join(RD, 'rack-deck-%s-%sshadow-solid.png' % (key, lay_))).convert('RGBA'))
@@ -197,6 +224,19 @@ def deck(L):
         e['prongs'] = {'picture': 'rack-deck-%s-prongs' % key, 'frames': n, 'span': r['span'],
                        'box': [pt(pb[0]), pt(pb[1]), pt(pb[2] - pb[0]), pt(pb[3] - pb[1])]}
         out['reels'][key] = e
+    if 'hood' in Dk:
+        # (11-12) the head hood stands in front of the reels: its pixels lifted off the base (the reels are not in the
+        # base, so they are the hood's own) inside its rounded outline, drawn over the reels by the app
+        q = Dk['hood']['rect']; x0, x1 = sorted((q[0], q[2])); y0, y1 = sorted((q[1], q[3]))
+        bx0, by0, bx1, by1 = int(x0) - 2, int(y0) - 2, int(x1) + 3, int(y1) + 3
+        base = Image.open(os.path.join(RD, L['picture'] + '.png')).convert('RGBA').crop((bx0, by0, bx1, by1))
+        ss = 4; rr = Dk['hood']['r_cm'] * PXCM
+        m = Image.new('L', (base.size[0] * ss, base.size[1] * ss), 0)
+        ImageDraw.Draw(m).rounded_rectangle([(x0 - bx0) * ss, (y0 - by0) * ss, (x1 - bx0) * ss, (y1 - by0) * ss], rr * ss, fill=255)
+        m = m.resize(base.size, Image.LANCZOS)
+        a = np.asarray(base).copy(); a[..., 3] = (a[..., 3].astype(np.float32) * np.asarray(m, np.float32) / 255).astype(np.uint8)
+        save(Image.fromarray(a, 'RGBA'), 'rack-deck-hood')
+        out['hood'] = {'picture': 'rack-deck-hood', 'rect': rect((bx0, by0, bx1, by1))}
     W = Dk['wheels']; c0 = W['crop']; r0 = W['rects'][0]
     x0, y0 = int(round(r0[0] - c0[0])), int(round(r0[1] - c0[1])); x1, y1 = int(round(r0[2] - c0[0])), int(round(r0[3] - c0[1]))
     figs = [Image.open(os.path.join(RD, 'rack-deck-wheel-%d.png' % d)).convert('RGBA').crop((x0, y0, x1, y1)) for d in range(10)]

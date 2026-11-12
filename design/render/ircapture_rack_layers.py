@@ -1147,6 +1147,10 @@ def unit_deck():
     TL, T_ = B['TL'], B['T_']
     RR = T_.REEL
     info = {'reels': {}, 'keys': [], 'wheels': {}}
+    # (11-12) the head hood stands in front of the reels' lower inner corners: its outline, so the post can lift it off
+    # the base as a layer drawn over them
+    hx1, hy = R.DECK['heads'][1], R.DECK['ty'] + 4.9
+    info['hood'] = dict(rect=[*P_(hx1 - 6.2, hy + 1.2), *P_(hx1 + 6.2, hy - 1.2)], r_cm=0.6)
     # the keys
     for i, k in enumerate(B['keys']):
         a, b = P_(k['x'] - k['w'] / 2, k['y'] + k['h'] / 2), P_(k['x'] + k['w'] / 2, k['y'] - k['h'] / 2)
