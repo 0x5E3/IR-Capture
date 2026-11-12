@@ -5834,5 +5834,199 @@
    "boardTop": 12.6,
    "boardBottom": 39.2
   }
+ },
+ "shelf": {
+  "plank": {
+   "picture": "rack-shelf-plank",
+   "size": [
+    3360.0,
+    257.333
+   ],
+   "frontTop": 19.6,
+   "frontBottom": 55.552,
+   "underBack": 81.833
+  },
+  "boxes": {
+   "jobs": {
+    "picture": "rack-shelf-jobs",
+    "size": [
+     270.667,
+     82.667
+    ],
+    "face": [
+     16.8,
+     16.8,
+     176.12,
+     58.077
+    ],
+    "plankRow": 78.217,
+    "keys": [
+     {
+      "id": "cab-ir",
+      "rect": [
+       33.6,
+       30.35,
+       59.36,
+       30.977
+      ]
+     },
+     {
+      "id": "amp-nam",
+      "rect": [
+       101.36,
+       30.35,
+       74.76,
+       30.977
+      ]
+     }
+    ],
+    "layers": {
+     "k0-down": {
+      "picture": "rack-shelf-jobs-k0-down",
+      "rect": [
+       18.667,
+       16.0,
+       90.667,
+       61.333
+      ]
+     },
+     "k0-lit": {
+      "picture": "rack-shelf-jobs-k0-lit",
+      "rect": [
+       18.667,
+       16.0,
+       90.667,
+       61.333
+      ]
+     },
+     "k0-litdown": {
+      "picture": "rack-shelf-jobs-k0-litdown",
+      "rect": [
+       18.667,
+       16.0,
+       90.667,
+       61.333
+      ]
+     },
+     "k1-down": {
+      "picture": "rack-shelf-jobs-k1-down",
+      "rect": [
+       85.333,
+       16.0,
+       106.667,
+       61.333
+      ]
+     },
+     "k1-lit": {
+      "picture": "rack-shelf-jobs-k1-lit",
+      "rect": [
+       85.333,
+       16.0,
+       106.667,
+       61.333
+      ]
+     },
+     "k1-litdown": {
+      "picture": "rack-shelf-jobs-k1-litdown",
+      "rect": [
+       85.333,
+       16.0,
+       106.667,
+       61.333
+      ]
+     }
+    }
+   },
+   "status": {
+    "picture": "rack-shelf-status",
+    "size": [
+     417.333,
+     82.667
+    ],
+    "face": [
+     16.8,
+     16.8,
+     323.4,
+     58.077
+    ],
+    "plankRow": 78.217,
+    "keys": [],
+    "layers": {
+     "lamp-amber": {
+      "picture": "rack-shelf-status-lamp-amber",
+      "rect": [
+       16.0,
+       18.667,
+       56.0,
+       56.0
+      ]
+     },
+     "lamp-red": {
+      "picture": "rack-shelf-status-lamp-red",
+      "rect": [
+       16.0,
+       18.667,
+       56.0,
+       56.0
+      ]
+     }
+    },
+    "lamp": [
+     44.1,
+     45.837
+    ],
+    "vfd": {
+     "cells": [
+      74.9,
+      41.29,
+      236.6,
+      14.003
+     ],
+     "mtx": [
+      3.5,
+      1.3,
+      160.0,
+      9.6
+     ],
+     "n": 26
+    }
+   },
+   "help": {
+    "picture": "rack-shelf-help",
+    "size": [
+     178.667,
+     82.667
+    ],
+    "face": [
+     16.8,
+     16.8,
+     84.56,
+     58.077
+    ],
+    "plankRow": 78.217,
+    "keys": [
+     {
+      "id": "help",
+      "rect": [
+       33.6,
+       30.35,
+       50.96,
+       30.977
+      ]
+     }
+    ],
+    "layers": {
+     "k0-down": {
+      "picture": "rack-shelf-help-k0-down",
+      "rect": [
+       18.667,
+       16.0,
+       80.0,
+       61.333
+      ]
+     }
+    }
+   }
+  }
  }
 }
