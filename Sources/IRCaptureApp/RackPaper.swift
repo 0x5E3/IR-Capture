@@ -99,6 +99,9 @@ enum PaperInk {
             cg.textPosition = .zero
             CTLineDraw(line, cg)
             cg.restoreGState()
+            // CTLineDraw moves the text position on by the line's width, and the text matrix is not part of the saved
+            // graphics state: put it back, or the next typed line (CTFontDrawGlyphs) starts that far to the right
+            cg.textMatrix = .identity
         }
         return w
     }
