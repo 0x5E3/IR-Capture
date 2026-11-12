@@ -247,7 +247,7 @@ jobs:
           ls dist/diagrams
           [ "$(ls dist/diagrams/*.png | wc -l)" -eq 5 ] || { echo "::error title=Diagrams::The app didn't render the 5 wiring diagrams"; exit 1; }
           "dist/IR Capture.app/Contents/MacOS/IR Capture" --render-gear "$PWD/dist"
-          [ -f dist/screenshot-gear.png ] || echo "::warning title=Gear preview::The app didn't render screenshot-gear.png"
+          [ -f dist/screenshot-gear.png ] || echo "::warning title=Gear preview::The app didn't render screenshot-gear.png ($(cat dist/gear-size.txt 2>/dev/null))"
           python scripts/make_quickstart.py dist/diagrams "dist/Quick start.pdf" "$(tr -d '[:space:]' < VERSION) (build ${{ github.run_number }})"
 
       - name: Notarize the app

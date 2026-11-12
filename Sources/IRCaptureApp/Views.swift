@@ -264,8 +264,7 @@ enum GearPreview {
                         RackMachineKey(kit: r.0, unit: r.1, index: i, rect: k.rect, label: k.id) {}
                     }
                 }
-            }
-            if let d = TapePieces.deck {
+            } else if let d = TapePieces.deck {
                 Engraved("Cab IR: the reel deck, 37 % into a capture (reels turned, packs sized, counter, REC lit)", size: 12)
                 ScaledMachine(size: d.size, outline: d.outline) {
                     ReelDeckFace(d: d, state: DeckState(phiS: 23, phiT: 71, p: 0.37, seconds: 27, recording: true)) {
@@ -424,8 +423,7 @@ enum GearPreview {
                         RackMachineKey(kit: r.0, unit: r.1, index: i, rect: k.rect, label: k.id, lit: k.id == "record", filament: false) {}
                     }
                 }
-            }
-            if let c = TapePieces.cart {
+            } else if let c = TapePieces.cart {
                 Engraved("Amp NAM: the cart machine, 74 s into the take (playhead, timer, READY and CUE lamps, RECORD lit)", size: 12)
                 ScaledMachine(size: c.size, outline: c.outline) {
                     CartFace(c: c, state: CartState(playhead: 74, secondsLeft: 116, ready: true, cues: true)) {
@@ -459,11 +457,18 @@ enum GearPreview {
             .background(WorkshopWall())
             .workshopDefaults()
         let r = ImageRenderer(content: sheet)
+        // (11-12) a sheet past about 8,000 pt tall gives no image at 2x (the 8U decks made it so): fall back to 1x
         r.scale = 2
+        if r.nsImage == nil { r.scale = 1 }
         if let img = r.nsImage, let tiff = img.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
            let png = rep.representation(using: .png, properties: [:]) {
             try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
             try? png.write(to: file)
+        } else {
+            // for CI's warning: how large the sheet came out
+            let size = NSHostingView(rootView: sheet).fittingSize
+            try? "sheet \(Int(size.width)) x \(Int(size.height)) pt".write(to: file.deletingLastPathComponent().appendingPathComponent("gear-size.txt"),
+                                                                            atomically: true, encoding: .utf8)
         }
     }
 }
