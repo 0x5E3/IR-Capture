@@ -1379,9 +1379,217 @@ def unit_cart():
     _save()
 
 
+# ---------------------------------------------------------------------------------------------------------------------
+# the shelf (11-12): the approved shelf from below (ircapture_shelf.py's proof) at the bay's scale, 14 pt a cm, seen
+# from 9 degrees below. For the app it is not one picture but:
+#   shelf-plank   the shop-wood plank alone, a long strip (render_long, the studio moved along it), its shadow on the wall
+#   shelf-jobs    the bronze box with CAB IR and AMP NAM: base (both keys out, dark), k<i>-lit, -down, -litdown
+#   shelf-status  the bronze box with the power lamp and the VFD: base (lamp dark, every dot dark), lamp-amber, lamp-red;
+#                 the app lights the VFD's dots on the render's grid (as the old status line)
+#   shelf-help    the oxblood box with HELP: base, k0-down
+# Each box is rendered alone over the wall (a shadow catcher), centred in its own studio (lit as the proof's middle
+# box), with the plank there as a holdout: the plank's front edge hides the box's feet as it will in the app, and the
+# box's shadow behind the plank is left out (the plank strip carries the wall's own shadow there).
+
+SHELF_BOXES = {'jobs': ('bronze', [('cab-ir', True), ('amp-nam', True)]),
+               'status': ('bronze', ['lamp', 'vfd']),
+               'help': ('oxblood', [('help', False)])}
+SHELF_MARGIN = dict(left=1.2, right=float(os.environ.get('IRC_SHELF_SHADOW_CM', '5.5')), head=1.2, foot=0.25)
+
+
+def _shelf_mod():
+    """ircapture_shelf.py (its box sizes, materials and VFD), imported with the argv it reads."""
+    a = sys.argv[:]
+    sys.argv = [a[0], OUT, str(PXCM), str(SAMPLES)]
+    try:
+        import ircapture_shelf as SH
+    finally:
+        sys.argv = a
+    return SH
+
+
+def _dark_vfd(SH, box, xc):
+    """ircapture_shelf.vfd with every dot dark (gas_disp's DEMO off): the window cut in the box's face at x = xc.
+    Returns the matrix's cells (x0, y0, x1, y1, z, world cm) and its geometry (MX_L, MY, Wu, Hu)."""
+    import gas_disp as GD
+    W, H, Wu, Hu = GD.mtx_geom(26, 1)
+    dw, dh = Wu * SH.VFD_PITCH, Hu * SH.VFD_PITCH
+    ww, wh = dw + 0.6, dh + 0.6
+    T = 0.32
+    hole = R.rbox('vhole', ww, wh, T + 2, -T - 1, 0.08); hole.location.x = xc
+    bpy.context.view_layer.update(); R.cut(box, hole)
+    got = {}
+    with R.moved(xc, 0, 0):
+        bw = K.GAS_BEZEL
+        bez = R.rbox('gbezel', ww + 2 * bw, wh + 2 * bw, 0.14, 0.0, 0.12, roll=0.05)
+        bh = R.rbox('gbezh', ww - 0.04, wh - 0.04, 1.0, -0.5, 0.06)
+        bpy.context.view_layer.update(); R.cut(bez, bh); R.chamfer(bez, 0.02, 2); TK.flat_faces(bez)
+        bez.data.materials.append(K.gas_bezel_mat())
+        rd = os.path.join(OUT, 'gas'); os.makedirs(rd, exist_ok=True)
+        RA = K._RackAdapter(T, rd)
+        old = GD.DEMO, GD.matrix_maps, GD.thin_glass
+        GD.DEMO = False
+        _tg = GD.thin_glass
+        GD.matrix_maps = lambda b, e, n_, nl, **kw: K.vfd_matrix_maps(GD, b, e, n_, nl, **kw)
+        GD.thin_glass = lambda RA_, name, tint='#c8b49e', dust=0.5, rough=0.03: _tg(RA_, name, K.VFD_GLASS if name.endswith('pane') else tint, dust, rough)
+        L = []
+        try:
+            GD.gas_window(RA, L, 'shelf-vfd', 'matrix', -ww / 2, -wh / 2, ww / 2, wh / 2, SG_nickel('gscrew', 3), 3, n=26, lines=1)
+        finally:
+            GD.DEMO, GD.matrix_maps, GD.thin_glass = old
+        got = L[0]
+    for o in bpy.data.objects:
+        if o.name.endswith('pane') or o.name.endswith('env'):
+            o.visible_shadow = False
+            if o not in R.GLASS: R.GLASS.append(o)
+    return got
+
+
+def SG_nickel(name, seed):
+    return R.SG.nickel(name, seed=seed)
+
+
+def _jewel_states(x, y, r):
+    """The power lamp three ways (dark, amber lit, red lit), each a whole jewel (bezel, lens, its glow); one shown."""
+    st = {}
+    for nm, colour, lit in (('off', 'amber', False), ('amber', 'amber', True), ('red', 'red', True)):
+        b0 = set(bpy.data.objects)
+        R.jewel(x, y, colour, lit, r=r)
+        st[nm] = _new_since(b0)
+    return st
+
+
+def _show_jewel(st, which):
+    for k, objs in st.items():
+        for o in objs: o.hide_render = k != which
+
+
+def shelf_box_unit(name):
+    """One shelf box, alone, every live part switchable; base and crops."""
+    SH = _shelf_mod()
+    import ircapture_legends as LG
+    import gas_disp as GD
+    finish, parts = SHELF_BOXES[name]
+    K.use_elev(K.SHELF_ELEV)                                  # seen from 9 degrees below (the studio's camera turned)
+    s, cam = TK.scene(20, 10, 0.5)
+    K.wall(0.0)
+    pc = K.plank_obj(80.0)                                    # the plank: hides the feet, casts nothing here
+    pc.is_holdout = True; pc.visible_shadow = False
+    B = SH.BOX
+    sizes = []
+    for p in parts:
+        if p == 'lamp': sizes.append(1.5)
+        elif p == 'vfd':
+            _, _, Wu, Hu = GD.mtx_geom(26, 1); sizes.append(Wu * SH.VFD_PITCH + 0.6 + 2 * K.GAS_BEZEL)
+        else: sizes.append(K.legend_width(LG.LEGENDS[p[0]][0], 'std') + 2 * TK.KEY['bezel'])
+    gap = 0.6
+    w = sum(sizes) + gap * (len(parts) - 1) + 2 * B['pad']
+    h, d, zf, fh = B['h'], B['d'], B['z_front'], B['foot']
+    K.set_seed('shelfbox-' + name)
+    keys, lamp, vfd = [], None, None
+    with R.moved(0.0, fh + h / 2, zf):
+        b = R.rbox('box-' + name, w, h, d, -d, B['r'], roll=B['roll']); TK.flat_faces(b)
+        x = -w / 2 + B['pad']
+        for p, sz in zip(parts, sizes):
+            xc = x + sz / 2
+            if p == 'lamp':
+                lamp = dict(x=xc, st=_jewel_states(xc, 0.0, 0.48))
+            elif p == 'vfd':
+                vfd = dict(x=xc, e=_dark_vfd(SH, b, xc))
+            else:
+                with R.moved(xc, 0, 0):
+                    k = _key_parts(p[0], p[1])
+                k.update(id=p[0], x=xc, litable=p[1]); keys.append(k)
+                if k['glow'] is not None: k['gz'] = zf + 1.05     # its glow's z when the cap is out (_key_parts: 1.05)
+            x += sz + gap
+        b.data.materials.append(SH.box_mat(finish, name, w))     # after every cut
+        nk = R.SG.nickel('boxscrew-' + name, seed=K.seed_of(name) % 97)
+        for sx in (-1, 1):
+            for sy in (-1, 1):
+                R.screw(sx * (w / 2 - B['screw_in']), sy * (h / 2 - B['screw_in']), nk)
+    rm = R.SG.rubber()
+    for fx in (-(w / 2 - 1.4), w / 2 - 1.4):
+        bpy.ops.mesh.primitive_cylinder_add(radius=0.55, depth=fh + 0.05, vertices=40, location=(fx, fh / 2, zf - 1.3))
+        f = bpy.context.active_object; f.rotation_euler = (math.radians(90), 0, 0); f.data.materials.append(rm)
+        bpy.ops.object.shade_smooth()
+    R.finish_glass()
+    for k in keys: _shelf_key(k, False, False)
+    if lamp: _show_jewel(lamp['st'], 'off')
+    M = SHELF_MARGIN
+    v_bot = K.v_of(0.0, K.PL['depth']) - M['foot']
+    v_top = max(K.v_of(fh + h, zf), K.v_of(fh + h, zf - d)) + M['head']
+    K.frame(s, cam, -w / 2 - M['left'], w / 2 + M['right'], v_bot, v_top)
+    bpy.context.view_layer.update()
+    Pj = lambda x, y, z=zf: TK.proj(s, cam, (x, y, z))
+    pic = 'rack-shelf-' + name
+    t = time.time(); s.render.use_border = False; P.render(s, os.path.join(OUT, pic + '.png'))
+    a, c = Pj(-w / 2, fh + h), Pj(w / 2, fh)
+    L = {'picture': pic, 'size_px': [s.render.resolution_x, s.render.resolution_y], 'cm': [w, h], 'finish': finish,
+         'face': [a[0], a[1], c[0], c[1]], 'plank_row': Pj(0.0, 0.0, K.PL['depth'])[1], 's': round(time.time() - t, 1),
+         'keys': [], 'layers': {}}
+    SHL = LAY.setdefault('shelf', {}); SHL.setdefault('boxes', {})[name] = L; _save()
+    yk = fh + h / 2
+    for i, k in enumerate(keys):
+        ka, kb = Pj(k['x'] - k['w'] / 2, yk + k['h'] / 2), Pj(k['x'] + k['w'] / 2, yk - k['h'] / 2)
+        L['keys'].append(dict(id=k['id'], rect=[ka[0], ka[1], kb[0], kb[1]]))
+        box = _shelf_crop(s, cam, k['x'], yk, zf, k['w'] / 2 + 1.0, k['h'] / 2 + 1.0)
+        states = [('down', False, True)] + ([('lit', True, False), ('litdown', True, True)] if k['litable'] else [])
+        for nm, lit, down in states:
+            _shelf_key(k, lit, down)
+            L['layers']['k%d-%s' % (i, nm)] = shoot_crop(s, cam, '%s-k%d-%s' % (pic, i, nm), box)
+            _shelf_key(k, False, False); _save()
+    if lamp:
+        L['lamp'] = Pj(lamp['x'], yk)
+        box = _shelf_crop(s, cam, lamp['x'], yk, zf, 1.9, 1.9)
+        for col in ('amber', 'red'):
+            _show_jewel(lamp['st'], col)
+            L['layers']['lamp-' + col] = shoot_crop(s, cam, '%s-lamp-%s' % (pic, col), box)
+        _show_jewel(lamp['st'], 'off'); _save()
+    if vfd:
+        e = vfd['e']; x0, y0, x1, y1, zd = e['cells']
+        # the cells were placed inside moved(): add the box's offsets
+        tl, br = TK.proj(s, cam, (x0 + vfd['x'], y0 + yk, zd + zf)), TK.proj(s, cam, (x1 + vfd['x'], y1 + yk, zd + zf))
+        L['vfd'] = {'cells': [tl[0], min(tl[1], br[1]), br[0], max(tl[1], br[1])], 'mtx': e.get('mtx'), 'n': 26}
+        _save()
+
+
+def _shelf_key(k, lit, down):
+    """_key_state for a key standing on a box face at z = zf (its glow kept at the same height over the cap)."""
+    for (l, d), c in k['caps'].items(): c.hide_render = not (l == lit and d == down)
+    if k['glow'] is not None:
+        k['glow'].hide_render = not lit
+        k['glow'].location.z = k['gz'] - (0.12 if down else 0.0)
+
+
+def _shelf_crop(s, cam, x, y, z, rx, ry):
+    a = TK.proj(s, cam, (x - rx, y + ry, z)); b = TK.proj(s, cam, (x + rx, y - ry, z))
+    W, H = s.render.resolution_x, s.render.resolution_y
+    x0 = int(min(a[0], b[0]) // 8 * 8); y0 = int(min(a[1], b[1]) // 8 * 8)
+    x1 = int(-(-max(a[0], b[0]) // 8) * 8); y1 = int(-(-max(a[1], b[1]) // 8) * 8)
+    return [max(0, x0), max(0, y0), min(W, x1), min(H, y1)]
+
+
+def unit_shelf_plank():
+    """The plank alone, IRC_SHELF_PLANK_CM long (240: 3360 pt, a wide screen at Actual Size; FrameStrip lays copies
+    end to end past that), from 9 degrees below."""
+    K.use_elev(K.SHELF_ELEV)
+    K.LONG['plank'] = float(os.environ.get('IRC_SHELF_PLANK_CM', '240'))
+    K.piece_plank_shop()
+    os.replace(os.path.join(OUT, 'plank.png'), os.path.join(OUT, 'rack-shelf-plank.png'))
+    pl = dict(K.LAY['out']['plank']); pl['picture'] = 'rack-shelf-plank'
+    LAY.setdefault('shelf', {})['plank'] = pl; _save()
+
+
+def unit_shelf():
+    for nm in SHELF_BOXES: shelf_box_unit(nm)
+
+
 UNITS = {'step-cab': unit_step_cab, 'step-nam': unit_step_nam, 'cheeks': unit_cheeks, 'meters': unit_meters,
          'results': unit_results, 'chart': unit_chart, 'preflight': unit_preflight, 'patch': unit_patch,
-         'nammeters': unit_nammeters, 'deck': unit_deck, 'cart': unit_cart}
+         'nammeters': unit_nammeters, 'deck': unit_deck, 'cart': unit_cart,
+         'shelf-boxes': unit_shelf, 'shelf-plank': unit_shelf_plank,
+         'shelf-jobs': lambda: shelf_box_unit('jobs'), 'shelf-status': lambda: shelf_box_unit('status'),
+         'shelf-help': lambda: shelf_box_unit('help')}
 
 
 if __name__ == '__main__':

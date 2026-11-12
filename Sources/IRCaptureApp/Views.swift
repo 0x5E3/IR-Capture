@@ -242,6 +242,13 @@ enum GearPreview {
         let vus: [Double] = [0.4, -1.5, 2.2, -2.8, -7, 1, -0.5]
         let eyes: [Double] = [0.9, 0.75, 1.0, 0.6, 0.35, 0.5, 1.0]
         let view = VStack(alignment: .leading, spacing: 22) {
+            if let p = RackShelf.parts {
+                Engraved("The shelf from below: Amp NAM showing, the lamp amber (red on an error), a level check's line on the VFD", size: 12)
+                RackShelf(parts: p, job: .nam, jobsLocked: false, lamp: .amber,
+                          vfdText: vfdLine(left: "Checking levels", middle: "Scarlett 18i20 USB", right: "48K", n: VFDStatusLine.n),
+                          vfdHelp: "", statusLabel: "Checking levels", setJob: { _ in }, openHelp: {})
+                    .padding(.bottom, 60).clipped()
+            }
             Engraved("Cab IR: four inputs, full-size meters, noise eyes", size: 12)
             MeterBridge(count: 4) {
                 MeterModule(label: "SM57", vu: 0, dbfs: "−6.0 dBFS", clipped: false, advice: ("OK", goodColor), eye: (1.0, true)) {
@@ -497,8 +504,26 @@ struct Shelf: View {
     }
     /// The rate for the VFD's right end, "96K".
     var rateText: String { "\(rateTag(m.job == .nam ? 48000 : m.captureRate).dropLast())K" }
+    /// The VFD's line: the status (or, during a Cab IR level check, the advice for the input that most needs it), the
+    /// interface shortened to fit, the rate.
+    func vfdText(_ st: (Lamp.Glow, String)) -> String {
+        let advice = m.job == .cab && m.levelRunning && RackMeterBridge.available ? m.levelGuidance : nil
+        let left = advice ?? st.1
+        let room = left.count + rateText.count + 1 <= VFDStatusLine.n
+        return vfdLine(left: left, middle: advice == nil ? (m.device?.name ?? "No interface") : "",
+                       right: m.device == nil || !room ? "" : rateText, n: VFDStatusLine.n)
+    }
     var body: some View {
         let st = status
+        if let p = RackShelf.parts {
+            // (Phase 7a, 11-12) the shelf from below at the bay's scale
+            RackShelf(parts: p, job: m.job, jobsLocked: m.busy != nil, lamp: st.0, vfdText: vfdText(st), vfdHelp: rig,
+                      statusLabel: st.1, setJob: { m.job = $0 }, openHelp: { m.helpPage = .quickStart })
+        } else {
+            oldShelf(st)
+        }
+    }
+    @ViewBuilder func oldShelf(_ st: (Lamp.Glow, String)) -> some View {
         let g = ShelfGeometry.own
         ZStack(alignment: .topLeading) {
             if let g {
@@ -526,13 +551,7 @@ struct Shelf: View {
                     .accessibilityHidden(true)
                     if GasKit.display("line") != nil {
                         // (11-11) the status on the bench's VFD: the status, the interface (shortened to fit), the rate
-                        // (Phase 7a) during the Cab IR level check, the advice for the input that most needs it
-                        let advice = m.job == .cab && m.levelRunning && RackMeterBridge.available ? m.levelGuidance : nil
-                        let left = advice ?? st.1
-                        let room = left.count + rateText.count + 1 <= VFDStatusLine.n
-                        VFDStatusLine(text: vfdLine(left: left, middle: advice == nil ? (m.device?.name ?? "No interface") : "",
-                                                    right: m.device == nil || !room ? "" : rateText, n: VFDStatusLine.n))
-                            .help(rig)
+                        VFDStatusLine(text: vfdText(st)).help(rig)
                     } else {
                         GlassWindow(size: 13) {
                             VStack(alignment: .leading, spacing: 1) {

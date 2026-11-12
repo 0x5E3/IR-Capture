@@ -20,6 +20,7 @@ struct RackKit: Decodable {
     let uPt: CGFloat
     let units: [String: Unit]
     let cheeks: Cheeks?
+    let shelf: Shelf?             // the shelf from below (RackShelf.swift)
 
     struct Unit: Decodable {
         let picture: String
@@ -100,6 +101,36 @@ struct RackKit: Decodable {
     struct Layer: Decodable {
         let picture: String
         let rect: [CGFloat]          // in the base picture, pt
+    }
+    /// The shelf from below (11-12): the plank strip and the three boxes standing on it. Places in each picture, pt.
+    struct Shelf: Decodable {
+        struct Plank: Decodable {
+            let picture: String
+            let size: [CGFloat]
+            let frontTop: CGFloat     // the plank's front top edge, from the strip's top
+            let frontBottom: CGFloat
+            let underBack: CGFloat    // where its underside meets the wall
+        }
+        struct Box: Decodable {
+            struct Key: Decodable { let id: String; let rect: [CGFloat] }
+            struct VFD: Decodable { let cells: [CGFloat]; let mtx: [CGFloat]; let n: Int }
+            let picture: String
+            let size: [CGFloat]
+            let face: [CGFloat]       // the box's front face (x, y, w, h)
+            let plankRow: CGFloat     // where the plank's front top edge falls in this picture
+            let keys: [Key]
+            let layers: [String: Layer]
+            let lamp: [CGFloat]?
+            let vfd: VFD?
+            /// The box as a unit, for RackMachineKey (its keys' layers k<i>-lit, -down, -litdown).
+            var unit: Unit {
+                Unit(picture: picture, u: 0, size: size, panel: face, layers: layers, meters: nil, results: nil,
+                     preflight: nil, patch: nil, nammeters: nil, deck: nil, cart: nil)
+            }
+            var pictures: [String] { [picture] + layers.values.map(\.picture) }
+        }
+        let plank: Plank?
+        let boxes: [String: Box]?
     }
     struct Cheeks: Decodable {
         struct V: Decodable { let picture: String; let size: [CGFloat]; let boardLeft: CGFloat; let boardWidth: CGFloat }

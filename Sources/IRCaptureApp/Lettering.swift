@@ -218,7 +218,10 @@ private struct DisplayPicture<Overlay: View>: View {
 /// left (the bench's VFD power-on); after that a new reading shows at once. Reduce Motion: no power-on.
 struct VFDStatusLine: View {
     let text: String
-    static var n: Int { GasKit.display("line")?.n ?? 26 }
+    /// (11-12) The VFD in the shelf's status box: the box's picture holds the display dark; the dots are lit over
+    /// `cells` (the matrix with its margins, in a view of `size`, the box picture's points). nil: the old status line.
+    var on: VFDGeometry? = nil
+    static var n: Int { RackShelf.parts?.status.vfd?.n ?? GasKit.display("line")?.n ?? 26 }
     private static var poweredAt: Date?
     @State private var bootAt: Date?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -227,7 +230,17 @@ struct VFDStatusLine: View {
     static let bootLength = 2.0
 
     var body: some View {
-        if let d = GasKit.display("line"), let m = d.mtx, m.count == 4 {
+        if let g = on, g.mtx.count == 4 {
+            TimelineView(.animation(paused: bootAt == nil)) { ctx in
+                let phase = boot(at: ctx.date)
+                VFDDots(text: text, n: g.n, mtx: g.mtx, cells: g.cells, all: phase.all, reveal: phase.reveal)
+                    .opacity(phase.level)
+            }
+            .frame(width: g.size.width, height: g.size.height, alignment: .topLeading)
+            .onAppear { powerOn() }
+            .accessibilityElement()
+            .accessibilityLabel(text)
+        } else if let d = GasKit.display("line"), let m = d.mtx, m.count == 4 {
             DisplayPicture(d: d) {
                 TimelineView(.animation(paused: bootAt == nil)) { ctx in
                     let phase = boot(at: ctx.date)
@@ -235,16 +248,17 @@ struct VFDStatusLine: View {
                         .opacity(phase.level)
                 }
             }
-            .onAppear {
-                guard VFDStatusLine.poweredAt == nil, !reduceMotion else { return }
-                let now = Date(); VFDStatusLine.poweredAt = now; bootAt = now
-                DispatchQueue.main.asyncAfter(deadline: .now() + VFDStatusLine.bootLength + 0.1) { bootAt = nil }
-            }
+            .onAppear { powerOn() }
             .accessibilityElement()
             .accessibilityLabel(text)
         } else {
             GlassWindow(size: 13) { Text(text).textCase(.uppercase).tracking(1.4).frame(minWidth: 172, alignment: .leading) }
         }
+    }
+    private func powerOn() {
+        guard VFDStatusLine.poweredAt == nil, !reduceMotion else { return }
+        let now = Date(); VFDStatusLine.poweredAt = now; bootAt = now
+        DispatchQueue.main.asyncAfter(deadline: .now() + VFDStatusLine.bootLength + 0.1) { bootAt = nil }
     }
     /// The power-on: the filament's fade (0 … 0.75 s, nothing lit yet but the warm-up of the whole face), every dot
     /// lit (0.75 … 1.15 s), dark a moment, the reading painted in from the left (1.25 … 2 s).
@@ -258,7 +272,15 @@ struct VFDStatusLine: View {
     }
 }
 
-private struct VFDDots: View {
+/// Where a VFD's dots go when the display is part of another picture (the shelf's status box).
+struct VFDGeometry {
+    let cells: CGRect
+    let mtx: [CGFloat]
+    let n: Int
+    let size: CGSize
+}
+
+struct VFDDots: View {
     let text: String
     let n: Int
     let mtx: [CGFloat]

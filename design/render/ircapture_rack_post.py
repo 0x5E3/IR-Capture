@@ -24,6 +24,10 @@ for f in sorted(glob.glob(os.path.join(RD, 'rack-layers-*.json'))):
     for k in ('pxcm', 'pt_per_cm'): lay[k] = d[k]
     lay.setdefault('units', {}).update(d.get('units', {}))
     if 'cheeks' in d: lay['cheeks'] = d['cheeks']
+    if 'shelf' in d:
+        sh = lay.setdefault('shelf', {})
+        if 'plank' in d['shelf']: sh['plank'] = d['shelf']['plank']
+        if d['shelf'].get('boxes'): sh.setdefault('boxes', {}).update(d['shelf']['boxes'])
 PXCM, PT = lay['pxcm'], lay['pt_per_cm']
 PXPT = PXCM / PT
 
@@ -290,6 +294,49 @@ for key, L in lay.get('units', {}).items():
     if 'preflight' in L: u['preflight'] = {'sheet': rect(L['preflight']['sheet']), 'form': L['preflight']['form']}
     J['units'][key] = u
     print(key, base.size, len(u['layers']), 'layers')
+
+def shelf(S, old):
+    """(11-12) The shelf from below: the plank strip and each box (base, layers, keys, lamp, the VFD's cells). Points;
+    a box's plankRow is where the plank's front top edge falls in its picture (the strip's frontTop: line the two up)."""
+    out = dict(old or {})
+    if 'plank' in S:
+        Pl = S['plank']
+        im = Image.open(os.path.join(RD, Pl['picture'] + '.png')).convert('RGBA'); save(im, Pl['picture'])
+        out['plank'] = {'picture': Pl['picture'], 'size': [pt(im.size[0]), pt(im.size[1])],
+                        'frontTop': pt(Pl['row_front_top']), 'frontBottom': pt(Pl['row_front_bot']),
+                        'underBack': pt(Pl.get('row_under_back', Pl['row_back']))}
+        print('  shelf plank', im.size)
+    boxes = dict(out.get('boxes', {}))
+    for nm, B in S.get('boxes', {}).items():
+        base = Image.open(os.path.join(RD, B['picture'] + '.png')).convert('RGBA')
+        layer_base = base.copy()                             # the layers are cut against the base as rendered
+        # the wall's last faint darkening at the picture's left, top and right edges (and the denoiser's edge) faded
+        # out over 0.4 cm, so no edge shows on the app's pegboard; the bottom is the plank's (the holdout)
+        a = np.asarray(base).astype(np.float32); hh, ww = a.shape[:2]; e = max(2, int(round(0.4 * PXCM)))
+        ry = np.clip((np.arange(hh) + 0.5) / e, 0, 1); rx = np.clip(np.minimum(np.arange(ww) + 0.5, ww - np.arange(ww) - 0.5) / e, 0, 1)
+        a[..., 3] *= ry[:, None] * rx[None, :]
+        base = Image.fromarray(np.clip(a + 0.5, 0, 255).astype(np.uint8), 'RGBA'); save(base, B['picture'])
+        b = {'picture': B['picture'], 'size': [pt(base.size[0]), pt(base.size[1])], 'face': rect(B['face']),
+             'plankRow': pt(B['plank_row']), 'keys': [{'id': k['id'], 'rect': rect(k['rect'])} for k in B['keys']], 'layers': {}}
+        for lk, LL in B.get('layers', {}).items():
+            r = layer(layer_base, os.path.join(RD, LL['picture'] + '.png'), LL['box_px'])
+            if r is None:
+                print('  shelf %s %s: no change from the base' % (nm, lk)); continue
+            im, (x, y, w, h) = r
+            save(im, LL['picture'])
+            b['layers'][lk] = {'picture': LL['picture'], 'rect': [pt(x), pt(y), pt(w), pt(h)]}
+        if 'lamp' in B: b['lamp'] = [pt(v) for v in B['lamp']]
+        if 'vfd' in B: b['vfd'] = {'cells': rect(B['vfd']['cells']), 'mtx': B['vfd']['mtx'], 'n': B['vfd']['n']}
+        boxes[nm] = b
+        print('  shelf box', nm, base.size, len(b['layers']), 'layers')
+    out['boxes'] = boxes
+    return out
+
+
+if lay.get('shelf'):
+    J['shelf'] = shelf(lay['shelf'], old.get('shelf'))
+elif old.get('shelf'):
+    J['shelf'] = old['shelf']
 
 if lay.get('cheeks'):
     C = lay['cheeks']
