@@ -949,7 +949,7 @@ def wiring_drawing(path, w, h, px=110):
     # the mics in front of the cab, their cables back to inputs 1 and 2
     for (mx, my, t, iy) in ((19.0, 8.3, 'MIC 1', 9.5), (19.0, 11.6, 'MIC 2', 11.0)):
         d.rounded_rectangle([P_.c(mx - 1.3), P_.c(my - 0.35), P_.c(mx), P_.c(my + 0.35)], radius=P_.c(0.3), outline=ink, width=max(1, P_.c(0.05)))
-        lab(mx - 0.95, my - 0.95, t, fS)
+        lab(mx - 1.25, my - 0.95, t, fS)
         P_.line([(mx - 1.3, my), (mx - 2.2, my), (mx - 2.2, iy), (8.5, iy)], ink, 0.04); P_.arrow(9.0, iy, 8.05, iy, ink)
     # the reference: the speaker terminals through the pad to input 8 (dashed: optional)
     def dash(pts):
@@ -975,7 +975,7 @@ def wiring_drawing(path, w, h, px=110):
     # the title block
     P_.box(17.6, h - 3.0, w - 0.8, h - 0.8, ox, 0.06, 0.05)
     P_.spaced(17.9, h - 2.35, 'CAB IR  HOOK-UP', P_.font('BarlowSemiCondensed-700-normal.ttf', 0.62), ox, 0.14)
-    P_.spaced(17.9, h - 1.4, 'DWG 1  ·  CAB IR', P_.font('BarlowSemiCondensed-600-normal.ttf', 0.45 / 0.7), ox, 0.06)
+    P_.spaced(17.9, h - 1.4, 'DWG 1', P_.font('BarlowSemiCondensed-600-normal.ttf', 0.45 / 0.7), ox, 0.06)
     age_paper(P_.im, P_.rng).save(path)
 
 
