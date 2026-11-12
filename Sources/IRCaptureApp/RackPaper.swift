@@ -44,8 +44,12 @@ enum PaperInk {
         }
     }
 
-    /// A red-pencil ring: a loose loop round (cx, cy), a little more than once round, uneven (points).
-    static func ring(_ cg: CGContext, cx: CGFloat, cy: CGFloat, rx: CGFloat, ry: CGFloat, width: CGFloat, rng: inout InkRandom) {
+    /// A red-pencil ring: a loose loop round (cx, cy), a little more than once round, uneven (points). `squareness`
+    /// above 0 flattens the loop toward a rounded box, as a hand rings a long phrase (0: an oval, for a short figure).
+    static func ring(_ cg: CGContext, cx: CGFloat, cy: CGFloat, rx: CGFloat, ry: CGFloat, width: CGFloat, squareness: Double = 0,
+                     rng: inout InkRandom) {
+        let e = 1 - 0.45 * max(0, min(1, squareness))          // the cosine and sine raised to e: 1 an ellipse
+        func sp(_ v: Double) -> Double { v < 0 ? -pow(-v, e) : pow(v, e) }
         let a0 = 2.2 + rng.uniform() * 0.6, turns = 1.12 + 0.08 * rng.uniform()
         let wob = rng.uniform() * 6.28
         cg.setStrokeColor(redPencil)
@@ -56,7 +60,7 @@ enum PaperInk {
             let t = Double(i) / Double(n)
             let a = a0 + t * turns * 2 * .pi
             let rr = 1 + 0.06 * sin(3 * a + wob) + 0.05 * t      // a hand's loop: uneven, opening as it goes round
-            let p = CGPoint(x: cx + rx * CGFloat(rr * cos(a)), y: cy - ry * CGFloat(rr * sin(a)))
+            let p = CGPoint(x: cx + rx * CGFloat(rr * sp(cos(a))), y: cy - ry * CGFloat(rr * sp(sin(a))))
             if i == 0 { cg.move(to: p) } else { cg.addLine(to: p) }
         }
         cg.strokePath()
@@ -206,8 +210,8 @@ struct PreflightSheetInk: View {
                 tick(cg, x: okx + 0.55, mid: mid, rng: &rng)
             case .ring, .cross:
                 let w = CGFloat(reading.count) * advCm
-                PaperInk.ring(cg, cx: (rx + w / 2) * k, cy: mid * k, rx: (w / 2 + 0.45) * k, ry: 0.5 * k,
-                              width: max(0.6, 0.055 * k), rng: &rng)
+                PaperInk.ring(cg, cx: (rx + w / 2) * k, cy: mid * k, rx: (w / 2 + 0.32) * k, ry: 0.46 * k,
+                              width: max(0.6, 0.055 * k), squareness: 1, rng: &rng)
                 if line.mark == .cross { cross(cg, x: okx + 0.55, mid: mid, rng: &rng) }
                 if let a = line.aside {
                     let size = 0.62 * k
@@ -226,8 +230,9 @@ struct PreflightSheetInk: View {
     /// The proof's pencil tick: a short stroke down, a long one up and right.
     func tick(_ cg: CGContext, x: CGFloat, mid: CGFloat, rng: inout InkRandom) {
         let j = (0..<4).map { _ in CGFloat(rng.normal()) * 0.06 }
-        let pts = [CGPoint(x: (x + j[0]) * k, y: (mid + j[1]) * k), CGPoint(x: (x + 0.35) * k, y: (mid + 0.4) * k),
-                   CGPoint(x: (x + 1.15 + j[2]) * k, y: (mid - 0.55 + j[3]) * k)]
+        // the proof's tick at 0.8: these rows are 1.25 cm, the proof's 1.42
+        let pts = [CGPoint(x: (x + j[0]) * k, y: (mid + j[1]) * k), CGPoint(x: (x + 0.28) * k, y: (mid + 0.32) * k),
+                   CGPoint(x: (x + 0.92 + j[2]) * k, y: (mid - 0.44 + j[3]) * k)]
         let G = PaperInk.graphite
         PaperInk.pencil(cg, pts, r: G.r, g: G.g, b: G.b, width: max(0.6, 0.07 * k), jitter: 0.03 * k, rng: &rng)
     }

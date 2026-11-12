@@ -44,12 +44,13 @@ def pencil(pts, col, w, jit, n=3):
 
 
 def ring(x, w, mid):
-    cx, cy, rx, ry = X(x + w / 2), Y(mid), (w / 2 + 0.45) * k, 0.5 * k
+    cx, cy, rx, ry = X(x + w / 2), Y(mid), (w / 2 + 0.32) * k, 0.46 * k
     a0 = 2.2 + rng.uniform() * 0.6; turns = 1.12 + 0.08 * rng.uniform(); wob = rng.uniform() * 6.28
     pts = []
     for i in range(91):
         t = i / 90; ang = a0 + t * turns * 2 * math.pi; rr = 1 + 0.06 * math.sin(3 * ang + wob) + 0.05 * t
-        pts.append((cx + rx * rr * math.cos(ang), cy - ry * rr * math.sin(ang)))
+        sp = lambda v: math.copysign(abs(v) ** 0.55, v)
+        pts.append((cx + rx * rr * sp(math.cos(ang)), cy - ry * rr * sp(math.sin(ang))))
     d.line(pts, fill=RED, width=max(1, int(0.055 * k)), joint='curve')
 
 
@@ -63,7 +64,7 @@ for i, (item, reading, mark, aside) in enumerate(lines[:F['rows']]):
     typed(item, ix, b); typed(reading, rx_, b)
     if mark == 'tick':
         x = okx + 0.55
-        pencil([(x, mid), (x + 0.35, mid + 0.4), (x + 1.15, mid - 0.55)], GRAPHITE, 0.07, 0.03)
+        pencil([(x, mid), (x + 0.28, mid + 0.32), (x + 0.92, mid - 0.44)], GRAPHITE, 0.07, 0.03)
     if mark in ('ring', 'cross'):
         w = len(reading) * advcm; ring(rx_, w, mid)
         if mark == 'cross':

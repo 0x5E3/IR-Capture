@@ -1049,6 +1049,60 @@
      }
     }
    }
+  },
+  "preflight": {
+   "picture": "rack-preflight",
+   "u": 4,
+   "size": [
+    685.333,
+    258.667
+   ],
+   "panel": [
+    4.9,
+    4.893,
+    675.533,
+    248.88
+   ],
+   "layers": {},
+   "preflight": {
+    "sheet": [
+     62.71,
+     25.75,
+     559.913,
+     187.57
+    ],
+    "form": {
+     "w": 40.0,
+     "h": 13.4,
+     "margin": 1.3,
+     "typedCm": 0.74,
+     "advance": 0.6,
+     "title": "BEFORE CAPTURE",
+     "headY": 2.85,
+     "rule": 3.75,
+     "rowH": 1.25,
+     "rows": 7,
+     "baseline0": 4.597,
+     "cols": [
+      {
+       "key": "item",
+       "label": "ITEM",
+       "x": 1.3
+      },
+      {
+       "key": "reading",
+       "label": "READING",
+       "x": 9.9
+      },
+      {
+       "key": "ok",
+       "label": "OK",
+       "x": 35.9
+      }
+     ],
+     "right": 38.7
+    }
+   }
   }
  },
  "cheeks": {
