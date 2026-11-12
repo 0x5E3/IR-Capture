@@ -28,6 +28,29 @@ struct RackKit: Decodable {
         let panel: [CGFloat]         // the unit's slot in the picture: x, y, width, height (pt)
         let layers: [String: Layer]
         let meters: Meters?          // the meter bridge's own parts
+        let results: Results?        // the results unit's own parts
+    }
+    /// The results (7U): the take sheet's printed form and where things go on it, the keys, the stamps.
+    struct Results: Decodable {
+        struct Field: Decodable { let key: String; let label: String; let x0: CGFloat; let x1: CGFloat; let baseline: CGFloat }
+        struct Col: Decodable { let key: String; let label: String; let x: CGFloat }
+        struct Table: Decodable {
+            let headY: CGFloat; let rule: CGFloat; let rowH: CGFloat; let rows: Int; let baseline0: CGFloat
+            let dabX: CGFloat; let nameX: CGFloat; let right: CGFloat; let cols: [Col]
+        }
+        struct Lines: Decodable { let labelY: CGFloat; let x0: CGFloat; let x1: CGFloat; let baselines: [CGFloat] }
+        /// The form in the sheet's centimetres (x from its left edge, y down from its top; entries by their baselines).
+        struct Form: Decodable {
+            let w: CGFloat; let h: CGFloat; let typedCm: CGFloat; let advance: CGFloat
+            let fields: [Field]; let checked: [CGFloat]; let table: Table; let files: Lines; let notes: Lines
+        }
+        struct Key: Decodable { let id: String; let rect: [CGFloat] }
+        struct Stamp: Decodable { let picture: String; let size: [CGFloat] }
+        let sheet: [CGFloat]         // the sheet in the base picture (pt)
+        let form: Form
+        let keys: [Key]              // each key's bezel in the base picture (pt); its pressed layer is "k<i>-down"
+        let pxPerPoint: CGFloat      // the stamps'
+        let stamps: [String: Stamp]  // excellent, check, again
     }
     /// The meter bridge (5U): four channel modules. Places are in the base picture (pt).
     struct Meters: Decodable {
@@ -88,6 +111,7 @@ struct RackKit: Decodable {
         guard let k = shared, let u = k.units[key] else { return nil }
         var files = [u.picture] + u.layers.values.map(\.picture)
         if let m = u.meters { files += [m.eye.picture, m.needle.picture] }
+        if let r = u.results { files += r.stamps.values.map(\.picture) }
         guard files.allSatisfy({ SwellPictures.shared.cgImage($0 + ".webp") != nil }) else { return nil }
         return (k, u)
     }

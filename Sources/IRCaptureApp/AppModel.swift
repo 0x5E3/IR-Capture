@@ -76,6 +76,14 @@ struct ResultSummary {
     /// Files at the top of the capture folder (the Universal ones).
     var topFiles: [String] = []
     var droppedOut = false
+    // (Phase 7a) for the take sheet's heading and notes
+    var date = Date()
+    /// The interface it was recorded through; nil when not known (a re-export).
+    var interface: String? = nil
+    var fs: Int = 0
+    var notes: String = ""
+    /// Recorded through the app (Record here), so RECORD AGAIN repeats it.
+    var direct = false
 }
 
 struct NAMInput: Identifiable {
@@ -747,7 +755,7 @@ final class AppModel: ObservableObject {
                                                extraWarnings: dropWarning.map { [$0] } ?? [], progress: { report($0) })
                 }.value
                 Log.write("capture \(capture) done in \(String(format: "%.1f", Date().timeIntervalSince(t0))) s: \(processed.fileCount) files, \(processed.result.warnings.count) warnings")
-                show(processed, title: capture, droppedOut: dropWarning != nil)
+                show(processed, title: capture, droppedOut: dropWarning != nil, interface: dev.name, fs: fs, notes: noteText, direct: true)
             } catch is CancellationError {
                 errorText = "Capture stopped. Nothing was saved."
             } catch {
@@ -761,10 +769,12 @@ final class AppModel: ObservableObject {
 
     func cancelCapture() { captureTask?.cancel() }
 
-    private func show(_ p: ProcessedCapture, title: String, droppedOut: Bool = false) {
+    private func show(_ p: ProcessedCapture, title: String, droppedOut: Bool = false, interface: String? = nil, fs: Int = 0,
+                      notes: String = "", direct: Bool = false) {
         result = ResultSummary(title: title, names: p.result.names, diagnostics: p.result.diagnostics, warnings: p.result.warnings,
                                referenced: p.result.referenced, curves: p.curves, folder: p.folder, fileCount: p.fileCount,
-                               polarityNotes: p.polarityNotes, exportNotes: p.exportNotes, topFiles: p.files.filter { !$0.contains("/") }, droppedOut: droppedOut)
+                               polarityNotes: p.polarityNotes, exportNotes: p.exportNotes, topFiles: p.files.filter { !$0.contains("/") }, droppedOut: droppedOut,
+                               interface: interface, fs: fs > 0 ? fs : p.result.fs, notes: notes, direct: direct)
     }
 
     func revealResult() {
@@ -952,7 +962,7 @@ final class AppModel: ObservableObject {
                     return try processAndWrite(rec: rec, spec: spec, names: names, refIndex: refIndex, capture: capture,
                                                outDir: outDir, layout: lay, keepPolarity: keep, extra: extra, progress: { report($0) })
                 }.value
-                show(processed, title: capture)
+                show(processed, title: capture, interface: "DAW recordings", notes: noteText)
             } catch {
                 Log.write("import error: \(error.localizedDescription)")
                 errorText = error.localizedDescription

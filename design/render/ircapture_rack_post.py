@@ -115,6 +115,52 @@ def meters(L):
     return out
 
 
+STAMP_PXPT = 6.0              # the stamps carry twice the kit's pixels: the broken ink is fine detail
+STAMPS = {'excellent': ('EXCELLENT', (30, 122, 74)),        # green ink
+          'check': ('CHECK NOTES', (52, 60, 138)),           # blue-violet ink
+          'again': ('RECORD AGAIN', (172, 34, 28))}          # red ink
+
+
+def stamps():
+    """The verdict's rubber stamps (the proof's EXCELLENT): a double box and the word, the ink uneven and broken; the
+    picture is the ink alone (colour, its density in alpha), upright: the app turns it a few degrees and multiplies it
+    onto the sheet. 1.3 cm letters, the box fitted to the word."""
+    from PIL import ImageDraw, ImageFont
+    px = STAMP_PXPT * PT
+    cm = lambda v: int(round(v * px))
+    fs = ImageFont.truetype(os.path.join(KIT, 'fonts', 'BarlowSemiCondensed-700-normal.ttf'), cm(1.3))
+    out = {}
+    for k, (txt, col) in STAMPS.items():
+        rng = np.random.default_rng(sum(map(ord, txt)))
+        tr = 0.14 * fs.size
+        wsum = sum(fs.getlength(c) for c in txt) + tr * (len(txt) - 1)
+        sw, sh = int(wsum + cm(1.3)), cm(2.5)
+        st = Image.new('L', (sw, sh), 0); sd = ImageDraw.Draw(st)
+        sd.rectangle([cm(0.1), cm(0.1), sw - cm(0.1), sh - cm(0.1)], outline=255, width=cm(0.13))
+        sd.rectangle([cm(0.33), cm(0.33), sw - cm(0.33), sh - cm(0.33)], outline=255, width=max(1, cm(0.04)))
+        bb = fs.getbbox('H'); x = (sw - wsum) / 2
+        for c in txt:
+            sd.text((x, sh / 2 - (bb[1] + bb[3]) / 2), c, font=fs, fill=255); x += fs.getlength(c) + tr
+        n1 = np.asarray(Image.fromarray((rng.random((sh, sw)) * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(2.2 * px / 110)), np.float32) / 255
+        n2 = np.asarray(Image.fromarray((rng.random((sh // 6 + 1, sw // 6 + 1)) * 255).astype(np.uint8)).resize((sw, sh), Image.BICUBIC), np.float32) / 255
+        sa = np.asarray(st, np.float32) / 255 * np.clip((n1 - 0.36) * 6, 0, 1) * (0.55 + 0.45 * n2)
+        rgba = np.zeros((sh, sw, 4), np.uint8); rgba[..., :3] = col; rgba[..., 3] = (sa * 235).astype(np.uint8)
+        name = 'rack-stamp-' + k
+        save(Image.fromarray(rgba, 'RGBA'), name)
+        out[k] = {'picture': name, 'size': [round(sw / STAMP_PXPT, 3), round(sh / STAMP_PXPT, 3)]}
+    return {'pxPerPoint': STAMP_PXPT, 'stamps': out}
+
+
+def results(L):
+    """The results unit's own parts: the sheet's rectangle and the keys' (pt in the base picture), the form's layout
+    (sheet cm, as ircapture_rack_layers.FORM), the stamps."""
+    Rz = L['results']
+    out = {'sheet': rect(Rz['sheet']), 'form': Rz['form'], 'keys': [{'id': k['id'], 'rect': rect(k['rect'])} for k in Rz['keys']]}
+    out.update(stamps())
+    print('  results: sheet %s, %d keys, %d stamps' % (out['sheet'], len(out['keys']), len(out['stamps'])))
+    return out
+
+
 for key, L in lay.get('units', {}).items():
     base = Image.open(os.path.join(RD, L['picture'] + '.png')).convert('RGBA')
     save(base, L['picture'])
@@ -130,6 +176,7 @@ for key, L in lay.get('units', {}).items():
         u['layers'][lk] = {'picture': LL['picture'], 'rect': [pt(x), pt(y), pt(w), pt(h)]}
     if 'lamp_x_cm' in L: u['lampXcm'] = L['lamp_x_cm']
     if 'meters' in L: u['meters'] = meters(L)
+    if 'results' in L: u['results'] = results(L)
     J['units'][key] = u
     print(key, base.size, len(u['layers']), 'layers')
 

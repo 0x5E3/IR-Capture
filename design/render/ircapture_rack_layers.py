@@ -374,7 +374,161 @@ def unit_meters():
     _save()
 
 
-UNITS = {'step-cab': unit_step_cab, 'step-nam': unit_step_nam, 'cheeks': unit_cheeks, 'meters': unit_meters}
+# ---------------------------------------------------------------------------------------------------------------------
+# the results (7U): the take sheet in its card frame, the unit's own keys under it (the first proof's unit_results)
+#
+# The sheet is rendered as the PRINTED FORM only: letterhead, field labels, the table's headings and rules, the CHECKED
+# box. Everything that belongs to a take is put on it by the app over the lit paper (multiplied, so the paper's shading
+# and tooth show through the ink): the typed entries (Courier Prime, as the proofs typed them), the coloured-pencil dabs
+# for the channels' colours, red-pencil rings round a figure to look at, and the verdict's rubber stamp in the CHECKED box
+# (stamp pictures from ircapture_rack_post.py). A per-take render is not possible on a customer's Mac; a printed form
+# filled in by hand is how such sheets are made anyway.
+#   base         the form blank, the keys up
+#   k<i>-down    key i pressed (FINDER, RE-EXPORT, RECORD AGAIN)
+# FORM (sheet cm: x from its left edge, y down from its top; typed entries by their baselines) goes to irc-rack.json so
+# the app types where the rules are. It is the one place the layout lives.
+
+TYPED_CM = 0.74                                         # the typed entries' size (Courier Prime: capitals 6 pt on screen)
+RES_W, RES_H = 40.0, 21.4
+RES_KEYS = ('finder', 'reexport', 'record-again')
+
+
+def _form():
+    m = 1.3; asc = 0.78 * TYPED_CM
+    t0, rh, rows = 6.45, 1.3, 5
+    y1 = t0 + rows * rh + 0.75
+    lines = lambda k: [round(y1 + 0.78 + asc + i * 1.05, 3) for i in range(k)]
+    return {
+        'w': RES_W, 'h': RES_H, 'margin': m, 'typedCm': TYPED_CM, 'advance': 0.6,     # Courier: every character 0.6 em
+        'title': 'CAB IR  TAKE SHEET',
+        'fields': [dict(key=k, label=l, x0=m + a, x1=m + b - 0.5, baseline=4.3) for k, l, a, b in
+                   (('capture', 'CAPTURE', 0.0, 10.2), ('date', 'DATE', 10.2, 14.9), ('interface', 'INTERFACE', 14.9, 22.6),
+                    ('rate', 'RATE', 22.6, 25.9))],
+        'checked': [28.0, 0.6, RES_W - m, 4.75],
+        'table': dict(headY=5.6, rule=t0, rowH=rh, rows=rows, baseline0=round(t0 + 0.27 + asc, 3), dabX=m + 0.5,
+                      nameX=m + 1.2, cols=[dict(key=k, label=l, x=m + x) for k, l, x in
+                                           (('channel', 'CHANNEL', 0.0), ('peak', 'PEAK dBFS', 9.6), ('noise', 'NOISE dB', 14.4),
+                                            ('tail', 'TAIL ms', 19.0), ('h2', 'H2 dB', 23.3), ('h3', 'H3 dB', 27.0),
+                                            ('arrival', 'ARRIVAL ms', 30.6))], right=RES_W - m),
+        'files': dict(labelY=y1, x0=m + 0.1, x1=m + 17.0, baselines=lines(6)),
+        'notes': dict(labelY=y1, x0=m + 18.2, x1=RES_W - m, baselines=lines(6)),
+    }
+
+
+FORM = _form()
+
+
+def take_form(path, px=120):
+    """The printed form, nothing typed on it: oxblood ink on cream stock, the paper's tooth and aged edges."""
+    from PIL import Image, ImageDraw, ImageFont, ImageFilter
+    import numpy as np
+    F_ = FORM; w, h = F_['w'], F_['h']
+    W, H = int(w * px), int(h * px)
+    rng = np.random.default_rng(5)
+    im = Image.new('RGB', (W, H), (246, 234, 200)); d = ImageDraw.Draw(im)
+    F = lambda name, cm: ImageFont.truetype(os.path.join(R.FONTS, name), int(cm * px))
+    ox = (104, 30, 24); rule = (150, 120, 104)
+    fh = F('BarlowSemiCondensed-700-normal.ttf', 0.95); # the labels' capitals 0.45 cm: 6.3 pt on screen, over MIN_CAP_PT (the proof's were 0.35 cm, under it)
+    fl = F('BarlowSemiCondensed-600-normal.ttf', 0.45 / 0.7)
+    cm = lambda v: int(round(v * px)); hair = max(1, cm(0.02))
+
+    def spaced(x, y, text, font, fill, track=0.14):
+        tr = track * font.size
+        for c in text:
+            d.text((x, y), c, font=font, fill=fill); x += font.getlength(c) + tr
+
+    m = F_['margin']; cx0, cy0, cx1, cy1 = F_['checked']
+    spaced(cm(m), cm(0.95), F_['title'], fh, ox)
+    d.line([(cm(m), cm(2.25)), (cm(cx0 - 0.8), cm(2.25))], fill=ox, width=cm(0.07))
+    d.line([(cm(m), cm(2.4)), (cm(cx0 - 0.8), cm(2.4))], fill=ox, width=hair)
+    for f in F_['fields']:
+        spaced(cm(f['x0'] + 0.1), cm(2.95), f['label'], fl, rule)
+        d.line([(cm(f['x0']), cm(4.7)), (cm(f['x1']), cm(4.7))], fill=rule, width=hair)
+    # the CHECKED box: where the verdict is stamped
+    d.rectangle([cm(cx0), cm(cy0), cm(cx1), cm(cy1)], outline=ox, width=cm(0.035))
+    spaced(cm(cx0 + 0.2), cm(cy0 + 0.18), 'CHECKED', fl, rule)
+    T = F_['table']; L_, R_ = m, T['right']
+    for c in T['cols']: spaced(cm(c['x'] + 0.1), cm(T['headY']), c['label'], fl, rule)
+    d.line([(cm(L_), cm(T['rule'])), (cm(R_), cm(T['rule']))], fill=ox, width=max(1, cm(0.035)))
+    for r in range(T['rows']):
+        y = T['rule'] + (r + 1) * T['rowH']
+        d.line([(cm(L_), cm(y)), (cm(R_), cm(y))], fill=rule, width=hair)
+    for c in T['cols'][1:]:
+        d.line([(cm(c['x'] - 0.25), cm(T['headY'] - 0.1)), (cm(c['x'] - 0.25), cm(T['rule'] + T['rows'] * T['rowH']))], fill=rule, width=hair)
+    for key, lab in (('files', 'LOAD THESE'), ('notes', 'NOTES')):
+        B = F_[key]
+        spaced(cm(B['x0']), cm(B['labelY']), lab, fl, rule)
+        for b in B['baselines']:
+            d.line([(cm(B['x0'] - 0.1), cm(b + 0.32)), (cm(B['x1']), cm(b + 0.32))], fill=rule, width=hair)
+    # paper: tooth, a soft blotchiness, aged edges (as the proof's take sheet)
+    a = np.asarray(im, np.float32)
+    tooth = np.asarray(Image.fromarray((rng.random((H, W)) * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(1.0)), np.float32) / 255
+    a *= (0.975 + 0.05 * tooth)[..., None]
+    blot = np.asarray(Image.fromarray((rng.random((H // 8, W // 8)) * 255).astype(np.uint8)).resize((W, H), Image.BICUBIC).filter(ImageFilter.GaussianBlur(40)), np.float32) / 255
+    a *= (0.96 + 0.08 * blot)[..., None]
+    yy_, xx_ = np.mgrid[0:H, 0:W]
+    e = np.maximum(np.abs(xx_ - W / 2) / (W / 2), np.abs(yy_ - H / 2) / (H / 2))
+    age = np.clip((e - 0.8) / 0.2, 0, 1) ** 1.8
+    a = a * (1 - 0.09 * age[..., None]) * np.array([1.0, 0.98, 0.93])[None, None, :] ** age[..., None]
+    Image.fromarray(np.clip(a, 0, 255).astype(np.uint8)).save(path)
+
+
+def build_results():
+    import ircapture_legends as LG
+    K.set_seed('rack-results')
+    u = 7
+    s, cam, h = R.unit_scene(u)
+    R.backing(h)
+    R.rack_panel(u, 'bronze', 'results')
+    sw, sh = RES_W, RES_H
+    kh = LG.SIZES['std']['cap_h'] + 2 * TK.KEY['bezel']
+    block = sh + 2 * 0.55 + 0.9 + kh                          # sheet and its frame, a gap, the keys
+    ysh = block / 2 - 0.55 - sh / 2
+    fp = os.path.join(OUT, 'take-form-print.png')
+    if not os.path.exists(fp): take_form(fp)
+    with R.moved(0, ysh, 0): R.sheet(sw, sh, fp, 'take', curl=0.35)
+    cm_ = R.SG.black_cast('cardframe')
+    for sy in (1, -1):
+        ch = R.rbox('cframe', sw + 1.6, 0.9, 0.22, 0.0, 0.08, roll=0.05); ch.location.y = ysh + sy * (sh / 2 + 0.1)
+        R.chamfer(ch, 0.012, 1); ch.data.materials.append(cm_)
+    R.small_screws([(sx * (sw / 2 + 0.45), ysh + sy * (sh / 2 + 0.1)) for sx in (-1, 1) for sy in (-1, 1)], r=0.17)
+    yk = -block / 2 + kh / 2
+    x = -sw / 2; keys = []
+    for lid in RES_KEYS:
+        wk = K.legend_width(LG.LEGENDS[lid][0], 'std') + 2 * TK.KEY['bezel']
+        b0 = set(bpy.data.objects)
+        with R.moved(x + wk / 2, yk, 0): R.key(lid)
+        cap = [o for o in _new_since(b0) if o.name.split('.')[0] == 'cap'][0]
+        dn = cap.copy(); bpy.context.scene.collection.objects.link(dn)
+        dn.location.z -= 0.12; dn.hide_render = True                # pressed: the cap 1.2 mm down in its well
+        keys.append(dict(id=lid, x=x + wk / 2, y=yk, w=wk, h=kh, up=cap, down=dn))
+        x += wk + 0.5
+    R.engrave('RESULTS', sw / 2 - 2.6, yk, 0.62)
+    return s, cam, h, ysh, keys
+
+
+def unit_results():
+    s, cam, h, ysh, keys = build_results()
+    L = shoot_base(s, cam, 'rack-results', R.PW, h)
+    L['u'] = 7; L['layers'] = {}
+    P_ = lambda x, y: TK.proj(s, cam, (x, y, 0.0))
+    a, b = P_(-RES_W / 2, ysh + RES_H / 2), P_(RES_W / 2, ysh - RES_H / 2)
+    kr = []
+    for k in keys:
+        p, q = P_(k['x'] - k['w'] / 2, k['y'] + k['h'] / 2), P_(k['x'] + k['w'] / 2, k['y'] - k['h'] / 2)
+        kr.append(dict(id=k['id'], rect=[p[0], p[1], q[0], q[1]]))
+    L['results'] = dict(sheet=[a[0], a[1], b[0], b[1]], form=FORM, keys=kr)
+    LAY['units']['results'] = L; _save()
+    for i, k in enumerate(keys):
+        k['up'].hide_render = True; k['down'].hide_render = False
+        L['layers']['k%d-down' % i] = shoot_crop(s, cam, 'rack-results-k%d-down' % i,
+                                                  box_px(s, cam, k['x'], k['y'], k['w'] / 2 + 0.4, k['h'] / 2 + 0.4))
+        k['up'].hide_render = False; k['down'].hide_render = True
+        _save()
+
+
+UNITS = {'step-cab': unit_step_cab, 'step-nam': unit_step_nam, 'cheeks': unit_cheeks, 'meters': unit_meters,
+         'results': unit_results}
 
 
 if __name__ == '__main__':

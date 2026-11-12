@@ -341,6 +341,19 @@ enum GearPreview {
                 RackMeterBridge(channels: [RackChannel(id: 0, name: "SM57"), RackChannel(id: 1, name: "R121 6 in center, 15 deg off axis"),
                                            RackChannel(id: 2, name: "MD421"), RackChannel(id: 7, name: "Reference")])
             }
+            if RackResultsUnit.available {
+                Engraved("The results unit: the take sheet typed for two mics and a reference, a distortion figure ringed, stamped CHECK NOTES", size: 12)
+                RackResultsUnit(sheet: TakeSheet(
+                    capture: "Mesa_4x12_V30_posA", date: "11 NOV 26", interface: "Scarlett 18i20 USB", rate: "96 kHz",
+                    rows: [TakeSheet.Row(name: "SM57", colour: 0, values: ["peak": "-11.6", "noise": "-108", "tail": "36", "h2": "-45", "h3": "-52", "arrival": "0.17"]),
+                           TakeSheet.Row(name: "R121 center", colour: 1, values: ["peak": "-10.5", "noise": "-84", "tail": "451", "h2": "-27", "h3": "-51", "arrival": "0.29"],
+                                         ring: ["h2"]),
+                           TakeSheet.Row(name: "Reference", colour: nil, values: ["peak": "-21.1", "noise": "-122", "tail": "360", "h2": "-", "h3": "-", "arrival": "-"])],
+                    files: ["Mesa_4x12_V30_posA_SM57.wav", "Mesa_4x12_V30_posA_R121_center.wav", "48 kHz  24-bit  500 ms"],
+                    notes: ["R121 center: harmonic distortion is 27 dB below the linear response. The speaker is being driven hard; an IR can't capture that, so try about 6 dB less level.",
+                            "86 IR files, README.txt, report.json. Reference used.", "Notes: 57 1 in off cap edge; 121 6 in center"],
+                    verdict: "check", seed: 7))
+            }
             HStack(alignment: .top, spacing: 16) {
                 Checklist(items: ["A manila card.", "Its second line, for the look of it."], style: PaperStyle(stock: .manila, ring: true))
                     .frame(width: 250)
@@ -858,6 +871,44 @@ struct ResultsView: View {
         return (r.warnings.count == 1 ? "Good: 1 item to check" : "Check \(r.warnings.count) items", warnColor)
     }
     var body: some View {
+        if RackResultsUnit.available {
+            // (Phase 7a) the results unit: the take sheet filled in, its stamp, FINDER, RE-EXPORT, RECORD AGAIN; the
+            // scope still the old panel under it until its unit is built
+            VStack(alignment: .leading, spacing: 18) {
+                RackResultsUnit(sheet: TakeSheet(r), finder: { m.revealResult() },
+                                reexport: { m.reexportMessage = nil; m.reexportFolder = r.folder },
+                                recordAgain: { m.startCapture() },
+                                recordAgainEnabled: r.direct && m.busy == nil && m.captureProblem == nil)
+                scope.frame(maxWidth: .infinity, alignment: .leading).onPanel()
+            }
+        } else {
+            classic
+        }
+    }
+
+    /// The frequency response on the scope's screen.
+    @ViewBuilder var scope: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Engraved("Frequency response, 1/6 octave")
+            FaceplateScreen {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 14) {
+                        ForEach(Array(r.names.enumerated()), id: \.offset) { i, n in
+                            HStack(spacing: 5) {
+                                RoundedRectangle(cornerRadius: 2).fill(screenColor(i)).frame(width: 10, height: 10)
+                                Text(n).font(.swellLegend(12)).foregroundColor(Color(swellHex: 0xCFE3D6))
+                            }
+                        }
+                    }
+                    SweptResponsePlot(fc: r.curves.fc, curves: r.names.map { r.curves.curves[$0] ?? [] }).frame(height: 300)
+                        .id(r.folder)
+                }
+            }
+        }
+    }
+
+    /// The results before the rack bay (the tape box, notes, the table, the scope).
+    @ViewBuilder var classic: some View {
         VStack(alignment: .leading, spacing: 14) {
             if let b = TapePieces.box("reel") {
                 // Phase 7: the capture goes back in its box; the track sheet lists what is on it.
