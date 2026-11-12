@@ -1,0 +1,26 @@
+{
+ "runner": "imac",
+ "note": "IR Capture's rack bay straight on (0 degrees), at full quality for the app (IR Capture chat, 11-12; the visual audit's step 5, replacing the held 10-degree lists imac-ircapture-1110, imac-ircapture-legends-1111 and macbook-ircapture-tape-1110). Each unit rendered by ircapture_rack_layers.py as a base with its live parts at rest, then each live state as a border crop of the same scene, at the app's scale: 42 px/cm (3 px a point at 14 pt a cm: Retina at page scale 1.5), 192 samples (the preview build's are the container's at 64). One unit per job, so a unit's base and its crops always come from one machine. Scripts beside the bench's in design/render/ (ircapture_rack_layers.py imports ircapture_rack.py, ircapture_shelf.py, ircapture_kit.py, ircapture_vu.py and the bench's toolkit, parts, shelf_gear, gear_kit, instrument, gas_disp, metal_kit, hammer_liquid, finish_maps, shop_wood). Fonts: from design/render/fonts/swellkit (FONTS_DIR, IR Capture's kit fonts: Barlow, Barlow Semi Condensed, Swell Marker, Courier Prime and the rest) and design/render/fonts/CourierPrime-400.ttf (the typed sheets); not the runner's ~/fonts, which has no Swell Marker. This list: the reel deck (its base, key states, each reel's flanges, shadows and pack, 24 prong frames, the counter's figures) and the shelf from 9 degrees below (the three boxes with their key and lamp layers, each in its own studio over the wall with the plank as a holdout; the shop-wood plank as a 240 cm strip in six 40 cm segments). Container times at 64 samples: deck 86 min, boxes 11, plank 29.5; on the iMac at 192 samples about 3 to 4 h in all (rough). Post (in the IR-Capture repo, branch preview/workshop-look): for each job folder d of the render-out branch, ~/bvenv/bin/python design/render/ircapture_rack_post.py <render-out>/<d> Resources/SwellKit (lossless; it merges into irc-rack.json, keeping units not in that folder; it refuses a mix of scales, so every list of the rack is at 42 px/cm). Then the _mock.py checks, push, and look at every CI screenshot.",
+ "estimate_min": {
+  "deck": 135,
+  "shelf-boxes": 18,
+  "shelf-plank": 47
+ },
+ "jobs": [
+  {
+   "id": "deck",
+   "env": "FONTS_DIR=design/render/fonts/swellkit IRC_LIQUID_RELIEF=0.7",
+   "cmd": "design/render/ircapture_rack_layers.py OUT deck 42 192"
+  },
+  {
+   "id": "shelf-boxes",
+   "env": "FONTS_DIR=design/render/fonts/swellkit IRC_LIQUID_RELIEF=0.7",
+   "cmd": "design/render/ircapture_rack_layers.py OUT shelf-boxes 42 192"
+  },
+  {
+   "id": "shelf-plank",
+   "env": "FONTS_DIR=design/render/fonts/swellkit IRC_LIQUID_RELIEF=0.7",
+   "cmd": "design/render/ircapture_rack_layers.py OUT shelf-plank 42 192"
+  }
+ ]
+}
