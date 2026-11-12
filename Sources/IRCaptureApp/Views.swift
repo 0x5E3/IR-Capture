@@ -354,6 +354,32 @@ enum GearPreview {
                             "86 IR files, README.txt, report.json. Reference used.", "Notes: 57 1 in off cap edge; 121 6 in center"],
                     verdict: "check", seed: 7))
             }
+            if RackChartUnit.available {
+                Engraved("The chart panel: the hook-up drawing and the card, rendered whole", size: 12)
+                RackChartUnit()
+            }
+            if RackPreflightUnit.available {
+                Engraved("The pre-flight typed in: ticked lines, levels and a noisy room ringed, the files crossed", size: 12)
+                RackPreflightUnit(lines: [
+                    PreflightLine(item: "Mics", reading: "2: SM57 cap edge, R121 center", mark: .tick),
+                    PreflightLine(item: "Reference", reading: "Input 8", mark: .tick),
+                    PreflightLine(item: "Sample rate", reading: "96 kHz on Scarlett 18i20 USB", mark: .tick),
+                    PreflightLine(item: "Levels", reading: "R121 center low by 9 dB", mark: .ring),
+                    PreflightLine(item: "Sweep level", reading: "-12 dBFS, set automatically", mark: .tick),
+                    PreflightLine(item: "Room noise", reading: "Noisy: R121 center at -38 dBFS", mark: .ring, aside: "fridge? fan?"),
+                    PreflightLine(item: "Files", reading: "None chosen", mark: .cross),
+                ])
+                Engraved("Before the level check: levels, sweep level and room noise not measured yet", size: 12)
+                RackPreflightUnit(lines: [
+                    PreflightLine(item: "Mics", reading: "1: SM57", mark: .tick),
+                    PreflightLine(item: "Reference", reading: "None", mark: .tick),
+                    PreflightLine(item: "Sample rate", reading: "48 kHz on USB Audio CODEC", mark: .tick),
+                    PreflightLine(item: "Levels", reading: "Not checked yet", mark: .none),
+                    PreflightLine(item: "Sweep level", reading: "Set automatically", mark: .none),
+                    PreflightLine(item: "Room noise", reading: "Not measured yet", mark: .none),
+                    PreflightLine(item: "Files", reading: "Universal, Mixes of two mics", mark: .tick),
+                ])
+            }
             HStack(alignment: .top, spacing: 16) {
                 Checklist(items: ["A manila card.", "Its second line, for the look of it."], style: PaperStyle(stock: .manila, ring: true))
                     .frame(width: 250)

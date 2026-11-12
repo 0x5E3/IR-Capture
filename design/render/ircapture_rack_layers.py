@@ -8,6 +8,8 @@
 #   cheeks     the rack's sides and top: shop-wood boards (ircapture_rack.unit_cheeks)
 #   step-cab   1U bronze, four jewels: CONNECT, SET LEVELS, CAPTURE, RESULTS (done green, current amber, ahead dark)
 #   step-nam   1U graphite anodised, five flush LEDs: SIGNAL, CONNECT, SET LEVELS, RECORD, UPLOAD (the NAM rack's family)
+#   meters     5U meter bridge          results    7U take sheet, typed by the app
+#   chart      6U hook-up drawing and card (whole)          preflight  4U BEFORE CAPTURE, typed by the app
 #
 #   FONTS_DIR=Resources/SwellKit/fonts IRC_LIQUID_RELIEF=0.7 ~/bvenv/bin/python design/render/ircapture_rack_layers.py \
 #       <out> <unit[,unit]> [px/cm] [samples]
@@ -527,8 +529,110 @@ def unit_results():
         _save()
 
 
+# ---------------------------------------------------------------------------------------------------------------------
+# the chart panel (6U): the hook-up drawing and the BEFORE YOU START card, each in its card frame (the third proof's
+# unit_chart, approved). Nothing on it changes, so it is rendered whole: a base and no layers.
+
+def unit_chart():
+    import ircapture_rack as R_
+    K.set_seed('rack-chart')
+    s, cam, h = R.unit_scene(6)
+    R.backing(h)
+    R.rack_panel(6, 'bronze', 'chart')
+    dw, dh, cw_, chh = 26.0, 20.0, 14.6, 20.0
+    gap_ = 2.2
+    xd = -(dw + gap_ + cw_) / 2 + dw / 2; xc = xd + dw / 2 + gap_ + cw_ / 2
+    ysh = 0.9
+    fd = os.path.join(OUT, 'wiring-print.png'); R.wiring_drawing(fd, dw, dh, px=120)
+    fc = os.path.join(OUT, 'card-print.png'); R.instruction_card(fc, cw_, chh, px=120)
+    with R.moved(xd, ysh, 0): R.sheet(dw, dh, fd, 'wiring', curl=0.25)
+    with R.moved(xc, ysh, 0): R.sheet(cw_, chh, fc, 'card', curl=0.0)
+    R.card_frame(dw, dh, ysh, xd, 'cf1'); R.card_frame(cw_, chh, ysh, xc, 'cf2')
+    R.engrave('HOOK-UP', -dw / 2 + xd + 2.0, -h / 2 + 1.25, 0.5)
+    L = shoot_base(s, cam, 'rack-chart', R.PW, h)
+    L['u'] = 6; L['layers'] = {}
+    LAY['units']['chart'] = L; _save()
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# the pre-flight (4U): BEFORE CAPTURE, a printed form in its card frame (the third proof's unit_preflight, approved),
+# rendered blank as the take sheet is. The app types each line (the item and its reading), ticks it in pencil, rings a
+# line to look at in red pencil (a cross in the OK column when it stops the capture), and pencils a word beside a noisy
+# room. PF_FORM is the one place its layout lives (sheet cm, entries by their baselines).
+
+PF_W, PF_H = 40.0, 13.4
+
+
+def _pf_form():
+    m = 1.3; asc = 0.78 * TYPED_CM
+    rule, rh, rows = 3.75, 1.25, 7
+    return {
+        'w': PF_W, 'h': PF_H, 'margin': m, 'typedCm': TYPED_CM, 'advance': 0.6,
+        'title': 'BEFORE CAPTURE', 'headY': 2.85, 'rule': rule, 'rowH': rh, 'rows': rows,
+        'baseline0': round(rule + 0.27 + asc, 3),
+        'cols': [dict(key=k, label=l, x=m + x) for k, l, x in (('item', 'ITEM', 0.0), ('reading', 'READING', 8.6), ('ok', 'OK', 34.6))],
+        'right': PF_W - m,
+    }
+
+
+PF_FORM = _pf_form()
+
+
+def preflight_form(path, px=120):
+    """The printed form, nothing typed on it: the take sheet's stock and ink."""
+    from PIL import Image, ImageDraw, ImageFont
+    import numpy as np
+    F_ = PF_FORM; w, h = F_['w'], F_['h']
+    W, H = int(w * px), int(h * px)
+    im = Image.new('RGB', (W, H), (246, 234, 200)); d = ImageDraw.Draw(im)
+    F = lambda name, cm_: ImageFont.truetype(os.path.join(R.FONTS, name), int(cm_ * px))
+    ox = (104, 30, 24); rule = (150, 120, 104)
+    fh = F('BarlowSemiCondensed-700-normal.ttf', 0.95)
+    fl = F('BarlowSemiCondensed-600-normal.ttf', 0.45 / 0.7)              # capitals 0.45 cm: 6.3 pt on screen
+    cm = lambda v: int(round(v * px)); hair = max(1, cm(0.02))
+
+    def spaced(x, y, text, font, fill, track=0.14, right=False):
+        tr = track * font.size
+        if right: x -= sum(font.getlength(c) for c in text) + tr * (len(text) - 1)
+        for c in text:
+            d.text((x, y), c, font=font, fill=fill); x += font.getlength(c) + tr
+
+    m = F_['margin']; R_ = F_['right']
+    spaced(cm(m), cm(0.95), F_['title'], fh, ox)
+    spaced(cm(R_), cm(1.3), 'PRE-FLIGHT', fl, ox, 0.16, right=True)
+    d.line([(cm(m), cm(2.25)), (cm(R_), cm(2.25))], fill=ox, width=cm(0.07))
+    d.line([(cm(m), cm(2.4)), (cm(R_), cm(2.4))], fill=ox, width=hair)
+    for c in F_['cols']: spaced(cm(c['x'] + 0.1), cm(F_['headY']), c['label'], fl, rule)
+    d.line([(cm(m), cm(F_['rule'])), (cm(R_), cm(F_['rule']))], fill=ox, width=max(1, cm(0.035)))
+    for r in range(F_['rows']):
+        y = F_['rule'] + (r + 1) * F_['rowH']
+        d.line([(cm(m), cm(y)), (cm(R_), cm(y))], fill=rule, width=hair)
+    for c in F_['cols'][1:]:
+        d.line([(cm(c['x'] - 0.25), cm(F_['headY'] - 0.1)), (cm(c['x'] - 0.25), cm(F_['rule'] + F_['rows'] * F_['rowH']))], fill=rule, width=hair)
+    R.age_paper(im, np.random.default_rng(6)).save(path)
+
+
+def unit_preflight():
+    K.set_seed('rack-preflight')
+    s, cam, h = R.unit_scene(4)
+    R.backing(h)
+    R.rack_panel(4, 'bronze', 'preflight')
+    ysh = 0.7
+    fp = os.path.join(OUT, 'preflight-form-print.png')
+    if not os.path.exists(fp): preflight_form(fp)
+    with R.moved(0, ysh, 0): R.sheet(PF_W, PF_H, fp, 'preflight', curl=0.25)
+    R.card_frame(PF_W, PF_H, ysh)
+    R.engrave('PRE-FLIGHT', -PF_W / 2 + 2.2, -h / 2 + 1.1, 0.5)
+    L = shoot_base(s, cam, 'rack-preflight', R.PW, h)
+    L['u'] = 4; L['layers'] = {}
+    P_ = lambda x, y: TK.proj(s, cam, (x, y, 0.0))
+    a, b = P_(-PF_W / 2, ysh + PF_H / 2), P_(PF_W / 2, ysh - PF_H / 2)
+    L['preflight'] = dict(sheet=[a[0], a[1], b[0], b[1]], form=PF_FORM)
+    LAY['units']['preflight'] = L; _save()
+
+
 UNITS = {'step-cab': unit_step_cab, 'step-nam': unit_step_nam, 'cheeks': unit_cheeks, 'meters': unit_meters,
-         'results': unit_results}
+         'results': unit_results, 'chart': unit_chart, 'preflight': unit_preflight}
 
 
 if __name__ == '__main__':

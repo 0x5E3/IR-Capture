@@ -225,8 +225,6 @@ struct TakeSheetInk: View {
     let form: RackKit.Results.Form
     let size: CGSize
 
-    static let ink = (r: 34.0, g: 32.0, b: 44.0)            // a black-violet ribbon, as the proofs' typing
-    static let redPencil = CGColor(srgbRed: 0.76, green: 0.17, blue: 0.14, alpha: 0.85)
 
     var body: some View {
         Canvas { ctx, _ in
@@ -293,27 +291,9 @@ struct TakeSheetInk: View {
         for (i, l) in lines.enumerated() { typed(cg, font, l, x: N.x0, baseline: N.baselines[i], rng: &rng) }
     }
 
-    /// Typed: one strike a character, each a little off the line and a little lighter or darker than the last.
+    /// Typed: one strike a character, each a little off the line and a little lighter or darker (PaperInk.type).
     func typed(_ cg: CGContext, _ font: CTFont, _ text: String, x: CGFloat, baseline: CGFloat, rng: inout InkRandom) {
-        var px = x * k
-        for ch in text {
-            defer { px += adv }
-            let u = Array(String(ch).utf16)
-            let dy = CGFloat(rng.normal()) * 0.012 * k
-            let dens = max(-30, min(30, rng.normal() * 14))
-            if ch == " " { continue }
-            var g = [CGGlyph](repeating: 0, count: u.count)
-            guard CTFontGetGlyphsForCharacters(font, u, &g, u.count) else { continue }
-            let I = Self.ink
-            cg.setFillColor(CGColor(srgbRed: (I.r + dens) / 255, green: (I.g + dens) / 255, blue: (I.b + dens) / 255,
-                                    alpha: 0.86 + 0.14 * rng.uniform()))
-            cg.saveGState()
-            cg.translateBy(x: px, y: baseline * k + dy)
-            cg.scaleBy(x: 1, y: -1)
-            var pos = CGPoint.zero
-            CTFontDrawGlyphs(font, &g, &pos, 1, cg)
-            cg.restoreGState()
-        }
+        PaperInk.type(cg, font, text, x: x * k, baseline: baseline * k, adv: adv, k: k, rng: &rng)
     }
 
     /// A dab of coloured pencil: short strokes scribbled in a patch (the proof's dab).
@@ -331,25 +311,11 @@ struct TakeSheetInk: View {
         }
     }
 
-    /// A red-pencil ring round a typed figure: a loose loop, a little more than once round.
+    /// A red-pencil ring round a typed figure: a loose loop, a little more than once round (PaperInk.ring).
     func ring(_ cg: CGContext, x: CGFloat, len: Int, baseline: CGFloat, rng: inout InkRandom) {
         let w = CGFloat(len) * form.advance * form.typedCm
-        let cx = (x + w / 2) * k, cy = (baseline - 0.22) * k
-        let rx = (w / 2 + 0.35) * k, ry = 0.5 * k
-        let a0 = 2.2 + rng.uniform() * 0.6, turns = 1.12 + 0.08 * rng.uniform()
-        let wob = rng.uniform() * 6.28
-        cg.setStrokeColor(Self.redPencil)
-        cg.setLineWidth(max(0.6, 0.055 * k))
-        cg.setLineCap(.round); cg.setLineJoin(.round)
-        let n = 90
-        for i in 0...n {
-            let t = Double(i) / Double(n)
-            let a = a0 + t * turns * 2 * .pi
-            let rr = 1 + 0.06 * sin(3 * a + wob) + 0.05 * t      // a hand's loop: uneven, opening as it goes round
-            let p = CGPoint(x: cx + rx * CGFloat(rr * cos(a)), y: cy - ry * CGFloat(rr * sin(a)))
-            if i == 0 { cg.move(to: p) } else { cg.addLine(to: p) }
-        }
-        cg.strokePath()
+        PaperInk.ring(cg, cx: (x + w / 2) * k, cy: (baseline - 0.22) * k, rx: (w / 2 + 0.35) * k, ry: 0.5 * k,
+                      width: max(0.6, 0.055 * k), rng: &rng)
     }
 
     static func fit(_ s: String, _ n: Int) -> String { s.count <= n ? s : String(s.prefix(max(1, n - 1))) + "…" }

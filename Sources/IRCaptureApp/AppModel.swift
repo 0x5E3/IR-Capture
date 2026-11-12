@@ -127,6 +127,16 @@ struct NAMSummary {
     var droppedOut = false
 }
 
+/// One line of the rack's BEFORE CAPTURE form (Phase 7a): what is typed and how it is marked in pencil.
+struct PreflightLine {
+    enum Mark { case tick, ring, cross, none }
+    let item: String
+    let reading: String
+    let mark: Mark
+    /// A word or two pencilled beside a reading to look at.
+    var aside: String? = nil
+}
+
 /// One line of the pre-flight summary before Capture (P0.7). A block stops Capture; a warning doesn't.
 struct PreflightItem: Identifiable {
     enum Level { case ok, warn, block }
@@ -567,6 +577,57 @@ final class AppModel: ObservableObject {
     }
 
     var captureProblem: String? { preflight.first { $0.level == .block }?.text }
+
+    /// The pre-flight as the rack's BEFORE CAPTURE form shows it (Phase 7a): seven lines, each typed as an item and a
+    /// short reading, ticked in pencil when it is good, ringed in red pencil when it needs a look, crossed when it stops
+    /// the capture, left unmarked while it has not been measured. Display only: `preflight` still decides Capture.
+    var preflightSheet: [PreflightLine] {
+        var out: [PreflightLine] = []
+        let names = mics.map(\.name)
+        if names.isEmpty { out.append(.init(item: "Mics", reading: "None set to MIC", mark: .cross)) }
+        else if let p = AppModel.namesProblem(names) {
+            out.append(.init(item: "Mics", reading: p.contains("reserved") ? "\u{201C}reference\u{201D} is reserved: rename the mic" : "Two mics with one name: rename one", mark: .cross))
+        } else { out.append(.init(item: "Mics", reading: "\(names.count): " + names.joined(separator: ", "), mark: .tick)) }
+        if refSource == .none { out.append(.init(item: "Reference", reading: "None", mark: .tick)) }
+        else if let r = refInput { out.append(.init(item: "Reference", reading: "Input \(r + 1)", mark: .tick)) }
+        else { out.append(.init(item: "Reference", reading: "No input set to REF", mark: .cross)) }
+        if let dev = device { out.append(.init(item: "Sample rate", reading: "\(rateTag(captureRate).dropLast()) kHz on \(dev.name)", mark: .tick)) }
+        else { out.append(.init(item: "Sample rate", reading: "No interface chosen", mark: .cross)) }
+        let used = levelReadings.filter { r in inputs.contains { $0.id == r.channel && $0.role != .off } }
+        if used.isEmpty { out.append(.init(item: "Levels", reading: "Not checked yet", mark: .none)) }
+        else {
+            let clipped = used.filter(\.clipped)
+            let off = used.filter { abs($0.changeDB) > 3 && $0.label != "Reference" }
+            if !clipped.isEmpty { out.append(.init(item: "Levels", reading: "CLIP on " + clipped.map(\.label).joined(separator: ", ") + ": turn down", mark: .cross)) }
+            else if !off.isEmpty {
+                out.append(.init(item: "Levels", reading: off.map { "\($0.label) \($0.changeDB > 0 ? "low" : "hot") by \(Int(abs($0.changeDB).rounded())) dB" }.joined(separator: ", "), mark: .ring))
+            } else { out.append(.init(item: "Levels", reading: "All inputs OK", mark: .tick)) }
+        }
+        let auto = levelChoice == 0, lvl = "\(Int(cabLevel)) dBFS"
+        if used.isEmpty { out.append(.init(item: "Sweep level", reading: auto ? "Set automatically" : lvl, mark: .none)) }
+        else {
+            let hot = used.filter { $0.label != "Reference" && max($0.h2, $0.h3) > -30 }
+            let base = auto ? (autoLevelSettled ? lvl + ", set automatically" : lvl + ", being set") : lvl
+            if !hot.isEmpty { out.append(.init(item: "Sweep level", reading: base + "; distortion high on " + hot.map(\.label).joined(separator: ", "), mark: .ring, aside: "amp down?")) }
+            else { out.append(.init(item: "Sweep level", reading: base, mark: auto && !autoLevelSettled ? .none : .tick)) }
+        }
+        if noise.isEmpty { out.append(.init(item: "Room noise", reading: "Not measured yet", mark: .none)) }
+        else {
+            var noisy: [String] = [], close: [String] = []
+            for r in inputs where r.role != .off {
+                guard let n = noise[r.id] else { continue }
+                let peak = levelReadings.first { $0.channel == r.id }?.peakDBFS
+                if n > -55 { noisy.append("\(label(for: r.id)) at \(Int(n.rounded())) dBFS") }
+                else if let p = peak, p - n < 40 { close.append("\(label(for: r.id)) only \(Int((p - n).rounded())) dB above it") }
+            }
+            if !noisy.isEmpty { out.append(.init(item: "Room noise", reading: "Noisy: " + (noisy + close).joined(separator: ", "), mark: .ring, aside: "fridge? fan?")) }
+            else if !close.isEmpty { out.append(.init(item: "Room noise", reading: close.joined(separator: ", "), mark: .ring, aside: "gain up?")) }
+            else { out.append(.init(item: "Room noise", reading: "Quiet", mark: .tick)) }
+        }
+        if outputProblem != nil { out.append(.init(item: "Files", reading: customOn ? "Custom: a choice is missing" : "None chosen", mark: .cross)) }
+        else { out.append(.init(item: "Files", reading: (chosenTargets.map(\.title) + (customOn ? ["Custom"] : [])).joined(separator: ", "), mark: .tick)) }
+        return out
+    }
 
     func chooseOutputFolder() {
         let p = NSOpenPanel()

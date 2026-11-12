@@ -927,7 +927,8 @@ def wiring_drawing(path, w, h, px=110):
     for i in range(int(h / 0.5) + 1):
         y = i * 0.5; d.line([P_.p(0, y), P_.p(w, y)], fill=g2 if i % 5 == 0 else g1, width=1)
     ink = (36, 34, 48); ox = (104, 30, 24); grey = (92, 90, 96)
-    fL = P_.font('BarlowSemiCondensed-700-normal.ttf', 0.62); fS = P_.font('BarlowSemiCondensed-600-normal.ttf', 0.5)
+    # (11-11 late night) the small labels' capitals 0.45 cm (6.3 pt on screen), over MIN_CAP_PT: the proof's were 0.35 cm
+    fL = P_.font('BarlowSemiCondensed-700-normal.ttf', 0.66); fS = P_.font('BarlowSemiCondensed-600-normal.ttf', 0.45 / 0.7)
     lab = lambda x, y, t, f=fL, a='m', col=ink: P_.spaced(x, y, t, f, col, 0.12, a)
     # the interface
     P_.box(1.5, 4.5, 8.0, 15.5, ink, 0.07); lab(4.75, 5.4, 'INTERFACE')
@@ -948,7 +949,7 @@ def wiring_drawing(path, w, h, px=110):
     # the mics in front of the cab, their cables back to inputs 1 and 2
     for (mx, my, t, iy) in ((19.0, 8.3, 'MIC 1', 9.5), (19.0, 11.6, 'MIC 2', 11.0)):
         d.rounded_rectangle([P_.c(mx - 1.3), P_.c(my - 0.35), P_.c(mx), P_.c(my + 0.35)], radius=P_.c(0.3), outline=ink, width=max(1, P_.c(0.05)))
-        lab(mx - 0.65, my - 0.95, t, fS)
+        lab(mx - 0.95, my - 0.95, t, fS)
         P_.line([(mx - 1.3, my), (mx - 2.2, my), (mx - 2.2, iy), (8.5, iy)], ink, 0.04); P_.arrow(9.0, iy, 8.05, iy, ink)
     # the reference: the speaker terminals through the pad to input 8 (dashed: optional)
     def dash(pts):
@@ -974,28 +975,31 @@ def wiring_drawing(path, w, h, px=110):
     # the title block
     P_.box(17.6, h - 3.0, w - 0.8, h - 0.8, ox, 0.06, 0.05)
     P_.spaced(17.9, h - 2.35, 'CAB IR  HOOK-UP', P_.font('BarlowSemiCondensed-700-normal.ttf', 0.62), ox, 0.14)
-    P_.spaced(17.9, h - 1.4, 'DWG 1  ·  REF OPTIONAL', P_.font('BarlowSemiCondensed-600-normal.ttf', 0.45), ox, 0.14)
+    P_.spaced(17.9, h - 1.4, 'DWG 1  ·  CAB IR', P_.font('BarlowSemiCondensed-600-normal.ttf', 0.45 / 0.7), ox, 0.06)
     age_paper(P_.im, P_.rng).save(path)
 
 
 def instruction_card(path, w, h, px=110):
-    """The card beside the drawing: what to do before CHECK LEVELS, typed on a manila card under a printed heading."""
+    """The card beside the drawing: what to do before and during CHECK LEVELS, typed on a manila card under a printed
+    heading. (11-11 late night) typed at 0.74 cm, capitals 6 pt on screen (the proof's 0.6 cm were under MIN_CAP_PT); the
+    level check's steps, a checklist beside the pre-flight list until now, folded in as 6 and 7."""
     P_ = Pen(w, h, px, (232, 214, 172), 12)
-    ox = (104, 30, 24); rule = (150, 120, 104)
+    ox = (104, 30, 24)
     P_.spaced(1.0, 1.25, 'BEFORE YOU START', P_.font('BarlowSemiCondensed-700-normal.ttf', 0.72), ox, 0.14)
     P_.d.line([P_.p(1.0, 2.0), P_.p(w - 1.0, 2.0)], fill=ox, width=P_.c(0.06))
-    ft = P_.font(TYPED, 0.6)
+    ft = P_.font(TYPED, 0.74)
     lines = [('1.', 'Mute the studio monitors.'),
-             ('2.', 'Out 1 to the amp\'s FX return'), ('', 'or power amp in. Not the'), ('', 'guitar input.'),
+             ('2.', 'An output to the amp\'s FX'), ('', 'return or power amp in.'), ('', 'Not the guitar input.'),
              ('3.', 'Amp master low to start.'),
-             ('4.', 'Mics to the inputs. Throw'), ('', 'each one to MIC.'),
-             ('5.', 'Optional: the speaker'), ('', 'terminals through the 20 dB'), ('', 'pad to a line input. Throw'), ('', 'it to REF.'),
-             ('6.', 'Warm a tube amp up for'), ('', '20 minutes.')]
-    y = 3.1
+             ('4.', 'Mics to the inputs. Set'), ('', 'each one to MIC.'),
+             ('5.', 'Optional: the speaker'), ('', 'terminals through the'), ('', '20 dB pad to a line input.'), ('', 'Set it to REF.'),
+             ('6.', 'Wear ear protection. Warm'), ('', 'a tube amp up for 20 min.'),
+             ('7.', 'CHECK LEVELS. Turn each'), ('', 'preamp until OK lights.')]
+    y = 2.95
     for num, t in lines:
-        if num and y > 3.2: y += 0.3
-        if num: P_.typed(1.0, y, num, ft)
-        P_.typed(1.9, y, t, ft); y += 0.92
+        if num and y > 3.0: y += 0.22
+        if num: P_.typed(0.85, y, num, ft)
+        P_.typed(1.85, y, t, ft); y += 0.86
     age_paper(P_.im, P_.rng, (1.0, 0.97, 0.9)).save(path)
 
 

@@ -29,6 +29,17 @@ struct RackKit: Decodable {
         let layers: [String: Layer]
         let meters: Meters?          // the meter bridge's own parts
         let results: Results?        // the results unit's own parts
+        let preflight: Preflight?    // the pre-flight unit's own parts
+    }
+    /// The pre-flight (4U): BEFORE CAPTURE, a printed form with a ruled table (ITEM, READING, OK), typed by the app.
+    struct Preflight: Decodable {
+        struct Form: Decodable {
+            let w: CGFloat; let h: CGFloat; let typedCm: CGFloat; let advance: CGFloat
+            let headY: CGFloat; let rule: CGFloat; let rowH: CGFloat; let rows: Int; let baseline0: CGFloat
+            let cols: [Results.Col]; let right: CGFloat
+        }
+        let sheet: [CGFloat]         // the sheet in the base picture (pt)
+        let form: Form
     }
     /// The results (7U): the take sheet's printed form and where things go on it, the keys, the stamps.
     struct Results: Decodable {

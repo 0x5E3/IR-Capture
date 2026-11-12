@@ -19,6 +19,8 @@ struct CabJob: View {
                 CabImportSteps()
             } else {
                 RackStepStrip(steps: [("Connect", connected), ("Set levels", levelsDone), ("Capture", m.result != nil), ("Results", m.result != nil)])
+                // (Phase 7a) the chart panel: the hook-up drawing and the card, in place of the Connect step's drawing
+                if RackChartUnit.available { RackChartUnit() }
                 CabConnectStep(done: connected)
                 if let d = TapePieces.deck {
                     // Phase 7: the reel deck replaces the Set levels and Capture panels. The capture's name and files
@@ -26,12 +28,17 @@ struct CabJob: View {
                     CabFilesStep()
                     // (Phase 7a) the meter bridge: a 5U rack unit, one channel module for each input in use
                     if RackMeterBridge.available { RackMeterBay() }
-                    HStack(alignment: .top, spacing: 16) {
-                        Checklist(items: levelSteps, style: PaperStyle(stock: .manila, ring: true))
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        PreflightList(items: m.preflight).frame(width: 300)
+                    if RackPreflightUnit.available {
+                        // (Phase 7a) BEFORE CAPTURE, typed in; the level check's steps are on the chart panel's card
+                        RackPreflightUnit(lines: m.preflightSheet, sentences: m.preflight.map(\.text)).id("machine")
+                    } else {
+                        HStack(alignment: .top, spacing: 16) {
+                            Checklist(items: levelSteps, style: PaperStyle(stock: .manila, ring: true))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            PreflightList(items: m.preflight).frame(width: 300)
+                        }
+                        .id("machine")
                     }
-                    .id("machine")
                     ReelDeck(d: d).padding(.top, 4)
                     CabDeckStatus()
                     if !RackMeterBridge.available && !m.levelReadings.isEmpty { LevelTable(readings: m.levelReadings) }
@@ -109,13 +116,15 @@ struct CabConnectStep: View {
     @EnvironmentObject var m: AppModel
     let done: Bool
     var body: some View {
-        Step(n: 1, title: "Connect", subtitle: "Wire the rig as shown. Then set the use of each input.", done: done) {
-            WiringDiagram(wiring: m.refSource == .none ? .cabNoRef : .cabRef).onPaper(padding: 14, style: .drawing)
-            Checklist(items: [
+        let chart = RackChartUnit.available
+        Step(n: 1, title: "Connect", subtitle: chart ? "Wire the rig as the hook-up drawing shows. Then set the use of each input."
+                                                     : "Wire the rig as shown. Then set the use of each input.", done: done) {
+            if !chart { WiringDiagram(wiring: m.refSource == .none ? .cabNoRef : .cabRef).onPaper(padding: 14, style: .drawing) }
+            if !chart { Checklist(items: [
                 "Interface output → amp FX return (power amp in) or clean power amp → cab. Do not use the guitar input. The preamp distorts the sweeps and the IR is incorrect.",
                 "Set the amp master low to start. The remaining levels are set in the level check.",
                 "Place the mics on the cab and connect them to the interface mic inputs. Mute the studio monitors. Otherwise the room mic records them.",
-            ])
+            ]) }
             InterfaceRow(outputLabel: "Output to the amp", output: $m.outChannel)
             if m.device != nil {
                 InputsGrid()

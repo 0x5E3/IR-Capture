@@ -177,6 +177,7 @@ for key, L in lay.get('units', {}).items():
     if 'lamp_x_cm' in L: u['lampXcm'] = L['lamp_x_cm']
     if 'meters' in L: u['meters'] = meters(L)
     if 'results' in L: u['results'] = results(L)
+    if 'preflight' in L: u['preflight'] = {'sheet': rect(L['preflight']['sheet']), 'form': L['preflight']['form']}
     J['units'][key] = u
     print(key, base.size, len(u['layers']), 'layers')
 
