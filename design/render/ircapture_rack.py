@@ -941,27 +941,49 @@ def wiring_drawing(path, w, h, px=110):
     # (11-11 late night) the small labels' capitals 0.45 cm (6.3 pt on screen), over MIN_CAP_PT: the proof's were 0.35 cm
     fL = P_.font('BarlowSemiCondensed-700-normal.ttf', 0.66); fS = P_.font('BarlowSemiCondensed-600-normal.ttf', 0.45 / 0.7)
     lab = lambda x, y, t, f=fL, a='m', col=ink: P_.spaced(x, y, t, f, col, 0.12, a)
+    grid = P_.im.copy()                                   # the bare graph paper, shown through anything drawn in front
     # the interface
     P_.box(1.5, 4.5, 8.0, 15.5, ink, 0.07); lab(4.75, 5.4, 'INTERFACE')
-    ports = [('OUT 1', 7.0), ('IN 1', 9.5), ('IN 2', 11.0), ('IN 8', 13.6)]
+    ports = [('OUT 1', 7.0), ('IN 1', 9.9), ('IN 2', 11.6), ('IN 8', 14.5)]
     for t, y in ports:
         d.ellipse([P_.c(7.55), P_.c(y - 0.22), P_.c(8.0 + 0.0), P_.c(y + 0.22)], outline=ink, width=max(1, P_.c(0.05)))
         lab(7.2, y, t, fS, 'r')
-    # the amp, into its FX return
-    P_.box(11.5, 2.5, 18.0, 6.5, ink, 0.07); lab(14.75, 3.4, 'AMP')
-    lab(12.0, 4.6, 'FX RETURN', fS, 'l'); lab(17.6, 5.6, 'SPEAKER', fS, 'r')
-    P_.arrow(8.0, 7.0, 10.0, 7.0, ink); P_.line([(10.0, 7.0), (10.0, 4.6), (11.45, 4.6)], ink, 0.04); P_.arrow(11.0, 4.6, 11.5, 4.6, ink)
-    # the speaker line to the cab
-    P_.line([(18.0, 5.6), (20.4, 5.6)], ink, 0.07)
-    # the cab: a box, a cone
-    P_.box(20.4, 2.5, 25.0, 12.5, ink, 0.07, 0.15); lab(22.7, 3.3, 'CAB')
-    for r_, wd in ((1.7, 0.06), (0.55, 0.05)):
-        d.ellipse([P_.c(22.7 - r_), P_.c(8.0 - r_), P_.c(22.7 + r_), P_.c(8.0 + r_)], outline=ink, width=max(1, P_.c(wd)))
-    # the mics in front of the cab, their cables back to inputs 1 and 2
-    for (mx, my, t, iy) in ((19.0, 8.3, 'MIC 1', 9.5), (19.0, 11.6, 'MIC 2', 11.0)):
-        d.rounded_rectangle([P_.c(mx - 1.3), P_.c(my - 0.35), P_.c(mx), P_.c(my + 0.35)], radius=P_.c(0.3), outline=ink, width=max(1, P_.c(0.05)))
-        lab(mx - 1.25, my - 0.95, t, fS)
-        P_.line([(mx - 1.3, my), (mx - 2.2, my), (mx - 2.2, iy), (8.5, iy)], ink, 0.04); P_.arrow(9.0, iy, 8.05, iy, ink)
+    # (11-12, Lowell) a guitar rig: the amp head standing on a 2x12 cab, wider than tall (the tall box read as a hi-fi
+    # speaker), and the mics level with the drivers, in front of them
+    # the amp head, into its FX return
+    P_.box(11.0, 3.1, 21.0, 6.5, ink, 0.07, 0.15)
+    P_.line([(14.6, 3.1), (14.85, 2.7), (17.15, 2.7), (17.4, 3.1)], ink, 0.06)          # the handle
+    lab(16.35, 4.1, 'AMP'); lab(11.5, 4.1, 'FX RETURN', fS, 'l'); lab(20.6, 4.1, 'SPEAKER', fS, 'r')
+    for k in range(7):
+        kx = 12.7 + k * 1.1
+        d.ellipse([P_.c(kx - 0.24), P_.c(5.45 - 0.24), P_.c(kx + 0.24), P_.c(5.45 + 0.24)], outline=ink, width=max(1, P_.c(0.04)))
+    P_.line([(8.0, 7.0), (10.0, 7.0), (10.0, 4.1), (10.95, 4.1)], ink, 0.04); P_.arrow(10.5, 4.1, 11.0, 4.1, ink)
+    # the speaker line round to the cab's jack
+    P_.line([(21.0, 4.1), (23.7, 4.1), (23.7, 8.1), (21.5, 8.1)], ink, 0.07)
+    # the cab: the box, the baffle, two drivers
+    P_.box(10.5, 6.5, 21.5, 13.3, ink, 0.07, 0.15)
+    P_.box(10.9, 6.9, 21.1, 12.9, ink, 0.035, 0.08)
+    cy = 9.9
+    for cx in (13.25, 18.75):
+        for r_, wd in ((2.1, 0.06), (1.75, 0.03), (0.6, 0.05)):
+            d.ellipse([P_.c(cx - r_), P_.c(cy - r_), P_.c(cx + r_), P_.c(cy + r_)], outline=ink, width=max(1, P_.c(wd)))
+    lab(16.0, 12.4, 'CAB')
+    # the mics in front of the drivers, level with them, each tip at a dust cap's edge; their cables to inputs 1 and 2
+    def mic(x0, x1, tip_right):
+        y0, y1 = cy - 0.36, cy + 0.36
+        m = Image.new('L', P_.im.size, 0)
+        ImageDraw.Draw(m).rounded_rectangle([P_.c(x0), P_.c(y0), P_.c(x1), P_.c(y1)], radius=P_.c(0.3), fill=255)
+        P_.im.paste(grid, mask=m)                           # the mic hides the cab behind it
+        d.rounded_rectangle([P_.c(x0), P_.c(y0), P_.c(x1), P_.c(y1)], radius=P_.c(0.3), outline=ink, width=max(1, P_.c(0.05)))
+        gx = x1 - 0.7 if tip_right else x0 + 0.7          # the grille
+        P_.line([(gx, y0), (gx, y1)], ink, 0.04)
+        for k in range(1, 4):
+            hx = gx + (0.16 * k if tip_right else -0.16 * k)
+            P_.line([(hx, y0 + 0.12), (hx, y1 - 0.12)], ink, 0.02)
+    mic(10.1, 13.25 - 0.6, True); lab(9.2, 9.15, 'MIC 1', fS)
+    P_.line([(10.1, cy), (8.5, cy)], ink, 0.04); P_.arrow(9.0, cy, 8.05, cy, ink)
+    mic(18.75 + 0.6, 21.9, False); lab(22.85, 9.15, 'MIC 2', fS)
+    P_.line([(21.9, cy), (22.8, cy), (22.8, 13.85), (9.3, 13.85), (9.3, 11.6), (8.5, 11.6)], ink, 0.04); P_.arrow(9.0, 11.6, 8.05, 11.6, ink)
     # the reference: the speaker terminals through the pad to input 8 (dashed: optional)
     def dash(pts):
         for (xa, ya), (xb, yb) in zip(pts, pts[1:]):
@@ -969,10 +991,10 @@ def wiring_drawing(path, w, h, px=110):
             for k in range(0, n, 2):
                 t0, t1 = k / n, min(1, (k + 1) / n)
                 P_.line([(xa + (xb - xa) * t0, ya + (yb - ya) * t0), (xa + (xb - xa) * t1, ya + (yb - ya) * t1)], ink, 0.04)
-    d.ellipse([P_.c(19.1), P_.c(5.45), P_.c(19.4), P_.c(5.75)], fill=ink)
-    dash([(19.25, 5.75), (19.25, 14.1), (16.6, 14.1)]); dash([(11.4, 14.1), (8.6, 14.1), (8.6, 13.6), (8.1, 13.6)])
-    P_.box(11.5, 13.0, 16.5, 15.2, ink, 0.06); lab(14.0, 13.8, '20 dB PAD'); lab(14.0, 14.6, 'OPTIONAL', fS, col=grey)
-    lab(16.9, 14.85, 'SPEAKER TERMINALS', fS, 'l', grey)
+    d.ellipse([P_.c(23.55), P_.c(6.05), P_.c(23.85), P_.c(6.35)], fill=ink)
+    dash([(23.85, 6.2), (24.8, 6.2), (24.8, 15.7), (16.6, 15.7)]); dash([(11.4, 15.7), (8.6, 15.7), (8.6, 14.5), (8.1, 14.5)])
+    P_.box(11.5, 14.7, 16.5, 16.7, ink, 0.06); lab(14.0, 15.4, '20 dB PAD'); lab(14.0, 16.2, 'OPTIONAL', fS, col=grey)
+    lab(16.9, 15.2, 'SPEAKER TERMINALS', fS, 'l', grey)
     # the monitors, crossed out
     P_.box(2.0, 16.6, 4.4, 19.2, ink, 0.05, 0.12)
     for r_ in (0.6, 0.22): d.ellipse([P_.c(3.2 - r_), P_.c(18.2 - r_), P_.c(3.2 + r_), P_.c(18.2 + r_)], outline=ink, width=max(1, P_.c(0.04)))
@@ -982,7 +1004,7 @@ def wiring_drawing(path, w, h, px=110):
     pen = (88, 86, 92)
     fM = P_.font('SwellMarker-400-normal.ttf', 0.62)
     d.text((P_.c(8.4), P_.c(0.55)), 'FX return, not the guitar input!', font=fM, fill=pen)
-    P_.pencil([(12.4, 1.55), (12.1, 2.35), (12.0, 4.0)], pen, 0.05, 2)
+    P_.pencil([(12.4, 1.55), (12.1, 2.35), (11.95, 3.65)], pen, 0.05, 2)
     # the title block
     P_.box(17.6, h - 3.0, w - 0.8, h - 0.8, ox, 0.06, 0.05)
     P_.spaced(17.9, h - 2.35, 'CAB IR  HOOK-UP', P_.font('BarlowSemiCondensed-700-normal.ttf', 0.62), ox, 0.14)
@@ -1765,7 +1787,7 @@ def unit_plotter():
     pl, ph = rack_panel(6, 'bronze', 'plotter')
     pw_, ph_ = PLOT['w'], PLOT['h']
     bw, bh = pw_ + 4.6, ph_ + 2.6
-    bx, by = 0.0, 0.75
+    bx, by = 0.0, 1.05                               # (11-12) 0.3 cm higher than the fourth proof: room for PRINT under it
     op = rbox('bedopen', bw, bh, 4, -2, 0.25); op.location = (bx, by, 0); bpy.context.view_layer.update(); cut(pl, op)
     pl.data.materials.append(K.hammertone_fine(name='hf-plotter'))
     bed = rbox('bed', bw + 0.4, bh + 0.4, 0.1, -0.9, 0.05); bed.location = (bx, by, 0)
@@ -1794,6 +1816,8 @@ def unit_plotter():
     pc = rbox('pencar', 2.0, 2.3, 0.7, 0.75, 0.2, roll=0.07); pc.location = (ax, pyy, 0); pc.data.materials.append(SG.black_cast('pencar'))
     pen = lathe('pen', [(0.36, 0.0), (0.36, 0.5), (0.3, 0.6), (0.0, 0.62)], 64)
     pen.location = (ax, pyy - 0.2, 1.45); pen.data.materials.append(mat('pencap', srgb('#2f6a34'), rough=0.35, coat=0.4))
+    # (11-12, Lowell) PRINT: one key, a menu of what to print or save (style, which curves); under the paper's centre
+    with moved(xp, -h / 2 + 1.45, 0): key(None, text='PRINT', vname='Print')
     engrave('RESPONSE', -bw / 2 + 2.6, -h / 2 + 1.05, 0.5)
     engrave('X-Y RECORDER', bw / 2 - 3.3, -h / 2 + 1.05, 0.44, track=0.2, color='#a8a298')
     shoot(s, cam, 'unit-plotter', PW, h)
