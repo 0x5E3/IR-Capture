@@ -19,7 +19,10 @@ PT, UPT, KS = J['ptPerCm'], J['uPt'], J['pxPerPoint']
 PANEL = round(48.26 * PT)
 U = {'step-cab': 1, 'step': 1, 'chart': 6, 'patch': 2, 'meters': 5, 'preflight': 4, 'deck': 8, 'results': 7,
      'connect': 2, 'files': 4, 'sweep': 2, 'sweep-open': 2, 'formats': 3, 'formats-open': 3, 'plotter': 6,
-     'nammeters': 3, 'cart': 3}
+     'nammeters': 3, 'cart': 3,
+     # (11-12, tenth chat) the fifth proof
+     'step-daw': 1, 'step-rex': 1, 'chart-daw': 6, 'signal': 3, 'tracks': 4, 'go-daw': 1, 'go-rex': 1, 'files-rex': 4,
+     'preflight-trouble': 5}
 lay = {}
 for f in os.listdir(RD):
     if f.startswith('rack-unit-') and f.endswith('.json'): lay.update(json.load(open(os.path.join(RD, f)))['out'])

@@ -529,13 +529,14 @@ def take_sheet(path, w, h, px=110):
 # ---------------------------------------------------------------------------------------------------------------------
 # units
 
-def unit_step(current=1, done=(0,)):
-    """1U: the job's steps. Done: green; the current step: amber; ahead: dark."""
+def unit_step(current=1, done=(0,), names=None, tag=''):
+    """1U: the job's steps. Done: green; the current step: amber; ahead: dark. (11-12, tenth chat) the DAW route's and
+    the re-export's strips pass their own legends (tag: the picture's name)."""
     K.set_seed('rack-step')
     s, cam, h = unit_scene(1)
     backing(h)
     rack_panel(1, 'bronze', 'step')
-    names = ['CONNECT', 'SET LEVELS', 'CAPTURE', 'RESULTS']
+    names = names or ['CONNECT', 'SET LEVELS', 'CAPTURE', 'RESULTS']
     x = -19.0
     for i, n in enumerate(names):
         col = 'green' if i in done else 'amber'
@@ -543,7 +544,7 @@ def unit_step(current=1, done=(0,)):
         e = engrave(n, 0, 0, 0.62)
         wcm = e.dimensions.x; e.location.x = x + 1.1 + wcm / 2 - 0.1 * wcm
         x += 10.2
-    shoot(s, cam, 'unit-step', PW, h)
+    shoot(s, cam, 'unit-step' + tag, PW, h)
 
 
 def unit_patch():
@@ -928,7 +929,7 @@ class Pen:
         self.d.rounded_rectangle([self.c(x0), self.c(y0), self.c(x1), self.c(y1)], radius=self.c(r), outline=fill, width=max(1, self.c(w)))
 
 
-def wiring_drawing(path, w, h, px=110):
+def wiring_drawing(path, w, h, px=110, daw=False):
     """Cab IR's hook-up, inked on graph paper: interface, amp (into its FX return), cab, two mics, the 20 dB pad from the
     speaker terminals, the monitors crossed out. A pencilled note where people go wrong."""
     P_ = Pen(w, h, px, (241, 237, 222), 11); d = P_.d
@@ -944,6 +945,10 @@ def wiring_drawing(path, w, h, px=110):
     grid = P_.im.copy()                                   # the bare graph paper, shown through anything drawn in front
     # the interface
     P_.box(1.5, 4.5, 8.0, 15.5, ink, 0.07); lab(4.75, 5.4, 'INTERFACE')
+    if daw:
+        # (11-12, tenth chat) the DAW route: the computer plays the sweep and records the mics, over USB
+        P_.box(1.5, 0.7, 7.0, 3.35, ink, 0.07, 0.15); lab(4.25, 1.6, 'COMPUTER'); lab(4.25, 2.55, 'DAW', fS)
+        P_.line([(4.25, 3.35), (4.25, 4.5)], ink, 0.06); lab(4.55, 3.95, 'USB', fS, 'l')
     ports = [('OUT 1', 7.0), ('IN 1', 9.9), ('IN 2', 11.6), ('IN 8', 14.5)]
     for t, y in ports:
         d.ellipse([P_.c(7.55), P_.c(y - 0.22), P_.c(8.0 + 0.0), P_.c(y + 0.22)], outline=ink, width=max(1, P_.c(0.05)))
@@ -1007,8 +1012,8 @@ def wiring_drawing(path, w, h, px=110):
     P_.pencil([(12.4, 1.55), (12.1, 2.35), (11.95, 3.65)], pen, 0.05, 2)
     # the title block
     P_.box(17.6, h - 3.0, w - 0.8, h - 0.8, ox, 0.06, 0.05)
-    P_.spaced(17.9, h - 2.35, 'CAB IR  HOOK-UP', P_.font('BarlowSemiCondensed-700-normal.ttf', 0.62), ox, 0.14)
-    P_.spaced(17.9, h - 1.4, 'DWG 1', P_.font('BarlowSemiCondensed-600-normal.ttf', 0.45 / 0.7), ox, 0.06)
+    P_.spaced(17.9, h - 2.35, 'CAB IR  DAW HOOK-UP' if daw else 'CAB IR  HOOK-UP', P_.font('BarlowSemiCondensed-700-normal.ttf', 0.62), ox, 0.14)
+    P_.spaced(17.9, h - 1.4, 'DWG 2' if daw else 'DWG 1', P_.font('BarlowSemiCondensed-600-normal.ttf', 0.45 / 0.7), ox, 0.06)
     age_paper(P_.im, P_.rng).save(path)
 
 
@@ -1036,7 +1041,7 @@ def instruction_card(path, w, h, px=110):
     age_paper(P_.im, P_.rng, (1.0, 0.97, 0.9)).save(path)
 
 
-def preflight_sheet(path, w, h, px=110):
+def preflight_sheet(path, w, h, px=110, trouble=False):
     """The pre-flight list: a printed form typed in, ticked in pencil, the noisy room ringed in red pencil."""
     P_ = Pen(w, h, px, (246, 234, 200), 13); d = P_.d
     ox = (104, 30, 24); rule = (150, 120, 104)
@@ -1052,6 +1057,7 @@ def preflight_sheet(path, w, h, px=110):
     rows = [('Mics', '2: SM57, R121', True), ('Reference', 'Input 8', True), ('Sample rate', '96 kHz', True),
             ('Levels', 'All inputs OK', True), ('Sweep level', '-12 dBFS, set automatically', True),
             ('Room noise', 'Room at -38 dBFS: noisy', False)]
+    if trouble: rows = rows[:5] + [('Room noise', 'Quiet: -71 dBFS', True), ('Files', 'Universal, minimum phase', True)]
     rh = 1.42; y0 = 3.75
     for i, (a, b, ok) in enumerate(rows):
         y = y0 + i * rh
@@ -1062,6 +1068,15 @@ def preflight_sheet(path, w, h, px=110):
             j = P_.rng.normal(0, 0.06, 4)
             P_.pencil([(tx + j[0], y + j[1]), (tx + 0.35, y + 0.4), (tx + 1.15 + j[2], y - 0.55 + j[3])], (70, 68, 74), 0.07)
     for x in (8.6, 34.6): d.line([P_.p(m + x - 0.25, 2.2), P_.p(m + x - 0.25, y0 + len(rows) * rh - 0.7)], fill=rule, width=max(1, P_.c(0.02)))
+    if trouble:
+        # (11-12, tenth chat) what CabDeckStatus said in red under the deck: typed here in the ribbon's red half
+        yt = y0 + len(rows) * rh - 0.2
+        d.line([P_.p(m, yt), P_.p(w - m, yt)], fill=ox, width=P_.c(0.05))
+        P_.spaced(m + 0.1, yt + 0.75, 'TROUBLE', fl, ox, 0.14)
+        red_ = (168, 36, 30)
+        P_.typed(m + 8.7, yt + 0.75, 'Capture stopped. The interface stopped answering', ft, red_)
+        P_.typed(m + 8.7, yt + 1.6, '(CoreAudio -10863). Nothing was saved.', ft, red_)
+        age_paper(P_.im, P_.rng).save(path); return
     # the red-pencil ring round the noisy line, and its note
     y = y0 + 5 * rh; red = (176, 40, 34)
     pts = []
@@ -1083,8 +1098,30 @@ def card_frame(sw, sh, ysh, xsh=0.0, name='cardframe'):
     small_screws([(xsh + sx * (sw / 2 + 0.45), ysh + sy * (sh / 2 + 0.1)) for sx in (-1, 1) for sy in (-1, 1)], r=0.17)
 
 
-def unit_chart():
-    """6U: the chart panel. The hook-up drawing and the card beside it, each in its card frame."""
+def daw_card(path, w, h, px=110):
+    """(11-12, tenth chat) the DAW route's card: the old step 2's checklist, typed in the BEFORE YOU START card's way."""
+    P_ = Pen(w, h, px, (232, 214, 172), 14)
+    ox = (104, 30, 24)
+    P_.spaced(1.0, 1.25, 'IN THE DAW', P_.font('BarlowSemiCondensed-700-normal.ttf', 0.72), ox, 0.14)
+    P_.d.line([P_.p(1.0, 2.0), P_.p(w - 1.0, 2.0)], fill=ox, width=P_.c(0.06))
+    ft = P_.font(TYPED, 0.74)
+    lines = [('1.', 'Project at the test'), ('', 'signal\'s RATE. The sweep'), ('', 'WAV on a track at bar 1.'),
+             ('2.', 'That track only to the'), ('', 'output to the amp.'), ('', 'Monitors muted.'),
+             ('3.', 'A track for each mic,'), ('', 'named after it. The'), ('', 'reference track: Ref.'), ('', 'No plug-ins.'),
+             ('4.', 'Play it. Each preamp to'), ('', 'about -6 dBFS. No clip.'),
+             ('5.', 'Record one full pass.'),
+             ('6.', 'Export all tracks as'), ('', 'WAV at the project rate.'), ('', 'Normalize off.')]
+    y = 2.95
+    for num, t in lines:
+        if num and y > 3.0: y += 0.22
+        if num: P_.typed(0.85, y, num, ft)
+        P_.typed(1.85, y, t, ft); y += 0.86
+    age_paper(P_.im, P_.rng, (1.0, 0.97, 0.9)).save(path)
+
+
+def unit_chart(daw=False):
+    """6U: the chart panel. The hook-up drawing and the card beside it, each in its card frame. (11-12, tenth chat) daw:
+    the DAW route's drawing (DWG 2, the computer on the interface's USB) and its card, IN THE DAW."""
     K.set_seed('rack-chart')
     s, cam, h = unit_scene(6)
     backing(h)
@@ -1093,28 +1130,29 @@ def unit_chart():
     gap_ = 2.2
     xd = -(dw + gap_ + cw_) / 2 + dw / 2; xc = xd + dw / 2 + gap_ + cw_ / 2
     ysh = 0.9
-    fd = os.path.join(OUT, 'wiring-print.png'); wiring_drawing(fd, dw, dh)
-    fc = os.path.join(OUT, 'card-print.png'); instruction_card(fc, cw_, chh)
+    fd = os.path.join(OUT, 'wiring-print%s.png' % ('-daw' if daw else '')); wiring_drawing(fd, dw, dh, daw=daw)
+    fc = os.path.join(OUT, 'card-print%s.png' % ('-daw' if daw else ''))
+    (daw_card if daw else instruction_card)(fc, cw_, chh)
     with moved(xd, ysh, 0): sheet(dw, dh, fd, 'wiring', curl=0.25)
     with moved(xc, ysh, 0): sheet(cw_, chh, fc, 'card', curl=0.0)
     card_frame(dw, dh, ysh, xd, 'cf1'); card_frame(cw_, chh, ysh, xc, 'cf2')
     engrave('HOOK-UP', -dw / 2 + xd + 2.0, -h / 2 + 1.25, 0.5)
-    shoot(s, cam, 'unit-chart', PW, h)
+    shoot(s, cam, 'unit-chart' + ('-daw' if daw else ''), PW, h)
 
 
-def unit_preflight():
-    """4U: the pre-flight list in its card frame."""
+def unit_preflight(trouble=False):
+    """4U: the pre-flight list in its card frame. (11-12, tenth chat) trouble: 5U, a seventh line and the TROUBLE box."""
     K.set_seed('rack-preflight')
-    s, cam, h = unit_scene(4)
+    s, cam, h = unit_scene(5 if trouble else 4)
     backing(h)
-    rack_panel(4, 'bronze', 'preflight')
-    sw, sh = 40.0, 12.8
+    rack_panel(5 if trouble else 4, 'bronze', 'preflight')
+    sw, sh = 40.0, 12.8 + (3.6 if trouble else 0)
     ysh = 0.55
-    fp = os.path.join(OUT, 'preflight-print.png'); preflight_sheet(fp, sw, sh)
+    fp = os.path.join(OUT, 'preflight-print.png'); preflight_sheet(fp, sw, sh, trouble=trouble)
     with moved(0, ysh, 0): sheet(sw, sh, fp, 'preflight', curl=0.25)
     card_frame(sw, sh, ysh)
     engrave('PRE-FLIGHT', -sw / 2 + 2.2, -h / 2 + 1.1, 0.5)
-    shoot(s, cam, 'unit-preflight', PW, h)
+    shoot(s, cam, 'unit-preflight' + ('-trouble' if trouble else ''), PW, h)
 
 
 # the solid-state parts
@@ -1592,7 +1630,7 @@ def unit_connect():
     shoot(s, cam, 'unit-connect', PW, h)
 
 
-def capture_card(path, w, h, px=110):
+def capture_card(path, w, h, px=110, rex=False):
     """The capture card: a printed form (oxblood) the app types into: the capture's name, notes, the save folder."""
     P_ = Pen(w, h, px, (246, 234, 200), 21); d = P_.d
     ox = (104, 30, 24); rule = (150, 120, 104)
@@ -1612,15 +1650,41 @@ def capture_card(path, w, h, px=110):
             d.line([P_.p(m, yy + 0.42), P_.p(w - m, yy + 0.42)], fill=rule, width=max(1, P_.c(0.02)))
             yy += 0.95
         return yy
-    y = field(2.75, 'CAPTURE NAME', [os.environ.get('IRC_CARD_NAME', 'Mesa_4x12_V30_PosA')], 'EVERY FILE NAME STARTS WITH IT')
-    y = field(y + 0.35, 'NOTES', ['SM57 1 in back, cap edge. R121 6 in,', 'centre. Master on 3, bright off.', ''],
-              'SAVED IN REPORT.JSON')
-    field(y + 0.35, 'SAVE TO', ['~/Music/IR Capture'])
-    age_paper(P_.im, P_.rng).save(path)
+    y = field(2.75, 'CAPTURE NAME', [os.environ.get('IRC_CARD_NAME', 'Marshall_1960A_G12M_Edge' if rex else 'Mesa_4x12_V30_PosA')], 'EVERY FILE NAME STARTS WITH IT')
+    y = field(y + 0.35, 'NOTES', ['G12M 25, SM57 on the cone edge.', 'Captured 2026-10-30.', ''] if rex else
+              ['SM57 1 in back, cap edge. R121 6 in,', 'centre. Master on 3, bright off.', ''], 'SAVED IN REPORT.JSON')
+    field(y + 0.35, 'SAVE TO', ['~/Music/IR Capture/Marshall_1960A_G1...' if rex else '~/Music/IR Capture'])
+    im = age_paper(P_.im, P_.rng)
+    if rex: im = stamp(im, 'RE-EXPORT', (150, 34, 30), w - 1.4, 6.05, px, 6.6, -4.0, P_.rng, right=True)
+    im.save(path)
 
 
-def unit_files():
-    """4U: the capture card in its frame; the files to make as latching keys; CHANGE (the save folder), RE-EXPORT OLD."""
+def stamp(im, txt, col, x, y, px, sw_cm, turn, rng, right=False):
+    """take_sheet's rubber stamp (a double box, turned, the ink uneven and broken) at (x, y) cm, its top right corner
+    there when right."""
+    cm = lambda v: int(v * px)
+    sw, sh = cm(sw_cm), cm(2.2)
+    st = Image.new('L', (sw, sh), 0); sd = ImageDraw.Draw(st)
+    sd.rectangle([cm(0.1), cm(0.1), sw - cm(0.1), sh - cm(0.1)], outline=255, width=cm(0.12))
+    sd.rectangle([cm(0.3), cm(0.3), sw - cm(0.3), sh - cm(0.3)], outline=255, width=max(1, cm(0.04)))
+    fs = ImageFont.truetype(os.path.join(FONTS, 'BarlowSemiCondensed-700-normal.ttf'), int(1.1 * px))
+    tr = 0.14 * fs.size
+    wsum = sum(fs.getlength(c) for c in txt) + tr * (len(txt) - 1); xx = (sw - wsum) / 2
+    bb = fs.getbbox('H')
+    for c in txt:
+        sd.text((xx, sh / 2 - (bb[1] + bb[3]) / 2), c, font=fs, fill=255); xx += fs.getlength(c) + tr
+    n1 = np.asarray(Image.fromarray((rng.random((sh, sw)) * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(2.2)), np.float32) / 255
+    n2 = np.asarray(Image.fromarray((rng.random((sh // 6 + 1, sw // 6 + 1)) * 255).astype(np.uint8)).resize((sw, sh), Image.BICUBIC), np.float32) / 255
+    sa = np.asarray(st, np.float32) / 255 * np.clip((n1 - 0.36) * 6, 0, 1) * (0.55 + 0.45 * n2)
+    st = Image.fromarray((sa * 225).astype(np.uint8)).rotate(turn, resample=Image.BICUBIC, expand=True)
+    im = im.copy()
+    im.paste(Image.new('RGB', st.size, col), (cm(x) - (st.size[0] if right else 0), cm(y)), st)
+    return im
+
+
+def unit_files(rex=False):
+    """4U: the capture card in its frame; the files to make as latching keys; CHANGE (the save folder), RE-EXPORT OLD.
+    (11-12, tenth chat) rex: the re-export's: the past capture's card, stamped; PAST CAPTURE: CHOOSE."""
     import ircapture_legends as LG
     K.set_seed('rack-files')
     s, cam, h = unit_scene(4)
@@ -1628,7 +1692,7 @@ def unit_files():
     rack_panel(4, 'bronze', 'files')
     cw_, ch_ = 24.2, 13.6
     xc_, ysh = -21.3 + 0.8 + cw_ / 2, 0.75
-    fp = os.path.join(OUT, 'card-capture-print.png'); capture_card(fp, cw_, ch_)
+    fp = os.path.join(OUT, 'card-capture-print%s.png' % ('-rex' if rex else '')); capture_card(fp, cw_, ch_, rex=rex)
     with moved(xc_, ysh, 0): sheet(cw_, ch_, fp, 'capcard', curl=0.2)
     card_frame(cw_, ch_, ysh, xc_, 'cfcap')
     on = set(os.environ.get('IRC_FILES_ON', 'universal,minphase').split(','))
@@ -1640,12 +1704,17 @@ def unit_files():
         for i, (t, nm, tid) in enumerate(keys):
             with moved(cx, 3.85 - i * 2.75, 0): key(None, lit=tid in on, text=t, vname=nm)
     y = -6.55; x = 5.3
-    engrave('SAVE TO', x + 1.25, y, 0.44, track=0.14); x += 2.75
-    for lid in ('change', 'reexport-past'):
-        wk = K.legend_width(LG.LEGENDS[lid][0], 'std') + 2 * TK.KEY['bezel']
-        with moved(x + wk / 2, y, 0): key(lid)
-        x += wk + 0.7
-    shoot(s, cam, 'unit-files', PW, h)
+    if rex:
+        engrave('PAST CAPTURE', x + 2.1, y, 0.44, track=0.14); x += 4.5
+        wk = K.legend_width('CHOOSE', 'std') + 2 * TK.KEY['bezel']
+        with moved(x + wk / 2, y, 0): key(None, text='CHOOSE', vname='Choose a past capture')
+    else:
+        engrave('SAVE TO', x + 1.25, y, 0.44, track=0.14); x += 2.75
+        for lid in ('change', 'reexport-past'):
+            wk = K.legend_width(LG.LEGENDS[lid][0], 'std') + 2 * TK.KEY['bezel']
+            with moved(x + wk / 2, y, 0): key(lid)
+            x += wk + 0.7
+    shoot(s, cam, 'unit-files' + ('-rex' if rex else ''), PW, h)
 
 
 def unit_sweep(cover=True):
@@ -1823,11 +1892,147 @@ def unit_plotter():
     shoot(s, cam, 'unit-plotter', PW, h)
 
 
+# ---------------------------------------------------------------------------------------------------------------------
+# (11-12, tenth chat) the fifth proof: the DAW route and the re-export as rack units
+
+def unit_signal():
+    """3U: the DAW route's test signal: RATE kHz and LEVEL dBFS rotaries, the sweep's four thumbwheels; SAVE SIGNAL,
+    LOAD SIGNAL; RECORD HERE (back to the app route). The connect unit's place in the DAW route."""
+    K.set_seed('rack-signal')
+    s, cam, h = unit_scene(3)
+    backing(h)
+    rack_panel(3, 'bronze', 'signal')
+    engrave('TEST', -18.7, 2.95, 0.62); engrave('SIGNAL', -18.7, 1.75, 0.62)
+    yt = 2.15
+    selector(-10.9, yt, ['44.1', '48', '88.2', '96'], 3, step=32.0, r_lab=2.7, legend='RATE kHz')
+    selector(-3.3, yt, ['-6', '-12', '-18', '-24'], 1, step=32.0, r_lab=2.7, legend='LEVEL dBFS')
+    D = ['%d' % i for i in range(10)]; HALF = ['0', '5'] * 5
+    x = 2.6
+    for lab, g in (('SWEEPS', [(D, 0), (D, 5)]), ('LENGTH  S', [(D, 0), (D, 6), '.', (HALF, 0)]),
+                   ('GAP  S', [(D, 0), (D, 2), '.', (HALF, 0)]), ('WARM-UP', [(D, 1)])):
+        nm = sum(1 for q in g if q != '.'); W = nm * TW['pitch'] + (0.35 if '.' in g else 0) + 2 * TW['end']
+        thumbwheel(x + W / 2, yt - 0.2, g, lab.split()[0].lower(), legend=lab)
+        x += W + 0.95
+    import ircapture_legends as LG
+    yk = -4.25; x = -14.4
+    for lid in ('save-signal', 'load-signal'):
+        wk = K.legend_width(LG.LEGENDS[lid][0], 'std') + 2 * TK.KEY['bezel']
+        with moved(x + wk / 2, yk, 0): key(lid)
+        x += wk + 0.7
+    wk = K.legend_width(LG.LEGENDS['record-here'][0], 'std') + 2 * TK.KEY['bezel']
+    with moved(21.3 - 0.6 - wk / 2, yk, 0): key('record-here')
+    finish_glass()
+    shoot(s, cam, 'unit-signal', PW, h)
+
+
+TRK = dict(w=29.0, h=14.6, top=3.95, pitch=1.3, n=8)
+
+
+def track_sheet(path, w, h, px=110):
+    """The DAW files' track sheet: a printed form, one line a track, typed by the app (the file, the mic's name, its
+    rate, bits and length). The sample: three mics and a reference."""
+    P_ = Pen(w, h, px, (246, 234, 200), 22); d = P_.d
+    ox = (104, 30, 24); rule = (150, 120, 104)
+    fh = P_.font('BarlowSemiCondensed-700-normal.ttf', 0.8); fl = P_.font('BarlowSemiCondensed-600-normal.ttf', 0.48)
+    fn = P_.font('BarlowSemiCondensed-700-normal.ttf', 0.56)
+    ft = P_.font(TYPED, 0.66)
+    m = 1.0
+    P_.spaced(m, 1.05, 'TRACK SHEET', fh, ox, 0.14)
+    P_.spaced(w - m, 1.15, 'DAW FILES', fl, ox, 0.16, 'r')
+    d.line([P_.p(m, 1.85), P_.p(w - m, 1.85)], fill=ox, width=P_.c(0.07))
+    d.line([P_.p(m, 1.98), P_.p(w - m, 1.98)], fill=ox, width=max(1, P_.c(0.02)))
+    cols = [('TRK', 0.0), ('FILE', 1.4), ('MIC NAME', 14.0), ('kHz', 21.0), ('BITS', 23.2), ('SECONDS', 25.0)]
+    for t, x in cols: P_.spaced(m + x + 0.1, 2.85, t, fl, rule, 0.14)
+    rows = [('Mesa 4x12 SM57.wav', 'SM57', '96', '24', '71.0'), ('Mesa 4x12 R121.wav', 'R121', '96', '24', '71.0'),
+            ('Mesa 4x12 Room.wav', 'Room', '96', '24', '71.0'), ('Mesa 4x12 Ref.wav', '', '96', '24', '71.0')]
+    for i in range(TRK['n']):
+        y = TRK['top'] + i * TRK['pitch']
+        P_.spaced(m + 0.35, y, str(i + 1), fn, ox, 0.1)
+        if i < len(rows):
+            f_, nm, k_, b_, sec = rows[i]
+            P_.typed(m + 1.5, y, f_, ft); P_.typed(m + 14.1, y, nm, ft)
+            P_.typed(m + 21.1, y, k_, ft); P_.typed(m + 23.3, y, b_, ft); P_.typed(m + 25.1, y, sec, ft)
+        d.line([P_.p(m, y + 0.62), P_.p(w - m, y + 0.62)], fill=rule, width=max(1, P_.c(0.02)))
+    yb = TRK['top'] + (TRK['n'] - 1) * TRK['pitch'] + 0.62
+    for x in (1.4, 14.0, 21.0, 23.2, 25.0): d.line([P_.p(m + x - 0.15, 2.35), P_.p(m + x - 0.15, yb)], fill=rule, width=max(1, P_.c(0.02)))
+    age_paper(P_.im, P_.rng).save(path)
+
+
+def side_toggle(pos, sc=0.78):
+    """toggle()'s bat-handle switch mounted on its side: thrown left (-1), centre (0) or right (+1)."""
+    ch = SG.nickel('tgl', seed=4)
+    nut = lathe('tnut', [(0.62 * sc, 0.0), (0.62 * sc, 0.16 * sc), (0.56 * sc, 0.2 * sc), (0.34 * sc, 0.2 * sc)], 6, smooth=False)
+    nut.data.materials.append(ch)
+    col = lathe('tcol', [(0.36 * sc, 0.0), (0.36 * sc, 0.42 * sc), (0.3 * sc, 0.5 * sc), (0.16 * sc, 0.5 * sc)], 48); col.data.materials.append(ch)
+    bat = lathe('tbat', [(a * sc, b * sc) for a, b in [(0.13, 0.0), (0.16, 0.6), (0.21, 1.4), (0.25, 1.85), (0.24, 2.05), (0.15, 2.18), (0.0, 2.2)]], 48)
+    bat.data.materials.append(ch)
+    bat.location = (0, 0, 0.3 * sc); bat.rotation_euler = (0, math.radians(24 * pos), 0)
+
+
+def unit_tracks():
+    """4U: the DAW files: the track sheet in its card frame; beside each line a small toggle on its side, MIC / OFF /
+    REF (the patch unit's three uses, thrown left, centre, right); ADD FILES and CLEAR. Files may also be dropped on it.
+    One unit for every eight tracks."""
+    K.set_seed('rack-tracks')
+    s, cam, h = unit_scene(4)
+    backing(h)
+    rack_panel(4, 'black', 'tracks')
+    sw, sh = TRK['w'], TRK['h']
+    xs, ysh = -21.3 + 0.8 + sw / 2, 0.55
+    fp = os.path.join(OUT, 'track-sheet-print.png'); track_sheet(fp, sw, sh)
+    with moved(xs, ysh, 0): sheet(sw, sh, fp, 'tracks', curl=0.2)
+    card_frame(sw, sh, ysh, xs, 'cftrk')
+    xt = xs + sw / 2 + 3.5
+    top = ysh + sh / 2
+    engrave('MIC', xt - 1.45, top - 2.85, 0.44, track=0.12); engrave('OFF', xt, top - 2.85, 0.44, track=0.12)
+    engrave('REF', xt + 1.45, top - 2.85, 0.44, track=0.12)
+    pos = [-1, -1, -1, 1, 0, 0, 0, 0]
+    for i in range(TRK['n']):
+        with moved(xt, top - TRK['top'] - i * TRK['pitch'], 0): side_toggle(pos[i])
+    import ircapture_legends as LG
+    xk = 17.65
+    wk = K.legend_width('ADD FILES', 'std') + 2 * TK.KEY['bezel']
+    with moved(xk, 3.4, 0): key(None, text='ADD FILES', vname='Choose files…')
+    with moved(xk, 0.55, 0): key(None, text='CLEAR', vname='Clear the files')
+    engrave('TRACKS', xk, -6.55, 0.5)
+    shoot(s, cam, 'unit-tracks', PW, h)
+
+
+def unit_go(kind):
+    """1U: the route's last key. daw: MAKE IRS (lit while the files are made); rex: CANCEL and RE-EXPORT."""
+    import ircapture_legends as LG
+    K.set_seed('rack-go-' + kind)
+    s, cam, h = unit_scene(1)
+    backing(h)
+    rack_panel(1, 'bronze', 'go-' + kind)
+    if kind == 'daw':
+        engrave('FROM THE TRACKS', -15.0, 0.0, 0.5)
+        wk = K.legend_width('MAKE IRS', 'std') + 2 * TK.KEY['bezel']
+        with moved(21.3 - 0.6 - wk / 2, 0, 0): key(None, text='MAKE IRS', vname='Make IRs')
+    else:
+        engrave('FROM THE RAW TAKE', -14.4, 0.0, 0.5)
+        x = 21.3 - 0.6
+        for lid in ('reexport', 'cancel'):
+            wk = K.legend_width(LG.LEGENDS[lid][0], 'std') + 2 * TK.KEY['bezel']
+            with moved(x - wk / 2, 0, 0): key(lid)
+            x -= wk + 0.7
+    shoot(s, cam, 'unit-go-' + kind, PW, h)
+
+
+DAW_STEPS = ['TEST SIGNAL', 'RECORD IN DAW', 'MAKE IRS', 'RESULTS']
+REX_STEPS = ['PAST CAPTURE', 'FILES', 'RE-EXPORT', 'RESULTS']
+
+
 UNITS = {'step': unit_step, 'patch': unit_patch, 'meters': unit_meters, 'gap': unit_gap, 'deck': unit_deck,
          'results': unit_results, 'cheeks': unit_cheeks, 'chart': unit_chart, 'preflight': unit_preflight,
          'nammeters': unit_nammeters, 'cart': unit_cart,
          'connect': unit_connect, 'files': unit_files, 'sweep': unit_sweep, 'sweep-open': lambda: unit_sweep(False),
-         'formats': unit_formats, 'formats-open': lambda: unit_formats(False), 'plotter': unit_plotter}
+         'formats': unit_formats, 'formats-open': lambda: unit_formats(False), 'plotter': unit_plotter,
+         # (11-12, tenth chat) the fifth proof
+         'step-daw': lambda: unit_step(2, (0, 1), DAW_STEPS, '-daw'), 'step-rex': lambda: unit_step(1, (0,), REX_STEPS, '-rex'),
+         'chart-daw': lambda: unit_chart(True), 'signal': unit_signal, 'tracks': unit_tracks,
+         'go-daw': lambda: unit_go('daw'), 'go-rex': lambda: unit_go('rex'), 'files-rex': lambda: unit_files(True),
+         'preflight-trouble': lambda: unit_preflight(True)}
 
 
 def main():
