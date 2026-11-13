@@ -203,7 +203,9 @@ jobs:
           # (11-12) the set-up units: connect and files; sweep and file options with the covers shut, then lifted
           for shot in "connect open connect" "sweep shut setup-shut" "sweep open setup-open"; do
             set -- $shot
-            "$EXE" --cab-tab --scroll-to $1 --covers $2 & PID=$!
+            # (each flag with a value first: AppKit pairs "-key value", and a bare word left over is opened as a
+            # document, which stops the window from opening)
+            "$EXE" --scroll-to $1 --covers $2 --cab-tab & PID=$!
             sleep 7
             kill -0 $PID || { echo "::error title=Smoke test::The app quit or crashed scrolling to the $1 unit"; exit 1; }
             screencapture -x dist/screenshot-$3.png || echo "screenshot failed"
