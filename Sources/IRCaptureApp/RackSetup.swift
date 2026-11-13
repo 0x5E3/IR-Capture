@@ -52,7 +52,13 @@ extension RackKit {
         let wheels: Wheels
     }
     /// The capture card: a printed form (sheet cm, entries by their baselines) the app types into.
+    /// (11-13) `files-rex`: the stamp the app puts on the past capture's card (its top right corner at right, top cm on
+    /// the card, turned `turn` degrees counterclockwise; the ink at pxPerPoint).
     struct Files: Decodable {
+        struct Stamp: Decodable {
+            let picture: String; let size: [CGFloat]; let pxPerPoint: CGFloat
+            let right: CGFloat; let top: CGFloat; let turn: Double; let word: String
+        }
         struct Field: Decodable {
             let key: String; let label: String; let labelY: CGFloat; let note: String?
             let rules: [CGFloat]; let baselines: [CGFloat]; let x0: CGFloat; let x1: CGFloat
@@ -61,6 +67,7 @@ extension RackKit {
         let sheet: [CGFloat]
         let form: Form
         let keys: [KeyRect]
+        var stamp: Stamp? = nil
     }
     /// sweep and formats.
     struct Setup: Decodable {
@@ -365,6 +372,8 @@ extension RackKit {
             if let c = u.connect { f.append(c.wheels.picture) }
             for s in [u.sweep, u.formats].compactMap({ $0 }) { f += [s.wheels.picture] + RackCoverPicture.pictures(s.cover) }
             if let p = u.plotter { f += p.parts.values.map(\.picture) }
+            if let s = u.signal { f.append(s.wheels.picture) }
+            if let st = u.files?.stamp { f.append(st.picture) }
             return f
         }
     }
@@ -687,7 +696,10 @@ struct RackSweepUnit: View {
         return "\(rate), \(lvl), \(m.nSweeps) sweeps of \(String(format: "%g", m.duration)) s, gap \(String(format: "%g", m.gap)) s, \(m.discard) warm-up"
     }
 
-    func wheelSettings(_ w: RackKit.Wheels) -> [WheelSetting] {
+    func wheelSettings(_ w: RackKit.Wheels) -> [WheelSetting] { Self.wheelSettings(w, m) }
+
+    /// SWEEPS, LENGTH, GAP and WARM-UP (the sweep unit's and, in the DAW route, the test signal unit's).
+    static func wheelSettings(_ w: RackKit.Wheels, _ m: AppModel) -> [WheelSetting] {
         let halves: (Double) -> [Int] = { v in [Int(v) / 10 % 10, Int(v) % 10, v - v.rounded(.down) >= 0.5 ? 5 : 0] }
         return [
             WheelSetting(modules: w.modules("sweeps"), figures: { v in [Int(v) / 10 % 10, Int(v) % 10] }, steps: [10, 1], range: 2...16,

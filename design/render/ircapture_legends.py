@@ -100,10 +100,16 @@ LEGENDS = {
     'c-32f':         ('32 FLOAT', 'std', ['custom 32 FLOAT']),
     'c-set':         ('KEEP TIMING', 'std', ['custom KEEP TIMING']),
     'c-individual':  ('EACH MIC', 'std', ['custom EACH MIC']),
+    # (11-13) the fifth proof's units (approved): the DAW route's track sheet and its last key, the re-export's past
+    # capture (each key's wear as the proof's: its name picks it)
+    'r-add-files':   ('ADD FILES', 'std', ['Choose files…']),
+    'r-clear':       ('CLEAR', 'std', ['Clear the files']),
+    'r-make-irs':    ('MAKE IRS', 'std', ['Make IRs']),
+    'r-choose':      ('CHOOSE', 'std', ['Choose a past capture']),
 }
 # the ids above that are rendered only inside a rack unit (ircapture_kit.py's `legends` and ircapture_lettering_post.py
 # skip them: they have no printed-key picture of their own)
-RACK_ONLY = {k for k in LEGENDS if k.startswith(('f-', 'c-')) or k == 'print'}
+RACK_ONLY = {k for k in LEGENDS if k.startswith(('f-', 'c-', 'r-')) or k == 'print'}
 
 KEY_SALT = 14007
 VARIANTS = 'abcdef'

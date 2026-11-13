@@ -112,7 +112,8 @@ struct ContentView: View {
         .background(WorkshopWall().ignoresSafeArea())
         .sheet(isPresented: $m.showWelcome) { WelcomeSheet().environmentObject(m).workshopDefaults(.panel) }
         .sheet(item: $m.helpPage) { p in HelpSheet(page: p).environmentObject(m).workshopDefaults(.panel) }
-        .sheet(isPresented: Binding(get: { m.reexportFolder != nil }, set: { if !$0 { m.reexportFolder = nil } })) {
+        // (11-13) the re-export is a bay of the Cab IR rack when its units are in the kit (CabReexportBay)
+        .sheet(isPresented: Binding(get: { m.reexportFolder != nil && !CabReexportBay.available }, set: { if !$0 { m.reexportFolder = nil } })) {
             ReexportSheet().environmentObject(m).workshopDefaults(.panel)
         }
         .onAppear { runAutomation() }
@@ -125,7 +126,8 @@ struct ContentView: View {
                 if let r = m.namResult { NAMResultsView(r: r).id("namresults") }
             } else {
                 CabJob()
-                if let r = m.result { ResultsView(r: r).id("results") }
+                // (11-13) the re-export bay stands alone: the last take's results come back when it is left
+                if let r = m.result, m.reexportFolder == nil || !CabReexportBay.available { ResultsView(r: r).id("results") }
             }
         }
     }
@@ -191,6 +193,10 @@ struct ContentView: View {
                 proxy.scrollTo("machine", anchor: .top)
             }
             .onChange(of: m.namResult?.folder) { _ in withAnimation { proxy.scrollTo("namresults", anchor: .top) } }
+            // (11-13) a route changed (IMPORT DAW, RECORD HERE, a re-export chosen or left): to the top of its bay
+            .onChange(of: m.cabImport) { _ in proxy.scrollTo("baytop", anchor: .top) }
+            // (a finished re-export leaves its bay while still busy: the results' own scroll then stands)
+            .onChange(of: m.reexportFolder) { f in if f != nil || m.busy == nil { proxy.scrollTo("baytop", anchor: .top) } }
         }
     }
 
@@ -200,6 +206,27 @@ struct ContentView: View {
         // CI hook (11-12): the set-up units' smoked covers shut or lifted
         if let i = args.firstIndex(of: "--covers"), i + 1 < args.count {
             for k in ["rack.cover.sweep", "rack.cover.formats"] { UserDefaults.standard.set(args[i + 1] != "open", forKey: k) }
+        }
+        // CI hooks (11-13, the fifth proof): the DAW route with the simulated files on its track sheet (not processed),
+        // a past capture open in the re-export bay, a fault typed in the pre-flight's TROUBLE box
+        if let i = args.firstIndex(of: "--daw-files"), i + 1 < args.count {
+            m.job = .cab; m.cabImport = true
+            let dir = URL(fileURLWithPath: args[i + 1])
+            m.addLogicFiles(["logic_close", "logic_room", "logic_ref"].map { dir.appendingPathComponent($0 + ".wav") })
+            for c in m.logicChannels where c.role == .mic {
+                if let k = m.logicChannels.firstIndex(where: { $0.id == c.id }) { m.logicChannels[k].name = c.name.contains("close") ? "SM57" : "Room" }
+            }
+            return
+        }
+        if let i = args.firstIndex(of: "--reexport"), i + 1 < args.count {
+            m.job = .cab; m.cabImport = false
+            m.reexportFolder = URL(fileURLWithPath: args[i + 1])
+            return
+        }
+        if let i = args.firstIndex(of: "--trouble"), i + 1 < args.count {
+            m.job = .cab; m.cabImport = false
+            m.errorText = args[i + 1]
+            return
         }
         if let i = args.firstIndex(of: "--demo"), i + 1 < args.count {
             // `IR Capture --demo <sim_out>` processes the simulated Logic recordings through Import DAW recordings.
@@ -502,6 +529,8 @@ struct Shelf: View {
     @EnvironmentObject var m: AppModel
     var status: (Lamp.Glow, String) {
         if m.errorText != nil || m.levelError != nil || m.namError != nil || m.namLevelError != nil { return (.red, "Error: see the message") }
+        // (11-13) the DAW route's and the re-export's faults (shown in a message window)
+        if (cabRoute == "daw" && m.logicMessage != nil) || (cabRoute == "rex" && m.reexportMessage != nil) { return (.red, "Error: see the message") }
         if let b = m.busy {
             switch b {
             case .preparing: return (.amber, "Preparing")
@@ -523,6 +552,8 @@ struct Shelf: View {
     /// The VFD's line: the status (or, during a Cab IR level check, the advice for the input that most needs it), the
     /// interface shortened to fit, the rate.
     func vfdText(_ st: (Lamp.Glow, String)) -> String {
+        // (11-13, the fifth proof) CabDeckStatus's lines, the DAW route's and the re-export's, on the VFD alone
+        if let l = cabLine { return vfdLine(left: l, middle: "", right: "", n: VFDStatusLine.n) }
         var advice = m.job == .cab && m.levelRunning && RackMeterBridge.available ? m.levelGuidance : nil
         // (the fourth proof) an unused input with signal: the line asks what it is; the input's own toggle answers
         if m.job == .cab, RackConnectUnit.available, m.busy == nil, advice == nil || advice == "LEVELS OK", let s = idleLine { advice = s }
@@ -538,6 +569,80 @@ struct Shelf: View {
         if let r = m.idleSignals.first { return "SIGNAL ON IN \(r.channel + 1)  MIC OR REF" }
         return nil
     }
+    /// (11-13, the fifth proof) Which Cab IR route is drawn in the new units, if any: "rec" (with the pre-flight's TROUBLE
+    /// box), "daw", "rex".
+    var cabRoute: String? {
+        guard m.job == .cab else { return nil }
+        if m.reexportFolder != nil { return CabReexportBay.available ? "rex" : nil }
+        if m.cabImport { return CabDAWBay.available ? "daw" : nil }
+        return RackPreflightUnit.available && RackPreflightUnit.troubleAvailable ? "rec" : nil
+    }
+    /// (11-13, the fifth proof) The VFD's line for what CabDeckStatus said under the deck, and for the other two routes:
+    /// a fault (the lamp red; typed in the pre-flight's TROUBLE box, or in a message window in the other routes), the
+    /// level check's phase, the capture, the IRs being made (the lamp amber), the capture blocked (the pre-flight's red
+    /// cross says why), the test signal saved, the tracks not ready. nil: the line as before (status, guidance, idle).
+    var cabLine: String? {
+        guard let route = cabRoute else { return nil }
+        let fault = m.errorText != nil || (route == "rec" && m.levelError != nil) || (route == "rex" && m.reexportMessage != nil)
+            || (route == "daw" && m.logicMessage != nil)
+        if fault { return route == "rec" ? "FAULT  SEE PRE-FLIGHT" : "FAULT  SEE THE MESSAGE" }
+        if let b = m.busy {
+            switch b {
+            case .preparing: return "GETTING READY"
+            case .recording: return "CAPTURE  KEEP ROOM QUIET"
+            case .processing(let t): return (route == "rex" ? "RE-EXPORT  " : "MAKING IRS  ") + Self.processingWords(t)
+            case .namRecording: return nil
+            }
+        }
+        if route == "rec" {
+            if m.levelRunning {
+                if let p = m.levelPhase, p.hasPrefix("Measuring room noise") { return "KEEP QUIET  NOISE CHECK" }
+                if m.levelChoice == 0 && !m.autoLevelSettled { return "SETTING SWEEP LEVEL  \(Int(m.autoLevel))" }
+                return nil
+            }
+            if idleLine == nil, m.captureProblem != nil { return "NOT READY  SEE PRE-FLIGHT" }
+            return nil
+        }
+        if route == "daw" {
+            if let s = m.signalMessage, s.hasPrefix("Saved") { return "TEST SIGNAL SAVED" }
+            if let s = m.signalMessage, s.hasPrefix("Loaded") { return "SIGNAL SETTINGS LOADED" }
+            if let p = m.logicProblem { return Self.dawProblemWords(p, m) }
+            return "READY TO MAKE IRS"
+        }
+        return m.outputProblem != nil ? "NOT READY  SEE FILES" : "READY TO RE-EXPORT"
+    }
+    /// The processing step in a few words for the VFD (after MAKING IRS, 14 characters).
+    static func processingWords(_ t: String) -> String {
+        if t.hasPrefix("Deconvolving"), let o = t.range(of: "("), let c = t.range(of: ")", range: o.upperBound..<t.endIndex) {
+            let q = t[o.upperBound..<c.lowerBound].split(separator: " ")         // "2 of 3"
+            if q.count == 3 { return "MIC \(q[0]) OF \(q[2])" }
+        }
+        if t.hasPrefix("Resampling to ") { return "RATE " + t.dropFirst(14).uppercased() }
+        let table: [(String, String)] = [("Saving the raw", "RAW TAKE"), ("Reading", "READING"), ("Building the inverse", "INVERSE SWEEP"),
+                                         ("Finding the sweeps", "FINDING SWEEPS"), ("Measuring noise", "NOISE AND DIST"),
+                                         ("Computing", "IMPULSES"), ("Making minimum-phase", "MIN PHASE"),
+                                         ("Writing", "WRITING FILES"), ("Saving files", "WRITING FILES")]
+        for (a, b) in table where t.hasPrefix(a) { return b }
+        return String(t.uppercased().prefix(14))
+    }
+    /// The DAW route's logicProblem in a few words (the whole sentence is the VFD's tooltip).
+    static func dawProblemWords(_ p: String, _ m: AppModel) -> String {
+        if m.logicChannels.isEmpty { return "ADD THE TRACKS" }
+        if p.hasPrefix("The files have different sample rates") { return "TRACKS DIFFER IN RATE" }
+        if p.hasPrefix("The recordings are"), p.contains("kHz but"), let fs = m.logicChannels.first?.fs {
+            return "TRACKS \(rateTag(fs).dropLast())K  SET RATE"
+        }
+        if p.contains("shorter than") { return "TRACKS TOO SHORT" }
+        if p == m.outputProblem { return "NOT READY  SEE FILES" }
+        return "NOT READY  CHECK NAMES"
+    }
+    /// The VFD's tooltip in the new routes: the whole sentence behind the line.
+    var cabHelp: String? {
+        guard let route = cabRoute else { return nil }
+        if route == "rec" { return (m.levelError ?? m.errorText ?? (idleLine == nil ? m.captureProblem : nil)).map { $0 + "\n" } }
+        if route == "daw" { return (m.errorText ?? m.logicMessage ?? m.signalMessage ?? m.logicProblem).map { $0 + "\n" } }
+        return (m.reexportMessage ?? m.errorText ?? m.outputProblem ?? m.reexportFolder?.path).map { $0 + "\n" }
+    }
     var idleHelp: String? {
         if let c = m.refCandidate, m.refInput == nil { return "Input \(c + 1) is probably a reference tap. Its signal arrives first and contains no cab or room sound. Set its switch on the inputs unit to REF." }
         if let r = m.idleSignals.first { return "Signal on Input \(r.channel + 1) (\(Int(r.peakDBFS.rounded())) dBFS). Set its switch on the inputs unit to MIC or REF." }
@@ -548,7 +653,7 @@ struct Shelf: View {
         if let p = RackShelf.parts {
             // (Phase 7a, 11-12) the shelf from below at the bay's scale
             RackShelf(parts: p, job: m.job, jobsLocked: m.busy != nil, lamp: st.0, vfdText: vfdText(st),
-                      vfdHelp: m.job == .cab && RackConnectUnit.available ? (idleHelp.map { $0 + "\n" } ?? "") + rig : rig,
+                      vfdHelp: (cabHelp ?? "") + (m.job == .cab && RackConnectUnit.available ? (idleHelp.map { $0 + "\n" } ?? "") + rig : rig),
                       statusLabel: st.1, setJob: { m.job = $0 }, openHelp: { m.helpPage = .quickStart })
         } else {
             oldShelf(st)

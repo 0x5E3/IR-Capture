@@ -360,8 +360,10 @@ def key(lid, lit=False, down=False, text=None, size=None, vname=None):
     return w + 2 * bz, h + 2 * bz
 
 
-TGL = dict(L=float(os.environ.get('IRC_TGL_LEN', '2.2')), throw=float(os.environ.get('IRC_TGL_THROW', '24')),
-           tip=os.environ.get('IRC_TGL_TIP', ''))
+# (11-13, Lowell picked C from the toggle proof) a 2.9 cm bat thrown 34 degrees, a cream push-on cap over its outer half
+# (the chicken heads' family): the throw reads straight on, OFF too (a cream dot in the nut). A was 2.2 cm, 24 degrees.
+TGL = dict(L=float(os.environ.get('IRC_TGL_LEN', '2.9')), throw=float(os.environ.get('IRC_TGL_THROW', '34')),
+           tip=os.environ.get('IRC_TGL_TIP', '#e2d6bb'))
 BAT = [(0.13, 0.0), (0.16, 0.6), (0.21, 1.4), (0.25, 1.85), (0.24, 2.05), (0.15, 2.18), (0.0, 2.2)]
 
 
@@ -1124,7 +1126,7 @@ def daw_card(path, w, h, px=110):
     P_.d.line([P_.p(1.0, 2.0), P_.p(w - 1.0, 2.0)], fill=ox, width=P_.c(0.06))
     ft = P_.font(TYPED, 0.74)
     lines = [('1.', 'Project at the test'), ('', 'signal\'s RATE. The sweep'), ('', 'WAV on a track at bar 1.'),
-             ('2.', 'That track only to the'), ('', 'output to the amp.'), ('', 'Monitors muted.'),
+             ('2.', 'That track only to the'), ('', 'output to the amp.'), ('', 'Monitors off.'),
              ('3.', 'A track for each mic,'), ('', 'named after it. The'), ('', 'reference track: Ref.'), ('', 'No plug-ins.'),
              ('4.', 'Play it. Each preamp to'), ('', 'about -6 dBFS. No clip.'),
              ('5.', 'Record one full pass.'),
@@ -1984,7 +1986,7 @@ def track_sheet(path, w, h, px=110):
 
 def side_toggle(pos, sc=None):
     """toggle()'s bat-handle switch mounted on its side: thrown left (-1), centre (0) or right (+1)."""
-    sc = float(os.environ.get('IRC_SIDE_SC', '0.78')) if sc is None else sc
+    sc = float(os.environ.get('IRC_SIDE_SC', '0.9')) if sc is None else sc     # (11-13) C: 0.9 (A 0.78)
     ch = SG.nickel('tgl', seed=4)
     nut = lathe('tnut', [(0.62 * sc, 0.0), (0.62 * sc, 0.16 * sc), (0.56 * sc, 0.2 * sc), (0.34 * sc, 0.2 * sc)], 6, smooth=False)
     nut.data.materials.append(ch)

@@ -568,26 +568,35 @@ def unit_chart():
 PF_W, PF_H = 40.0, 13.4
 
 
-def _pf_form():
+def _pf_form(trouble=False):
     m = 1.3; asc = 0.78 * TYPED_CM
     rule, rh, rows = 3.75, 1.25, 7
-    return {
+    F = {
         'w': PF_W, 'h': PF_H, 'margin': m, 'typedCm': TYPED_CM, 'advance': 0.6,
         'title': 'BEFORE CAPTURE', 'headY': 2.85, 'rule': rule, 'rowH': rh, 'rows': rows,
         'baseline0': round(rule + 0.27 + asc, 3),
         'cols': [dict(key=k, label=l, x=m + x) for k, l, x in (('item', 'ITEM', 0.0), ('reading', 'READING', 8.6), ('ok', 'OK', 34.6))],
         'right': PF_W - m,
     }
+    if trouble:
+        # (11-13, the fifth proof) the TROUBLE box at the form's foot: what CabDeckStatus said in red under the deck, typed
+        # by the app in the ribbon's red half, three lines under the READING column
+        tr = round(rule + rows * rh + 0.45, 3)
+        F['trouble'] = dict(rule=tr, labelY=round(tr + 0.72, 3), x0=round(m + 8.7, 3), x1=round(PF_W - m, 3),
+                            baselines=[round(tr + 0.55 + asc + i * 0.9, 3) for i in range(3)])
+        F['h'] = round(tr + 0.55 + 3 * 0.9 + 0.45, 3)
+    return F
 
 
 PF_FORM = _pf_form()
+PF_FORM_T = _pf_form(True)
 
 
-def preflight_form(path, px=120):
-    """The printed form, nothing typed on it: the take sheet's stock and ink."""
+def preflight_form(path, px=120, F_=None):
+    """The printed form, nothing typed on it: the take sheet's stock and ink. (11-13) With a TROUBLE box when F_ has one."""
     from PIL import Image, ImageDraw, ImageFont
     import numpy as np
-    F_ = PF_FORM; w, h = F_['w'], F_['h']
+    F_ = F_ or PF_FORM; w, h = F_['w'], F_['h']
     W, H = int(w * px), int(h * px)
     im = Image.new('RGB', (W, H), (246, 234, 200)); d = ImageDraw.Draw(im)
     F = lambda name, cm_: ImageFont.truetype(os.path.join(R.FONTS, name), int(cm_ * px))
@@ -614,26 +623,35 @@ def preflight_form(path, px=120):
         d.line([(cm(m), cm(y)), (cm(R_), cm(y))], fill=rule, width=hair)
     for c in F_['cols'][1:]:
         d.line([(cm(c['x'] - 0.25), cm(F_['headY'] - 0.1)), (cm(c['x'] - 0.25), cm(F_['rule'] + F_['rows'] * F_['rowH']))], fill=rule, width=hair)
+    if 'trouble' in F_:
+        T_ = F_['trouble']
+        d.line([(cm(m), cm(T_['rule'])), (cm(R_), cm(T_['rule']))], fill=ox, width=cm(0.05))
+        spaced(cm(m + 0.1), cm(T_['labelY']), 'TROUBLE', fl, ox)
     R.age_paper(im, np.random.default_rng(6)).save(path)
 
 
-def unit_preflight():
+def unit_preflight(trouble=False):
+    """4U, or (11-13, the fifth proof) `preflight-trouble`: 5U, the form with its TROUBLE box. The app types the
+    capture's error there in red; the shelf's lamp goes red and its VFD reads FAULT  SEE PRE-FLIGHT."""
+    F_ = PF_FORM_T if trouble else PF_FORM
+    u = 5 if trouble else 4
+    key = 'preflight-trouble' if trouble else 'preflight'
     K.set_seed('rack-preflight')
-    s, cam, h = R.unit_scene(4)
+    s, cam, h = R.unit_scene(u)
     R.backing(h)
-    R.rack_panel(4, 'bronze', 'preflight')
+    R.rack_panel(u, 'bronze', 'preflight')
     ysh = 0.7
-    fp = os.path.join(OUT, 'preflight-form-print.png')
-    if not os.path.exists(fp): preflight_form(fp)
-    with R.moved(0, ysh, 0): R.sheet(PF_W, PF_H, fp, 'preflight', curl=0.25)
-    R.card_frame(PF_W, PF_H, ysh)
+    fp = os.path.join(OUT, '%s-form-print.png' % key)
+    if not os.path.exists(fp): preflight_form(fp, F_=F_)
+    with R.moved(0, ysh, 0): R.sheet(PF_W, F_['h'], fp, 'preflight', curl=0.25)
+    R.card_frame(PF_W, F_['h'], ysh)
     R.engrave('PRE-FLIGHT', -PF_W / 2 + 2.2, -h / 2 + 1.1, 0.5)
-    L = shoot_base(s, cam, 'rack-preflight', R.PW, h)
-    L['u'] = 4; L['layers'] = {}
+    L = shoot_base(s, cam, 'rack-' + key, R.PW, h)
+    L['u'] = u; L['layers'] = {}
     P_ = lambda x, y: TK.proj(s, cam, (x, y, 0.0))
-    a, b = P_(-PF_W / 2, ysh + PF_H / 2), P_(PF_W / 2, ysh - PF_H / 2)
-    L['preflight'] = dict(sheet=[a[0], a[1], b[0], b[1]], form=PF_FORM)
-    LAY['units']['preflight'] = L; _save()
+    a, b = P_(-PF_W / 2, ysh + F_['h'] / 2), P_(PF_W / 2, ysh - F_['h'] / 2)
+    L['preflight'] = dict(sheet=[a[0], a[1], b[0], b[1]], form=F_)
+    LAY['units'][key] = L; _save()
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -649,25 +667,31 @@ PATCH_N, PATCH_BANKS = 8, 4
 PATCH_X0, PATCH_DX, PATCH_TY = -14.6, 4.75, -0.35
 PATCH_ROWS = {'mic': 0.85, 'off': -0.35, 'ref': -1.55}        # the legends' centres: where a click throws the toggle
 PATCH_THROW = {'mic': 1, 'off': 0, 'ref': -1}
-PATCH_DEG = float(os.environ.get('IRC_PATCH_DEG', '30'))          # the throw (the proof's 24 read weakly straight on)
+PATCH_DEG = float(os.environ.get('IRC_PATCH_DEG', str(R.TGL['throw'])))   # (11-13) C: 34 degrees (was 30; the proof's 24)
 
 
 def _toggle(x, y, ch):
-    """ircapture_rack.toggle, its parts kept: the bat apart so it can be thrown between shots."""
+    """ircapture_rack.toggle, its parts kept: the bat apart so it can be thrown between shots. (11-13) The bat is
+    ircapture_rack._bat: Lowell's pick C (2.9 cm, the cream cap parented to it, so it moves and hides with the bat:
+    _kids)."""
     with R.moved(x, y, 0):
         nut = R.lathe('tnut', [(0.62, 0.0), (0.62, 0.16), (0.56, 0.2), (0.34, 0.2)], 6, smooth=False); nut.data.materials.append(ch)
         nut.rotation_euler = (0, 0, R.math.radians(30 + 7 * (K.seed_of('tn%.1f' % x) % 5)))
         col = R.lathe('tcol', [(0.36, 0.0), (0.36, 0.42), (0.3, 0.5), (0.16, 0.5)], 48); col.data.materials.append(ch)
-        bat = R.lathe('tbat', [(0.13, 0.0), (0.16, 0.6), (0.21, 1.4), (0.25, 1.85), (0.24, 2.05), (0.15, 2.18), (0.0, 2.2)], 48)
-        bat.data.materials.append(ch)
+        bat = R._bat()
         bat.location = (0, 0, 0.3)
     return [nut, col], bat
 
 
-def _plug(x, y):
+def _kids(o):
+    """An object and its children (the bat and its cap)."""
+    return [o] + list(o.children)
+
+
+def _plug(x, y, sc=1.0):
     """A black nylon snap-in hole plug: a low dome on a thin flange."""
     m = R.mat('plug', R.srgb('#0d0c0b'), rough=0.45, spec=0.35)
-    p = R.lathe('plug', [(0.58, 0.0), (0.58, 0.05), (0.52, 0.08), (0.45, 0.16), (0.3, 0.21), (0.0, 0.23)], 64)
+    p = R.lathe('plug', [(a * sc, b * sc) for a, b in [(0.58, 0.0), (0.58, 0.05), (0.52, 0.08), (0.45, 0.16), (0.3, 0.21), (0.0, 0.23)]], 64)
     p.location = (x, y, 0); p.data.materials.append(m)
     p.hide_render = True
     return p
@@ -699,16 +723,16 @@ def unit_patch():
     LAY['units']['patch'] = L; _save()
     for i, sl in enumerate(slots):
         x = sl['x']
-        box = box_px(s, cam, x, PATCH_TY - 0.1, 1.4, 1.75)
+        box = box_px(s, cam, x, PATCH_TY - 0.1, 1.7, 2.5)          # (11-13) C's bat and cap reach 1.95 cm
         for k in ('mic', 'ref'):
             sl['bat'].rotation_euler = (R.math.radians(-PATCH_DEG * PATCH_THROW[k]), 0, 0)
             L['layers']['t%d-%s' % (i, k)] = shoot_crop(s, cam, 'rack-patch-t%d-%s' % (i, k), box)
             sl['bat'].rotation_euler = (0, 0, 0); _save()
-        for o in sl['fixed'] + [sl['bat']]: o.hide_render = True
+        for o in sl['fixed'] + _kids(sl['bat']): o.hide_render = True
         sl['plug'].hide_render = False
         L['layers']['p%d' % i] = shoot_crop(s, cam, 'rack-patch-p%d' % i, box)
         sl['plug'].hide_render = True
-        for o in sl['fixed'] + [sl['bat']]: o.hide_render = False
+        for o in sl['fixed'] + _kids(sl['bat']): o.hide_render = False
         _save()
         nb = box_px(s, cam, x, 2.6, 0.9, 0.6)
         for k in range(1, PATCH_BANKS):
@@ -1995,8 +2019,11 @@ def unit_sweep():
     _cover_layers(s, cam, L, cv)
 
 
-FORMAT_KEYS = [(2.35, [('RATES  kHz', ['c-441', 'c-48', 'c-882', 'c-96']), ('LENGTHS', ['c-full', 'c-1024', 'c-2048', 'c-4096'])]),
-               (-3.35, [('BITS', ['c-16', 'c-24', 'c-32f']), ('TRIMMING', ['c-set', 'c-individual'])])]
+# (11-13, Lowell on the fifth proof) LENGTHS ordered shortest to full, FULL at the far right over the FULL ms wheel. The
+# lower row is laid first: the wheel stands after it, and the LENGTHS group is placed so FULL's centre is over the wheel.
+# (The app finds each key by its id, so the order here is only the layout's.)
+FORMAT_KEYS = [(-3.35, [('BITS', ['c-16', 'c-24', 'c-32f']), ('TRIMMING', ['c-set', 'c-individual'])]),
+               (2.35, [('RATES  kHz', ['c-441', 'c-48', 'c-882', 'c-96']), ('LENGTHS', ['c-1024', 'c-2048', 'c-4096', 'c-full'])])]
 
 
 def unit_formats():
@@ -2017,23 +2044,25 @@ def unit_formats():
         R.engrave(leg, -14.3, ty + 2.45, 0.44, track=0.14)
         tgls.append(dict(bat=bat, x=-14.3, y=ty))
     keys = []
-    xe = 0.0
+    D = ['%d' % i for i in range(10)]; HALF = ['0', '5'] * 5
+    g = [(['0', '1'] * 5, 0), (D, 5), (HALF, 0), '=0']
+    W = 3 * R.TW['pitch'] + 0.85 + 2 * R.TW['end']
+    xw = None
     for y, groups in FORMAT_KEYS:
         x = -9.6
         for head, lids in groups:
             ws = [K.legend_width(LG.LEGENDS[l][0], 'std') + 2 * TK.KEY['bezel'] for l in lids]
             gw = sum(ws) + 0.3 * (len(ws) - 1)
+            if head == 'LENGTHS':
+                x = max(x, xw + ws[-1] / 2 - gw)
             R.engrave(head, x + gw / 2, y + 1.95, 0.44, track=0.14)
             for lid, wk in zip(lids, ws):
                 with R.moved(x + wk / 2, y, 0): kp = _keyl(lid, True)
                 kp.update(id=lid, x=x + wk / 2, y=y); keys.append(kp)
                 x += wk + 0.3
             x += 0.8
-        xe = x
-    D = ['%d' % i for i in range(10)]; HALF = ['0', '5'] * 5
-    g = [(['0', '1'] * 5, 0), (D, 5), (HALF, 0), '=0']
-    W = 3 * R.TW['pitch'] + 0.85 + 2 * R.TW['end']
-    mods, _ = _thumbwheel(xe + W / 2 - 0.1, -2.9, g, 'fullms', legend='FULL  ms')
+        if xw is None: xw = x + W / 2 - 0.1
+    mods, _ = _thumbwheel(xw, -2.9, g, 'fullms', legend='FULL  ms')
     cv = _cover(-16.3, 22.1, -6.2, 5.4, name='cvformats', hinge_in=3.9)
     for o in cv['pane'] + cv['hinges'] + cv['latch']: o.hide_render = True
     R.finish_glass()
@@ -2046,7 +2075,7 @@ def unit_formats():
     LAY['units']['formats'] = L; _save()
     for i, t in enumerate(tgls):
         t['bat'].rotation_euler = (math.radians(PATCH_DEG), 0, 0)
-        L['layers']['t%d-down' % i] = shoot_crop(s, cam, 'rack-formats-t%d-down' % i, box_px(s, cam, t['x'], t['y'], 1.4, 2.4))
+        L['layers']['t%d-down' % i] = shoot_crop(s, cam, 'rack-formats-t%d-down' % i, box_px(s, cam, t['x'], t['y'], 1.7, 2.7))
         t['bat'].rotation_euler = (math.radians(-PATCH_DEG), 0, 0); _save()
     _keys_layers(s, cam, L, keys)
     L['formats']['wheels'] = _tw_layers(s, cam, L, mods); _save()
@@ -2158,6 +2187,259 @@ def unit_plotter(only_shadows=False):
     _save()
 
 
+# ---------------------------------------------------------------------------------------------------------------------
+# (11-13, eleventh chat) the fifth proof's units (approved: "looks good ... Looks great, very visually appealing with
+# great ideas"), with Lowell's pick of the toggles (C). The DAW route (IMPORT DAW) and the re-export as bays of their own:
+#   step-daw   1U  TEST SIGNAL, RECORD IN DAW, MAKE IRS, RESULTS (the Cab IR strip's jewels)
+#   step-rex   1U  PAST CAPTURE, FILES, RE-EXPORT, RESULTS
+#   chart-daw  6U  DWG 2 (the computer on the interface's USB) and the card IN THE DAW (whole)
+#   signal     3U  RATE kHz and LEVEL dBFS rotaries, SWEEPS, LENGTH, GAP, WARM-UP; SAVE SIGNAL, LOAD SIGNAL, RECORD HERE
+#   tracks     4U  the TRACK SHEET form (typed by the app), a side toggle a line (MIC left, OFF centre, REF right), a hole
+#                  plug where a line has no track; ADD FILES, CLEAR
+#   go-daw     1U  FROM THE TRACKS, MAKE IRS (lit while the files are made)
+#   go-rex     1U  FROM THE RAW TAKE, CANCEL, RE-EXPORT (lit while the files are made)
+#   files-rex  4U  the files unit with the past capture's card (typed and stamped RE-EXPORT by the app), PAST CAPTURE CHOOSE
+#   preflight-trouble  5U  (above) the pre-flight with its TROUBLE box
+
+DAW_STEPS = ['TEST SIGNAL', 'RECORD IN DAW', 'MAKE IRS', 'RESULTS']
+REX_STEPS = ['PAST CAPTURE', 'FILES', 'RE-EXPORT', 'RESULTS']
+
+
+def build_step_named(names):
+    def build(lit):
+        K.set_seed('rack-step')
+        s, cam, h = R.unit_scene(1)
+        R.backing(h)
+        R.rack_panel(1, 'bronze', 'step')
+        x = -19.0; xs = []
+        for i, n in enumerate(names):
+            col = lit.get(i, 'amber')
+            R.jewel(x, 0.0, col, i in lit, r=0.55)
+            e = R.engrave(n, 0, 0, 0.62)
+            wcm = e.dimensions.x; e.location.x = x + 1.1 + wcm / 2 - 0.1 * wcm
+            xs.append(x); x += 10.2
+        return s, cam, h, xs
+    return build
+
+
+def unit_chart_daw():
+    K.set_seed('rack-chart')
+    s, cam, h = R.unit_scene(6)
+    R.backing(h)
+    R.rack_panel(6, 'bronze', 'chart')
+    dw, dh, cw_, chh = 26.0, 20.0, 14.6, 20.0
+    gap_ = 2.2
+    xd = -(dw + gap_ + cw_) / 2 + dw / 2; xc = xd + dw / 2 + gap_ + cw_ / 2
+    ysh = 0.9
+    fd = os.path.join(OUT, 'wiring-print-daw.png'); R.wiring_drawing(fd, dw, dh, px=120, daw=True)
+    fc = os.path.join(OUT, 'card-print-daw.png'); R.daw_card(fc, cw_, chh, px=120)
+    with R.moved(xd, ysh, 0): R.sheet(dw, dh, fd, 'wiring', curl=0.25)
+    with R.moved(xc, ysh, 0): R.sheet(cw_, chh, fc, 'card', curl=0.0)
+    R.card_frame(dw, dh, ysh, xd, 'cf1'); R.card_frame(cw_, chh, ysh, xc, 'cf2')
+    R.engrave('HOOK-UP', -dw / 2 + xd + 2.0, -h / 2 + 1.25, 0.5)
+    L = shoot_base(s, cam, 'rack-chart-daw', R.PW, h)
+    L['u'] = 6; L['layers'] = {}
+    LAY['units']['chart-daw'] = L; _save()
+
+
+def _key_at(lid, x, y, litable=False):
+    with R.moved(x, y, 0): kp = _keyl(lid, litable)
+    kp.update(id=lid, x=x, y=y)
+    return kp
+
+
+def _kw(lid):
+    import ircapture_legends as LG
+    return K.legend_width(LG.LEGENDS[lid][0], 'std') + 2 * TK.KEY['bezel']
+
+
+def unit_signal():
+    """3U: the DAW route's test signal (the proof's unit_signal). The app turns the rotaries, shows the figures, and
+    takes SAVE SIGNAL, LOAD SIGNAL and RECORD HERE."""
+    K.set_seed('rack-signal')
+    s, cam, h = R.unit_scene(3)
+    R.backing(h)
+    R.rack_panel(3, 'bronze', 'signal')
+    R.engrave('TEST', -18.7, 2.95, 0.62); R.engrave('SIGNAL', -18.7, 1.75, 0.62)
+    yt = 2.15
+    sels = [_selector(-10.9, yt, ['44.1', '48', '88.2', '96'], 3, step=32.0, r_lab=2.7, legend='RATE kHz'),
+            _selector(-3.3, yt, ['-6', '-12', '-18', '-24'], 1, step=32.0, r_lab=2.7, legend='LEVEL dBFS')]
+    D = ['%d' % i for i in range(10)]; HALF = ['0', '5'] * 5
+    x = 2.6; mods = []
+    for lab, g in (('SWEEPS', [(D, 0), (D, 5)]), ('LENGTH  S', [(D, 0), (D, 6), '.', (HALF, 0)]),
+                   ('GAP  S', [(D, 0), (D, 2), '.', (HALF, 0)]), ('WARM-UP', [(D, 1)])):
+        nm = sum(1 for q in g if q != '.'); W = nm * R.TW['pitch'] + (0.35 if '.' in g else 0) + 2 * R.TW['end']
+        md, _ = _thumbwheel(x + W / 2, yt - 0.2, g, lab.split()[0].lower(), legend=lab); mods += md
+        x += W + 0.95
+    yk = -4.25
+    keys, _ = _keyrow([('save-signal', False), ('load-signal', False)], -14.4, yk, 0.7)
+    keys.append(_key_at('record-here', 21.3 - 0.6 - _kw('record-here') / 2, yk))
+    R.finish_glass()
+    L = shoot_base(s, cam, 'rack-signal', R.PW, h)
+    L['u'] = 3; L['layers'] = {}
+    L['signal'] = dict(selectors=_sel_info(s, cam, sels), keys=_keys_info(s, cam, keys))
+    LAY['units']['signal'] = L; _save()
+    _keys_layers(s, cam, L, keys)
+    _sel_layers(s, cam, L, sels)
+    L['signal']['wheels'] = _tw_layers(s, cam, L, mods); _save()
+
+
+# the track sheet: a printed form the app types into, one line a track (sheet cm, entries by their baselines). TRK_FORM
+# is the one place its layout lives. The track numbers are printed by the app too (one unit for every eight tracks).
+TRK_W, TRK_H = 29.0, 14.6
+
+
+def _trk_form():
+    m = 1.0; top, pitch, n = 3.95, 1.3, 8
+    rules = [round(top + i * pitch + 0.62, 3) for i in range(n)]
+    return {'w': TRK_W, 'h': TRK_H, 'margin': m, 'typedCm': TYPED_CM, 'advance': 0.6, 'headY': 2.85, 'rows': n,
+            'pitch': pitch, 'centres': [round(top + i * pitch, 3) for i in range(n)], 'rules': rules,
+            'baselines': [round(r - 0.2, 3) for r in rules],
+            'cols': [dict(key=k, label=l, x=round(m + x, 3)) for k, l, x in
+                     (('trk', 'TRK', 0.0), ('file', 'FILE', 1.4), ('name', 'MIC NAME', 14.0), ('khz', 'kHz', 21.0),
+                      ('bits', 'BITS', 23.2), ('seconds', 'SECONDS', 25.0))],
+            'right': TRK_W - m}
+
+
+TRK_FORM = _trk_form()
+
+
+def track_form(path, px=120):
+    """The track sheet blank: ircapture_rack.track_sheet's printing, nothing typed, no track numbers."""
+    import numpy as np
+    F_ = TRK_FORM; w, h, m = F_['w'], F_['h'], F_['margin']
+    P_ = R.Pen(w, h, px, (246, 234, 200), 22); d = P_.d
+    ox = (104, 30, 24); rule = (150, 120, 104)
+    fh = P_.font('BarlowSemiCondensed-700-normal.ttf', 0.8); fl = P_.font('BarlowSemiCondensed-600-normal.ttf', 0.48)
+    P_.spaced(m, 1.05, 'TRACK SHEET', fh, ox, 0.14)
+    P_.spaced(w - m, 1.15, 'DAW FILES', fl, ox, 0.16, 'r')
+    d.line([P_.p(m, 1.85), P_.p(w - m, 1.85)], fill=ox, width=P_.c(0.07))
+    d.line([P_.p(m, 1.98), P_.p(w - m, 1.98)], fill=ox, width=max(1, P_.c(0.02)))
+    for c in F_['cols']: P_.spaced(c['x'] + 0.1, F_['headY'], c['label'], fl, rule, 0.14)
+    for r_ in F_['rules']: d.line([P_.p(m, r_), P_.p(w - m, r_)], fill=rule, width=max(1, P_.c(0.02)))
+    for c in F_['cols'][1:]:
+        d.line([P_.p(c['x'] - 0.15, 2.35), P_.p(c['x'] - 0.15, F_['rules'][-1])], fill=rule, width=max(1, P_.c(0.02)))
+    R.age_paper(P_.im, np.random.default_rng(22)).save(path)
+
+
+SIDE_X = (-1.45, 0.0, 1.45)                     # MIC, OFF, REF: the side toggles' legends over their throws
+
+
+def _side_toggle(x, y, ch, sc):
+    """ircapture_rack.side_toggle, its parts kept: the bat (and its cap) turned between shots."""
+    with R.moved(x, y, 0):
+        nut = R.lathe('tnut', [(0.62 * sc, 0.0), (0.62 * sc, 0.16 * sc), (0.56 * sc, 0.2 * sc), (0.34 * sc, 0.2 * sc)], 6, smooth=False)
+        nut.data.materials.append(ch); nut.rotation_euler = (0, 0, math.radians(30 + 7 * (K.seed_of('st%.2f' % y) % 5)))
+        col = R.lathe('tcol', [(0.36 * sc, 0.0), (0.36 * sc, 0.42 * sc), (0.3 * sc, 0.5 * sc), (0.16 * sc, 0.5 * sc)], 48)
+        col.data.materials.append(ch)
+        bat = R._bat(sc); bat.location = (0, 0, 0.3 * sc)
+    return [nut, col], bat
+
+
+def unit_tracks():
+    """4U: the DAW files (the proof's unit_tracks): the track sheet in its card frame, a side toggle beside each line,
+    ADD FILES and CLEAR. Built once, shot in its states (the patch unit's way):
+      base       every toggle centred (OFF)
+      t<i>-mic   line i's toggle thrown left       t<i>-ref    thrown right
+      p<i>       a hole plug in place of line i's toggle (a line with no track)"""
+    K.set_seed('rack-tracks')
+    s, cam, h = R.unit_scene(4)
+    R.backing(h)
+    R.rack_panel(4, 'black', 'tracks')
+    F_ = TRK_FORM; sw, sh = F_['w'], F_['h']
+    xs, ysh = -21.3 + 0.8 + sw / 2, 0.55
+    fp = os.path.join(OUT, 'track-form-print.png'); track_form(fp)
+    with R.moved(xs, ysh, 0): R.sheet(sw, sh, fp, 'tracks', curl=0.2)
+    R.card_frame(sw, sh, ysh, xs, 'cftrk')
+    xt = xs + sw / 2 + 3.5
+    top = ysh + sh / 2
+    for t, dx in zip(('MIC', 'OFF', 'REF'), SIDE_X): R.engrave(t, xt + dx, top - 2.85, 0.44, track=0.12)
+    sc = float(os.environ.get('IRC_SIDE_SC', '0.9'))
+    ch = R.SG.nickel('tgl', seed=4)
+    lines = []
+    for i in range(F_['rows']):
+        y = top - F_['centres'][i]
+        fixed, bat = _side_toggle(xt, y, ch, sc)
+        lines.append(dict(y=y, fixed=fixed, bat=bat, plug=_plug(xt, y, sc)))
+    xk = 17.65
+    keys = [_key_at('r-add-files', xk, 3.4), _key_at('r-clear', xk, 0.55)]
+    R.engrave('TRACKS', xk, -6.55, 0.5)
+    L = shoot_base(s, cam, 'rack-tracks', R.PW, h)
+    L['u'] = 4; L['layers'] = {}
+    P_ = lambda x, y: TK.proj(s, cam, (x, y, 0.0))
+    L['tracks'] = dict(sheet=_rect(s, cam, xs, ysh, sw, sh), form=F_, keys=_keys_info(s, cam, keys),
+                       toggles=[P_(xt, ln['y']) for ln in lines],
+                       columns=[P_(xt + dx, 0)[0] for dx in SIDE_X],
+                       column=abs(P_(SIDE_X[1], 0)[0] - P_(SIDE_X[0], 0)[0]),
+                       pitch=abs(P_(0, F_['pitch'])[1] - P_(0, 0)[1]))
+    LAY['units']['tracks'] = L; _save()
+    _keys_layers(s, cam, L, keys)
+    th = R.TGL['throw']
+    for i, ln in enumerate(lines):
+        box = box_px(s, cam, xt, ln['y'], 2.3, 0.85)
+        for k, pos in (('mic', -1), ('ref', 1)):
+            ln['bat'].rotation_euler = (0, math.radians(th * pos), 0)
+            L['layers']['t%d-%s' % (i, k)] = shoot_crop(s, cam, 'rack-tracks-t%d-%s' % (i, k), box)
+            ln['bat'].rotation_euler = (0, 0, 0); _save()
+        for o in ln['fixed'] + _kids(ln['bat']): o.hide_render = True
+        ln['plug'].hide_render = False
+        L['layers']['p%d' % i] = shoot_crop(s, cam, 'rack-tracks-p%d' % i, box)
+        ln['plug'].hide_render = True
+        for o in ln['fixed'] + _kids(ln['bat']): o.hide_render = False
+        _save()
+
+
+def unit_go(kind):
+    """1U: the route's last key (the proof's unit_go). daw: MAKE IRS; rex: CANCEL and RE-EXPORT. The make key lights while
+    the files are made."""
+    K.set_seed('rack-go-' + kind)
+    s, cam, h = R.unit_scene(1)
+    R.backing(h)
+    R.rack_panel(1, 'bronze', 'go-' + kind)
+    if kind == 'daw':
+        R.engrave('FROM THE TRACKS', -15.0, 0.0, 0.5)
+        keys = [_key_at('r-make-irs', 21.3 - 0.6 - _kw('r-make-irs') / 2, 0, True)]
+    else:
+        R.engrave('FROM THE RAW TAKE', -14.4, 0.0, 0.5)
+        xr = 21.3 - 0.6 - _kw('reexport') / 2
+        keys = [_key_at('cancel', xr - _kw('reexport') / 2 - 0.7 - _kw('cancel') / 2, 0),
+                _key_at('reexport', xr, 0, True)]
+    L = shoot_base(s, cam, 'rack-go-' + kind, R.PW, h)
+    L['u'] = 1; L['layers'] = {}
+    L['go'] = dict(keys=_keys_info(s, cam, keys))
+    LAY['units']['go-' + kind] = L; _save()
+    _keys_layers(s, cam, L, keys)
+
+
+def unit_files_rex():
+    """4U: the re-export's files unit: the capture card blank (the app types the past capture's name, notes and folder
+    and stamps it RE-EXPORT in red), the five latching keys, PAST CAPTURE CHOOSE in place of SAVE TO CHANGE and RE-EXPORT
+    OLD (so no key does nothing)."""
+    K.set_seed('rack-files')
+    s, cam, h = R.unit_scene(4)
+    R.backing(h)
+    R.rack_panel(4, 'bronze', 'files')
+    cw_, ch_ = CARD_W, CARD_H
+    xc_, ysh = -21.3 + 0.8 + cw_ / 2, 0.75
+    fp = os.path.join(OUT, 'card-form-print.png')
+    if not os.path.exists(fp): card_form(fp)
+    with R.moved(xc_, ysh, 0): R.sheet(cw_, ch_, fp, 'capcard', curl=0.2)
+    R.card_frame(cw_, ch_, ysh, xc_, 'cfcap')
+    R.engrave('FILES', 9.3, 5.75, 0.44, track=0.14); R.engrave('ALSO MAKE', 17.6, 5.75, 0.44, track=0.14)
+    keys = [_key_at(lid, x, y, True) for lid, x, y in FILES_KEYS]
+    y = -6.55; x = 5.3
+    R.engrave('PAST CAPTURE', x + 2.1, y, 0.44, track=0.14); x += 4.5
+    keys.append(_key_at('r-choose', x + _kw('r-choose') / 2, y))
+    L = shoot_base(s, cam, 'rack-files-rex', R.PW, h)
+    L['u'] = 4; L['layers'] = {}
+    # the stamp: its top right corner on the card (cm from the card's top left), turned (degrees, counterclockwise)
+    L['files'] = dict(sheet=_rect(s, cam, xc_, ysh, cw_, ch_), form=CARD, keys=_keys_info(s, cam, keys),
+                      stamp=dict(right=round(CARD_W - 1.4, 3), top=6.05, turn=-4.0, word='RE-EXPORT'))
+    LAY['units']['files-rex'] = L; _save()
+    _keys_layers(s, cam, L, keys)
+
+
+
 UNITS = {'step-cab': unit_step_cab, 'step-nam': unit_step_nam, 'cheeks': unit_cheeks, 'meters': unit_meters,
          'results': unit_results, 'chart': unit_chart, 'preflight': unit_preflight, 'patch': unit_patch,
          'nammeters': unit_nammeters, 'deck': unit_deck, 'cart': unit_cart,
@@ -2165,7 +2447,13 @@ UNITS = {'step-cab': unit_step_cab, 'step-nam': unit_step_nam, 'cheeks': unit_ch
          'shelf-jobs': lambda: shelf_box_unit('jobs'), 'shelf-status': lambda: shelf_box_unit('status'),
          'shelf-help': lambda: shelf_box_unit('help'),
          'connect': unit_connect, 'files': unit_files, 'sweep': unit_sweep, 'formats': unit_formats, 'plotter': unit_plotter,
-         'plotter-shadows': lambda: unit_plotter(only_shadows=True)}
+         'plotter-shadows': lambda: unit_plotter(only_shadows=True),
+         # (11-13) the fifth proof's units
+         'step-daw': lambda: step_unit('step-daw', build_step_named(DAW_STEPS), len(DAW_STEPS), 1.9),
+         'step-rex': lambda: step_unit('step-rex', build_step_named(REX_STEPS), len(REX_STEPS), 1.9),
+         'chart-daw': unit_chart_daw, 'signal': unit_signal, 'tracks': unit_tracks,
+         'go-daw': lambda: unit_go('daw'), 'go-rex': lambda: unit_go('rex'), 'files-rex': unit_files_rex,
+         'preflight-trouble': lambda: unit_preflight(True)}
 
 
 if __name__ == '__main__':

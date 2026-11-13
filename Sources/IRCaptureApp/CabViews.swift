@@ -9,9 +9,17 @@ struct CabJob: View {
     var levelsDone: Bool {
         !m.levelReadings.isEmpty && m.levelReadings.allSatisfy { !$0.clipped && (abs($0.changeDB) <= 3 || $0.label == "Reference") }
     }
+    /// (11-13) A fault for the pre-flight's TROUBLE box: the level check's or the capture's error.
+    var trouble: String? { m.levelError ?? m.errorText }
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            if m.cabImport {
+            if m.reexportFolder != nil && CabReexportBay.available {
+                // (11-13, the fifth proof) the re-export as a bay of its own, in place of the sheet
+                CabReexportBay()
+            } else if m.cabImport && CabDAWBay.available {
+                // (11-13, the fifth proof) the DAW route as a bay of its own, in place of CabImportSteps
+                CabDAWBay()
+            } else if m.cabImport {
                 HStack(spacing: 12) {
                     Button("‹ Record here") { m.cabImport = false }.buttonStyle(KeyButtonStyle(key: "‹ Record here"))
                     Engraved("Import DAW recordings", size: 15)
@@ -19,6 +27,7 @@ struct CabJob: View {
                 CabImportSteps()
             } else {
                 RackStepStrip(steps: [("Connect", connected), ("Set levels", levelsDone), ("Capture", m.result != nil), ("Results", m.result != nil)])
+                    .id("baytop")
                 // (Phase 7a) the chart panel: the hook-up drawing and the card, in place of the Connect step's drawing
                 if RackChartUnit.available { RackChartUnit() }
                 // (Phase 7a, the fourth proof) the connect unit: the interface on its VFD, OUT TO AMP, REFERENCE
@@ -37,7 +46,9 @@ struct CabJob: View {
                     if RackMeterBridge.available { RackMeterBay() }
                     if RackPreflightUnit.available {
                         // (Phase 7a) BEFORE CAPTURE, typed in; the level check's steps are on the chart panel's card
-                        RackPreflightUnit(lines: m.preflightSheet, sentences: m.preflight.map(\.text)).id(RackDeck.available ? "preflight" : "machine")
+                        RackPreflightUnit(lines: m.preflightSheet, sentences: m.preflight.map(\.text),
+                                          trouble: RackPreflightUnit.troubleAvailable ? trouble : nil)
+                            .id(RackDeck.available ? "preflight" : "machine")
                     } else {
                         HStack(alignment: .top, spacing: 16) {
                             Checklist(items: levelSteps, style: PaperStyle(stock: .manila, ring: true))
@@ -48,7 +59,9 @@ struct CabJob: View {
                     }
                     // (Phase 7a) the reel deck as an 8U rack unit; without its pictures, the 11-04 deck
                     if RackDeck.available { RackDeck().id("machine") } else if let d = TapePieces.deck { ReelDeck(d: d).padding(.top, 4) }
-                    CabDeckStatus()
+                    // (11-13, the fifth proof) with the TROUBLE box, CabDeckStatus is no unit: its lines are on the shelf's
+                    // VFD (Shelf.cabLine) and its errors typed in the pre-flight's TROUBLE box
+                    if !(RackPreflightUnit.available && RackPreflightUnit.troubleAvailable) { CabDeckStatus() }
                     if !RackMeterBridge.available && !m.levelReadings.isEmpty { LevelTable(readings: m.levelReadings) }
                 } else {
                     CabLevelStep(done: levelsDone)

@@ -41,13 +41,20 @@ struct RackKit: Decodable {
         var sweep: Setup? = nil
         var formats: Setup? = nil
         var plotter: Plotter? = nil
+        // (11-13) the fifth proof's units (RackRoutes.swift)
+        var signal: Signal? = nil
+        var tracks: Tracks? = nil
+        var go: Go? = nil
     }
     /// The pre-flight (4U): BEFORE CAPTURE, a printed form with a ruled table (ITEM, READING, OK), typed by the app.
+    /// (11-13) `preflight-trouble` (5U): the same form with a TROUBLE box at its foot (sheet cm), where a fault is typed.
     struct Preflight: Decodable {
+        struct Trouble: Decodable { let rule: CGFloat; let labelY: CGFloat; let x0: CGFloat; let x1: CGFloat; let baselines: [CGFloat] }
         struct Form: Decodable {
             let w: CGFloat; let h: CGFloat; let typedCm: CGFloat; let advance: CGFloat
             let headY: CGFloat; let rule: CGFloat; let rowH: CGFloat; let rows: Int; let baseline0: CGFloat
             let cols: [Results.Col]; let right: CGFloat
+            var trouble: Trouble? = nil
         }
         let sheet: [CGFloat]         // the sheet in the base picture (pt)
         let form: Form
@@ -302,9 +309,11 @@ struct RackUnitPicture: View {
 /// old panel (JobStepper).
 struct RackStepStrip: View {
     let steps: [(String, Bool)]
+    /// (11-13) another strip of the Cab IR rack's: "step-daw" (the DAW route), "step-rex" (the re-export)
+    var unit: String? = nil
     @Environment(\.swellTheme) private var theme
     var body: some View {
-        let key = theme == .nam ? "step-nam" : "step-cab"
+        let key = unit ?? (theme == .nam ? "step-nam" : "step-cab")
         if let r = RackKit.ready(key), r.1.layers.count >= 2 * steps.count {
             let kit = r.0, u = r.1
             let current = steps.firstIndex { !$0.1 }

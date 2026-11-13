@@ -11,18 +11,23 @@ import IRCaptureCore
 //               each line typed (the item, its reading), ticked in pencil, ringed in red pencil when it needs a look,
 //               crossed in the OK column when it stops the capture, a word pencilled beside a noisy room. A line not
 //               measured yet is typed and left unmarked. Ink multiplied over the lit paper.
+//               (11-13, the fifth proof) `preflight-trouble`, 5U, when its pictures are in the kit: the form with a
+//               TROUBLE box at its foot. A fault (the level check's or the capture's error, which CabDeckStatus showed in
+//               red under the deck) is typed there in the ribbon's red half; the shelf's lamp is red, its VFD FAULT.
 // Also here: the typewriter and the pencil, shared with the take sheet (RackResults.swift).
 
 // ------------------------------------------------------------------ ink on paper
 enum PaperInk {
     static let ribbon = (r: 34.0, g: 32.0, b: 44.0)          // a black-violet ribbon, as the proofs' typing
+    /// (11-13) the ribbon's red half: the pre-flight's TROUBLE box (the fifth proof's red)
+    static let ribbonRed = (r: 168.0, g: 36.0, b: 30.0)
     static let redPencil = CGColor(srgbRed: 0.76, green: 0.17, blue: 0.14, alpha: 0.85)
     static let graphite = (r: 70.0 / 255, g: 68.0 / 255, b: 74.0 / 255)
 
     /// Typed: one strike a character, each a little off the line and a little lighter or darker than the last.
     /// x and baseline in points; `adv` the character advance, `k` points a centimetre (for the strike's wander).
     static func type(_ cg: CGContext, _ font: CTFont, _ text: String, x: CGFloat, baseline: CGFloat, adv: CGFloat, k: CGFloat,
-                     rng: inout InkRandom) {
+                     rng: inout InkRandom, ink: (r: Double, g: Double, b: Double) = ribbon) {
         var px = x
         for ch in text {
             defer { px += adv }
@@ -32,7 +37,7 @@ enum PaperInk {
             if ch == " " { continue }
             var g = [CGGlyph](repeating: 0, count: u.count)
             guard CTFontGetGlyphsForCharacters(font, u, &g, u.count) else { continue }
-            let I = ribbon
+            let I = ink
             cg.setFillColor(CGColor(srgbRed: (I.r + dens) / 255, green: (I.g + dens) / 255, blue: (I.b + dens) / 255,
                                     alpha: 0.86 + 0.14 * rng.uniform()))
             cg.saveGState()
@@ -111,6 +116,8 @@ enum PaperInk {
 /// The hook-up drawing and the BEFORE YOU START card. Without the unit's picture: nothing (the caller keeps the old
 /// drawing and checklist).
 struct RackChartUnit: View {
+    /// (11-13) the DAW route's: DWG 2 and the card IN THE DAW (`chart-daw`)
+    var daw = false
     static var available: Bool { RackKit.ready("chart") != nil }
 
     /// The card's words, for VoiceOver (as typed on the card in ircapture_rack.instruction_card).
@@ -125,11 +132,12 @@ struct RackChartUnit: View {
     ]
 
     var body: some View {
-        if let r = RackKit.ready("chart") {
+        if let r = RackKit.ready(daw ? "chart-daw" : "chart") {
             RackUnitPicture(kit: r.0, unit: r.1)
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Hook-up drawing: interface output to the amp's FX return, the amp's speaker output to the cab, mic 1 and mic 2 to inputs 1 and 2, optional 20 dB pad from the speaker terminals to input 8, monitors off")
-                .accessibilityValue("Before you start: " + Self.card.enumerated().map { "\($0 + 1). \($1)" }.joined(separator: " "))
+                .accessibilityLabel(daw ? "DAW hook-up drawing: the computer's DAW on the interface's USB, interface output to the amp's FX return, the amp's speaker output to the cab, mic 1 and mic 2 to inputs 1 and 2, optional 20 dB pad from the speaker terminals to input 8, monitors off"
+                                        : "Hook-up drawing: interface output to the amp's FX return, the amp's speaker output to the cab, mic 1 and mic 2 to inputs 1 and 2, optional 20 dB pad from the speaker terminals to input 8, monitors off")
+                .accessibilityValue((daw ? "In the DAW: " : "Before you start: ") + (daw ? Self.dawCard : Self.card).enumerated().map { "\($0 + 1). \($1)" }.joined(separator: " "))
         }
     }
 }
@@ -139,16 +147,22 @@ struct RackChartUnit: View {
 struct RackPreflightUnit: View {
     let lines: [PreflightLine]
     var sentences: [String] = []
+    /// (11-13) a fault, typed in red in the TROUBLE box (preflight-trouble only)
+    var trouble: String? = nil
 
-    static var available: Bool { RackKit.ready("preflight")?.1.preflight != nil }
+    /// The 5U form with the TROUBLE box when it is in the kit, else the 4U form.
+    static var key: String { RackKit.ready("preflight-trouble")?.1.preflight?.form.trouble != nil ? "preflight-trouble" : "preflight" }
+    static var available: Bool { RackKit.ready(key)?.1.preflight != nil }
+    /// The TROUBLE box is in the kit: CabDeckStatus is not drawn, its lines are on the shelf's VFD and here.
+    static var troubleAvailable: Bool { key == "preflight-trouble" }
 
     var body: some View {
-        if let r = RackKit.ready("preflight"), let pf = r.1.preflight {
+        if let r = RackKit.ready(Self.key), let pf = r.1.preflight {
             let kit = r.0, u = r.1, p = u.panel, sr = pf.sheet
             ZStack(alignment: .topLeading) {
                 RackUnitPicture(kit: kit, unit: u, overlay: AnyView(
                     ZStack(alignment: .topLeading) {
-                        PreflightSheetInk(lines: lines, form: pf.form, size: CGSize(width: sr[2], height: sr[3]))
+                        PreflightSheetInk(lines: lines, form: pf.form, size: CGSize(width: sr[2], height: sr[3]), trouble: trouble)
                             .frame(width: sr[2], height: sr[3])
                             .offset(x: sr[0], y: sr[1])
                     }
@@ -156,10 +170,10 @@ struct RackPreflightUnit: View {
                     .allowsHitTesting(false)))
                 Color.clear.contentShape(Rectangle())
                     .frame(width: sr[2], height: sr[3]).offset(x: sr[0] - p[0], y: sr[1] - p[1])
-                    .help(sentences.joined(separator: "\n"))
+                    .help((sentences + (trouble.map { ["Trouble: " + $0] } ?? [])).joined(separator: "\n"))
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel("Before capture")
-                    .accessibilityValue(spoken)
+                    .accessibilityValue(spoken + (trouble.map { " Trouble: " + $0 } ?? ""))
             }
             .frame(width: kit.panelWidth, height: CGFloat(u.u) * kit.uPt, alignment: .topLeading)
         }
@@ -181,6 +195,7 @@ struct PreflightSheetInk: View {
     let lines: [PreflightLine]
     let form: RackKit.Preflight.Form
     let size: CGSize
+    var trouble: String? = nil
 
     var body: some View {
         Canvas { ctx, _ in ctx.withCGContext { cg in draw(cg) } }
@@ -226,6 +241,15 @@ struct PreflightSheetInk: View {
                 }
             case .none:
                 break
+            }
+        }
+        // (11-13) the TROUBLE box: the fault in the ribbon's red half, wrapped on its lines (the rest cut with "…"; the
+        // whole message is in the tooltip)
+        if let t = trouble, !t.isEmpty, let T = F.trouble {
+            var rng = InkRandom(s: TakeSheet.hash("trouble|" + t))
+            let n = chars(T.x0, T.x1)
+            for (i, l) in CaptureCardInk.wrap(t, n, T.baselines.count).enumerated() where i < T.baselines.count {
+                PaperInk.type(cg, font, l, x: T.x0 * k, baseline: T.baselines[i] * k, adv: adv, k: k, rng: &rng, ink: PaperInk.ribbonRed)
             }
         }
     }

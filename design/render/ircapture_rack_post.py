@@ -130,9 +130,11 @@ STAMP_PXPT = 6.0              # the stamps carry twice the kit's pixels: the bro
 STAMPS = {'excellent': ('EXCELLENT', (30, 122, 74)),        # green ink
           'check': ('CHECK NOTES', (52, 60, 138)),           # blue-violet ink
           'again': ('RECORD AGAIN', (172, 34, 28))}          # red ink
+# (11-13) the re-export's capture card, stamped (the fifth proof's red, a little darker than RECORD AGAIN)
+CARD_STAMPS = {'reexport': ('RE-EXPORT', (150, 34, 30))}
 
 
-def stamps():
+def stamps(table=None):
     """The verdict's rubber stamps (the proof's EXCELLENT): a double box and the word, the ink uneven and broken; the
     picture is the ink alone (colour, its density in alpha), upright: the app turns it a few degrees and multiplies it
     onto the sheet. 1.3 cm letters, the box fitted to the word."""
@@ -141,7 +143,7 @@ def stamps():
     cm = lambda v: int(round(v * px))
     fs = ImageFont.truetype(os.path.join(KIT, 'fonts', 'BarlowSemiCondensed-700-normal.ttf'), cm(1.3))
     out = {}
-    for k, (txt, col) in STAMPS.items():
+    for k, (txt, col) in (table or STAMPS).items():
         rng = np.random.default_rng(sum(map(ord, txt)))
         tr = 0.14 * fs.size
         wsum = sum(fs.getlength(c) for c in txt) + tr * (len(txt) - 1)
@@ -406,15 +408,27 @@ for key, L in lay.get('units', {}).items():
                         'wheels': wheels(L, Cn['wheels'])}
     if 'files' in L:
         u['files'] = {'sheet': rect(L['files']['sheet']), 'form': L['files']['form'], 'keys': keys_pt(L['files']['keys'])}
-    for nm_ in ('sweep', 'formats'):
+        if 'stamp' in L['files']:
+            # (11-13) the re-export's card: the stamp's ink as a picture, placed and turned by the app
+            st = L['files']['stamp']; sp = stamps(CARD_STAMPS)
+            u['files']['stamp'] = dict(st, picture=sp['stamps']['reexport']['picture'], size=sp['stamps']['reexport']['size'],
+                                       pxPerPoint=sp['pxPerPoint'])
+    for nm_ in ('sweep', 'formats', 'signal'):
         if nm_ in L:
             S_ = L[nm_]; o_ = {'wheels': wheels(L, S_['wheels'])}
             if 'selectors' in S_: o_['selectors'] = selectors_pt(S_['selectors'])
             if 'keys' in S_: o_['keys'] = keys_pt(S_['keys'])
             if 'toggles' in S_:
                 o_['toggles'] = [{'c': [pt(v) for v in t['c']], 'up': rect(t['up']), 'down': rect(t['down'])} for t in S_['toggles']]
-            o_['cover'] = cover(L)
+            if 'cover' in L: o_['cover'] = cover(L)
             u[nm_] = o_
+    if 'tracks' in L:
+        # (11-13) the DAW files' track sheet: its form, the side toggles' centres, the MIC / OFF / REF columns (x, pt)
+        Tr = L['tracks']
+        u['tracks'] = {'sheet': rect(Tr['sheet']), 'form': Tr['form'], 'keys': keys_pt(Tr['keys']),
+                       'toggles': [[pt(v) for v in p_] for p_ in Tr['toggles']], 'columns': [pt(v) for v in Tr['columns']],
+                       'column': pt(Tr['column']), 'pitch': pt(Tr['pitch'])}
+    if 'go' in L: u['go'] = {'keys': keys_pt(L['go']['keys'])}
     if 'plotter' in L: u['plotter'] = plotter(L)
     J['units'][key] = u
     print(key, base.size, len(u['layers']), 'layers')

@@ -211,6 +211,26 @@ jobs:
             screencapture -x dist/screenshot-$3.png || echo "screenshot failed"
             kill $PID; sleep 1
           done
+          # (11-13, the fifth proof) the DAW route with the simulated files on the track sheet; the re-export bay on the
+          # demo's capture; a fault typed in the pre-flight's TROUBLE box
+          for shot in "signal daw-signal" "tracks daw-tracks" "machine daw-go"; do
+            set -- $shot
+            "$EXE" --scroll-to $1 --daw-files "$PWD/reference/sim_out" & PID=$!
+            sleep 7
+            kill -0 $PID || { echo "::error title=Smoke test::The app quit or crashed in the DAW route ($1)"; exit 1; }
+            screencapture -x dist/screenshot-$2.png || echo "screenshot failed"
+            kill $PID; sleep 1
+          done
+          "$EXE" --reexport "$OUT" & PID=$!
+          sleep 7
+          kill -0 $PID || { echo "::error title=Smoke test::The app quit or crashed opening the re-export bay"; exit 1; }
+          screencapture -x dist/screenshot-reexport.png || echo "screenshot failed"
+          kill $PID; sleep 1
+          "$EXE" --scroll-to preflight --trouble "Capture stopped. The interface stopped answering (CoreAudio -10863). Nothing was saved. Check the cable and the interface, then click Capture again." & PID=$!
+          sleep 7
+          kill -0 $PID || { echo "::error title=Smoke test::The app quit or crashed showing a fault on the pre-flight"; exit 1; }
+          screencapture -x dist/screenshot-trouble.png || echo "screenshot failed"
+          kill $PID; sleep 1
           # (11-10) View › Page Size: the reel deck drawn 1.5 times larger (check the text and pictures stay sharp)
           "$EXE" --cab-tab --scroll-to-machine --page-scale 1.5 & PID=$!
           sleep 7
