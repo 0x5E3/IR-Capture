@@ -113,16 +113,16 @@ struct RackPlotterUnit: View {
         return (mx / 10).rounded(.up) * 10 + 5
     }
 
-    struct State { var upTo: Int; var frac: Double; var armX: CGFloat; var penY: CGFloat; var pen: Int }
+    struct PenState { var upTo: Int; var frac: Double; var armX: CGFloat; var penY: CGFloat; var pen: Int }
 
     /// Where the arm and the pen are at t seconds, and how much is inked: each mic a return (pen up) to the left
     /// edge at its curve's first point, then 1.6 s drawing; at the end the arm parks.
-    func state(_ t: Double, _ P: RackKit.Plotter) -> State {
+    func state(_ t: Double, _ P: RackKit.Plotter) -> PenState {
         let n = r.names.count
         let parkX = P.park, parkY = P.penAt[1]
         // not come into view yet for this take: the paper blank, the arm parked
-        if shownFor != r.folder && !reduceMotion { return State(upTo: 0, frac: 0, armX: parkX, penY: parkY, pen: 0) }
-        guard n > 0, t < total, start != nil else { return State(upTo: n, frac: 0, armX: parkX, penY: parkY, pen: max(0, n - 1)) }
+        if shownFor != r.folder && !reduceMotion { return PenState(upTo: 0, frac: 0, armX: parkX, penY: parkY, pen: 0) }
+        guard n > 0, t < total, start != nil else { return PenState(upTo: n, frac: 0, armX: parkX, penY: parkY, pen: max(0, n - 1)) }
         func ease(_ x: Double) -> Double { let c = max(0, min(1, x)); return c * c * (3 - 2 * c) }
         var fromX = parkX, fromY = parkY
         for k in 0..<n {
@@ -130,17 +130,17 @@ struct RackPlotterUnit: View {
             let startPt = penPoint(P, k, 0)
             if t < t0 + Self.ret {
                 let e = CGFloat(ease((t - t0) / Self.ret))
-                return State(upTo: k, frac: 0, armX: fromX + (startPt.x - fromX) * e, penY: fromY + (startPt.y - fromY) * e, pen: k)
+                return PenState(upTo: k, frac: 0, armX: fromX + (startPt.x - fromX) * e, penY: fromY + (startPt.y - fromY) * e, pen: k)
             }
             if t < t0 + Self.ret + Self.draw {
                 let u = 0.5 - 0.5 * cos(.pi * (t - t0 - Self.ret) / Self.draw)
                 let p = penPoint(P, k, u)
-                return State(upTo: k, frac: u, armX: p.x, penY: p.y, pen: k)
+                return PenState(upTo: k, frac: u, armX: p.x, penY: p.y, pen: k)
             }
             let e = penPoint(P, k, 1); fromX = e.x; fromY = e.y
         }
         let e = CGFloat(ease((t - Double(n) * (Self.draw + Self.ret)) / Self.park))
-        return State(upTo: n, frac: 0, armX: fromX + (parkX - fromX) * e, penY: fromY + (parkY - fromY) * e, pen: n - 1)
+        return PenState(upTo: n, frac: 0, armX: fromX + (parkX - fromX) * e, penY: fromY + (parkY - fromY) * e, pen: n - 1)
     }
 
     /// The pen's tip on curve k at u (0 to 1 across the paper's frequency scale), picture points.
@@ -160,7 +160,7 @@ struct RackPlotterUnit: View {
         return CGPoint(x: g[0] + CGFloat(u) * g[2], y: g[1] + CGFloat(-db / 60) * g[3])
     }
 
-    @ViewBuilder func parts(kit: RackKit, P: RackKit.Plotter, st: State) -> some View {
+    @ViewBuilder func parts(kit: RackKit, P: RackKit.Plotter, st: PenState) -> some View {
         let dx = st.armX - P.park, dy = st.penY - P.penAt[1]
         let pen = "pen-\(st.pen % max(1, P.inks.count))"
         // the shadows fall on the bed: kept inside its opening (the paper with the bed's margins)
