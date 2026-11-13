@@ -360,15 +360,33 @@ def key(lid, lit=False, down=False, text=None, size=None, vname=None):
     return w + 2 * bz, h + 2 * bz
 
 
+TGL = dict(L=float(os.environ.get('IRC_TGL_LEN', '2.2')), throw=float(os.environ.get('IRC_TGL_THROW', '24')),
+           tip=os.environ.get('IRC_TGL_TIP', ''))
+BAT = [(0.13, 0.0), (0.16, 0.6), (0.21, 1.4), (0.25, 1.85), (0.24, 2.05), (0.15, 2.18), (0.0, 2.2)]
+
+
+def _bat(sc=1.0):
+    """The bat handle, TGL['L'] long; with TGL['tip'] (a colour) a push-on plastic cap over its outer half, as on
+    console and test-gear toggles, so the throw reads straight on (11-13, Lowell: the toggles are hard to see)."""
+    L = TGL['L'] / 2.2
+    bat = lathe('tbat', [(a * sc, b * L * sc) for a, b in BAT], 48); bat.data.materials.append(SG.nickel('tgl', seed=4))
+    if TGL['tip']:
+        z0, z1, r = 0.95 * L * sc, 2.2 * L * sc, 0.31 * sc
+        cap = lathe('tcap', [(0.2 * sc, z0), (r, z0 + 0.06 * sc), (r, z1 - 0.22 * sc), (r * 0.82, z1 - 0.06 * sc),
+                             (r * 0.45, z1), (0.0, z1)], 48)
+        cap.data.materials.append(mat('tglcap-' + TGL['tip'], srgb(TGL['tip']), rough=0.34, spec=0.5))
+        cap.parent = bat
+    return bat
+
+
 def toggle(pos):
     """A bat-handle toggle switch seen end on: a hex nut, a collar, the handle thrown up (+1), level (0) or down (-1)."""
     ch = SG.nickel('tgl', seed=4)
     nut = lathe('tnut', [(0.62, 0.0), (0.62, 0.16), (0.56, 0.2), (0.34, 0.2)], 6, smooth=False); nut.data.materials.append(ch)
     nut.rotation_euler = (0, 0, math.radians(30))
     col = lathe('tcol', [(0.36, 0.0), (0.36, 0.42), (0.3, 0.5), (0.16, 0.5)], 48); col.data.materials.append(ch)
-    bat = lathe('tbat', [(0.13, 0.0), (0.16, 0.6), (0.21, 1.4), (0.25, 1.85), (0.24, 2.05), (0.15, 2.18), (0.0, 2.2)], 48)
-    bat.data.materials.append(ch)
-    bat.location = (0, 0, 0.3); bat.rotation_euler = (math.radians(-24 * pos), 0, 0)
+    bat = _bat()
+    bat.location = (0, 0, 0.3); bat.rotation_euler = (math.radians(-TGL['throw'] * pos), 0, 0)
 
 
 def paper_mat(name, img_path, rough=0.7):
@@ -1750,25 +1768,31 @@ def unit_formats(cover=True):
     bat_toggle(-14.3, 2.2, 1, 'POSITIVE', 'AS RECORDED', 'POLARITY')
     bat_toggle(-14.3, -3.4, 1, 'ON', 'OFF', 'CUSTOM')
     on = set(os.environ.get('IRC_FORMATS_ON', '48,96,full,24,set').split(','))
-    rows = [(2.35, [('RATES  kHz', [('44.1', '441'), ('48', '48'), ('88.2', '882'), ('96', '96')]),
-                    ('LENGTHS', [('FULL', 'full'), ('1024', '1024'), ('2048', '2048'), ('4096', '4096')])]),
-            (-3.35, [('BITS', [('16', '16'), ('24', '24'), ('32 FLOAT', '32f')]),
-                     ('TRIMMING', [('KEEP TIMING', 'set'), ('EACH MIC', 'individual')])])]
+    # (11-13, Lowell on the fifth proof) LENGTHS ordered shortest to full, FULL at the far right over the FULL ms wheel
+    rows = [(-3.35, [('BITS', [('16', '16'), ('24', '24'), ('32 FLOAT', '32f')]),
+                     ('TRIMMING', [('KEEP TIMING', 'set'), ('EACH MIC', 'individual')])]),
+            (2.35, [('RATES  kHz', [('44.1', '441'), ('48', '48'), ('88.2', '882'), ('96', '96')]),
+                    ('LENGTHS', [('1024', '1024'), ('2048', '2048'), ('4096', '4096'), ('FULL', 'full')])])]
+    D = ['%d' % i for i in range(10)]; HALF = ['0', '5'] * 5
+    W = 3 * TW['pitch'] + 0.85 + 2 * TW['end']
+    xw = None
     for y, groups in rows:
         x = -9.6
-        for head, keys in groups:
+        for gi, (head, keys) in enumerate(groups):
             ws = [K.legend_width(t, 'std') + 2 * TK.KEY['bezel'] for t, _ in keys]
             gw = sum(ws) + 0.3 * (len(ws) - 1)
+            if head == 'LENGTHS':
+                x = max(x, xw + ws[-1] / 2 - gw)
             engrave(head, x + gw / 2, y + 1.95, 0.44, track=0.14)
             for (t, tid), wk in zip(keys, ws):
                 with moved(x + wk / 2, y, 0): key(None, lit=tid in on, text=t, vname='custom ' + t)
                 x += wk + 0.3
             x += 0.8
-        xe = x
-    D = ['%d' % i for i in range(10)]; HALF = ['0', '5'] * 5
+        if xw is None:
+            xw = x + W / 2 - 0.1
+            print('formats: FULL ms wheel at x %.2f' % xw, flush=True)
     g = [(['0', '1'] * 5, 0), (D, 5), (HALF, 0), '=0']
-    W = 3 * TW['pitch'] + 0.85 + 2 * TW['end']
-    thumbwheel(xe + W / 2 - 0.1, -2.9, g, 'fullms', legend='FULL  ms')
+    thumbwheel(xw, -2.9, g, 'fullms', legend='FULL  ms')
     if cover: smoked_cover(-16.3, 22.1, -6.2, 5.4, name='cvformats', hinge_in=3.9)
     finish_glass()
     shoot(s, cam, 'unit-formats' + ('' if cover else '-open'), PW, h)
@@ -1958,15 +1982,15 @@ def track_sheet(path, w, h, px=110):
     age_paper(P_.im, P_.rng).save(path)
 
 
-def side_toggle(pos, sc=0.78):
+def side_toggle(pos, sc=None):
     """toggle()'s bat-handle switch mounted on its side: thrown left (-1), centre (0) or right (+1)."""
+    sc = float(os.environ.get('IRC_SIDE_SC', '0.78')) if sc is None else sc
     ch = SG.nickel('tgl', seed=4)
     nut = lathe('tnut', [(0.62 * sc, 0.0), (0.62 * sc, 0.16 * sc), (0.56 * sc, 0.2 * sc), (0.34 * sc, 0.2 * sc)], 6, smooth=False)
     nut.data.materials.append(ch)
     col = lathe('tcol', [(0.36 * sc, 0.0), (0.36 * sc, 0.42 * sc), (0.3 * sc, 0.5 * sc), (0.16 * sc, 0.5 * sc)], 48); col.data.materials.append(ch)
-    bat = lathe('tbat', [(a * sc, b * sc) for a, b in [(0.13, 0.0), (0.16, 0.6), (0.21, 1.4), (0.25, 1.85), (0.24, 2.05), (0.15, 2.18), (0.0, 2.2)]], 48)
-    bat.data.materials.append(ch)
-    bat.location = (0, 0, 0.3 * sc); bat.rotation_euler = (0, math.radians(24 * pos), 0)
+    bat = _bat(sc)
+    bat.location = (0, 0, 0.3 * sc); bat.rotation_euler = (0, math.radians(TGL['throw'] * pos), 0)
 
 
 def unit_tracks():
