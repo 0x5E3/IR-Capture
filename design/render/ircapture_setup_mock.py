@@ -79,7 +79,8 @@ cover(o, U, S['cover']); units.append(o)
 # formats: POLARITY at AS RECORDED, CUSTOM ON (base up), 48 96 FULL 24 KEEP TIMING lit, FULL ms 0500
 U = J['units']['formats']; Fm = U['formats']
 o = img(U['picture']); lay(o, U, 't0-down')
-for i in (1, 3, 4, 9, 11): lay(o, U, 'k%d-lit' % i)
+ids = [k_['id'] for k_ in Fm['keys']]      # (11-13) by id: the keys' order is only the layout's
+for kid in ('c-48', 'c-96', 'c-full', 'c-24', 'c-set'): lay(o, U, 'k%d-lit' % ids.index(kid))
 figures(o, Fm['wheels'], [0, 5, 0])
 cover(o, U, Fm['cover']); units.append(o)
 # plotter: the arm part way, a curve inked as far as the arm, the pen down on it

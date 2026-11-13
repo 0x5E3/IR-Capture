@@ -355,7 +355,8 @@ struct RackSetupFrame<Under: View, Controls: View>: View {
                             own: { ($0.hasPrefix("k") && $0.hasSuffix("down")) || $0.hasPrefix("tw") || $0.hasPrefix("cover") },
                             overlay: AnyView(ZStack(alignment: .topLeading) { under }
                                 .frame(width: unit.size[0], height: unit.size[1], alignment: .topLeading)),
-                            instant: { $0.hasPrefix("sel") || $0.hasPrefix("t") })
+                            // (11-13) "p<i>": the track sheet's hole plugs, put in or taken out at once
+                            instant: { $0.hasPrefix("sel") || $0.hasPrefix("t") || $0.hasPrefix("p") })
             ZStack(alignment: .topLeading) { controls }
                 .frame(width: unit.size[0], height: unit.size[1], alignment: .topLeading)
                 .offset(x: -unit.panel[0], y: -unit.panel[1])

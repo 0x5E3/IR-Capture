@@ -1,0 +1,62 @@
+{
+ "runner": "imac",
+ "note": "IR Capture's fifth proof's units (approved 11-13 with Lowell's toggle pick C; IR Capture chat, 11-13 twelfth chat) at full quality for the app: the DAW route (step-daw, chart-daw with DWG 2 and the card IN THE DAW, signal: the test signal's rotaries and thumbwheels, tracks: the track sheet with a side toggle a line, go-daw: MAKE IRS), the re-export (step-rex, files-rex: the past capture's card and CHOOSE, go-rex: CANCEL and RE-EXPORT) and the pre-flight with its TROUBLE box (preflight-trouble, 5U). Each by ircapture_rack_layers.py as a base and its live states as border crops, at the app's scale, 42 px/cm, 192 samples (the preview build's are the container's at 64). One unit per job. The patch and formats units with toggle C and LENGTHS reordered come from imac-ircapture-rack-1112 and imac-ircapture-setup-1112 (they render with look's scripts, updated 11-13). Post in the IR-Capture repo, each job folder on its own: ircapture_rack_post.py <job folder> Resources/SwellKit.",
+ "estimate_min": {
+  "step-daw": 13,
+  "step-rex": 13,
+  "go-daw": 7,
+  "go-rex": 7,
+  "preflight-trouble": 10,
+  "chart-daw": 19,
+  "tracks": 55,
+  "files-rex": 40,
+  "signal": 55
+ },
+ "jobs": [
+  {
+   "id": "step-daw",
+   "env": "FONTS_DIR=design/render/fonts/swellkit IRC_LIQUID_RELIEF=0.7",
+   "cmd": "design/render/ircapture_rack_layers.py OUT step-daw 42 192"
+  },
+  {
+   "id": "step-rex",
+   "env": "FONTS_DIR=design/render/fonts/swellkit IRC_LIQUID_RELIEF=0.7",
+   "cmd": "design/render/ircapture_rack_layers.py OUT step-rex 42 192"
+  },
+  {
+   "id": "go-daw",
+   "env": "FONTS_DIR=design/render/fonts/swellkit IRC_LIQUID_RELIEF=0.7",
+   "cmd": "design/render/ircapture_rack_layers.py OUT go-daw 42 192"
+  },
+  {
+   "id": "go-rex",
+   "env": "FONTS_DIR=design/render/fonts/swellkit IRC_LIQUID_RELIEF=0.7",
+   "cmd": "design/render/ircapture_rack_layers.py OUT go-rex 42 192"
+  },
+  {
+   "id": "preflight-trouble",
+   "env": "FONTS_DIR=design/render/fonts/swellkit IRC_LIQUID_RELIEF=0.7",
+   "cmd": "design/render/ircapture_rack_layers.py OUT preflight-trouble 42 192"
+  },
+  {
+   "id": "chart-daw",
+   "env": "FONTS_DIR=design/render/fonts/swellkit IRC_LIQUID_RELIEF=0.7",
+   "cmd": "design/render/ircapture_rack_layers.py OUT chart-daw 42 192"
+  },
+  {
+   "id": "tracks",
+   "env": "FONTS_DIR=design/render/fonts/swellkit IRC_LIQUID_RELIEF=0.7",
+   "cmd": "design/render/ircapture_rack_layers.py OUT tracks 42 192"
+  },
+  {
+   "id": "files-rex",
+   "env": "FONTS_DIR=design/render/fonts/swellkit IRC_LIQUID_RELIEF=0.7",
+   "cmd": "design/render/ircapture_rack_layers.py OUT files-rex 42 192"
+  },
+  {
+   "id": "signal",
+   "env": "FONTS_DIR=design/render/fonts/swellkit IRC_LIQUID_RELIEF=0.7",
+   "cmd": "design/render/ircapture_rack_layers.py OUT signal 42 192"
+  }
+ ]
+}
