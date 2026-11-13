@@ -80,6 +80,8 @@ public struct ProcessedCapture {
     public var fileCount: Int
     public var folder: URL
     public var curves: (fc: [Double], curves: [String: [Double]])
+    /// (11-12) The automatic mixes' responses, on the same scale as `curves` (the plotter's printed charts).
+    public var mixCurves: [(label: String, curve: [Double])] = []
     public var polarityNotes: [String] = []
     /// Room-mic and extras notes from the export.
     public var exportNotes: [String] = []
@@ -129,6 +131,8 @@ public func processAndWrite(rec: [[Double]], spec: SweepSpec, names: [String], r
     }
     let g = res.gains["set"]?[names[0]] ?? res.gains["individual"]?[names[0]] ?? 1
     let prefix = capture + "/"
-    return ProcessedCapture(result: res, fileCount: files.count, folder: folder, curves: responseCurves(res, gain: g),
-                            polarityNotes: notes, exportNotes: res.exportNotes, files: files.map { $0.path.hasPrefix(prefix) ? String($0.path.dropFirst(prefix.count)) : $0.path })
+    var out = ProcessedCapture(result: res, fileCount: files.count, folder: folder, curves: responseCurves(res, gain: g),
+                               polarityNotes: notes, exportNotes: res.exportNotes, files: files.map { $0.path.hasPrefix(prefix) ? String($0.path.dropFirst(prefix.count)) : $0.path })
+    out.mixCurves = mixResponseCurves(res, gain: g)
+    return out
 }

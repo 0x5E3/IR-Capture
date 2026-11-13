@@ -432,6 +432,22 @@ struct QuickStartPage: View {
             "Click Check levels, then Record (3 minutes 12 seconds). Do not adjust any controls during the recording.",
             "Upload the WAV files at tone3000.com/capture. TONE3000 trains the model and provides a .nam file.",
         ])
+        // (11-12) what the old panels said beside their controls, now that the controls are rack units
+        Text("The set-up units").font(.swellBody(20, semibold: true)).padding(.top, 8)
+        Checklist(items: [
+            "INTERFACE: click SELECT for the list of interfaces, or turn it with the scroll wheel. OUT TO AMP: the interface output connected to the amp. AUDIO SETUP opens Audio MIDI Setup. If inputs and outputs are on two devices, combine them into an aggregate device there.",
+            "REFERENCE: NONE, LOAD BOX (a load box line out) or TAP OR PAD (a reference tap or a 20 dB pad across the speaker terminals). Set the input it is connected to to REF on the inputs unit. See Help › The reference tap.",
+            "CAPTURE NAME: cab and mic position, e.g. 412_V30_PosA. All file names start with this name. Click a line on the card to type on it. NOTES are saved in report.json.",
+            "FILES: UNIVERSAL makes one file per mic at the top of the capture folder (48 kHz, 24-bit, 500 ms). Use it for devices not listed (Quad Cortex, ToneX, Fractal, Kemper Cab Maker). These manufacturers do not publish a fixed format. Conversion is done by their software on import. ALL RATES makes 44.1, 48, 88.2 and 96 kHz files at 500 ms and 200 ms. IRIDIUM makes the Strymon Iridium format.",
+            "ALSO MAKE: MIN PHASE makes minimum-phase versions of the close mics. MIXES makes two-mic blends. A mic named Room or Amb (Room L, Ambient) is treated as a room mic: it has no minimum-phase version and is mixed with close mics at 80/20 and 60/40.",
+            "The sweep and file options units are under smoked covers. Click a cover to lift it. Click its hinges to shut it.",
+            "RATE: AUTO records at the highest rate of the interface, up to 96 kHz. All other rates are made from this capture. The interface is reset to its previous rate afterwards.",
+            "LEVEL: AUTO starts at −18 dBFS. The level is raised in steps while speaker distortion stays low, and reduced if distortion increases.",
+            "SWEEPS, LENGTH, GAP, WARM-UP: set the gap longer than the room reverb tail. The warm-up sweeps are discarded. Each doubling of the sweep count lowers the noise floor by about 3 dB.",
+            "POLARITY: POSITIVE makes each IR with its main peak positive, as in commercial IR packs, so mics blend without cancellation. An inverted mic is flipped, and the flip is listed in the results. AS RECORDED keeps the polarity of each recording.",
+            "CUSTOM: ON adds the files chosen on the keys, in More formats › Custom. KEEP TIMING: all mics are trimmed by the same amount and share one gain, so the blend matches the original mics. EACH MIC: each file starts at its own first arrival and is normalized separately. FULL ms: the length of the FULL files.",
+            "PRINT, on the response plotter: print the response chart, or save it as a PDF in the capture folder. The style (plotter colours, or black and white) and the curves (all mics, each mic on its own page, the mixes) are chosen in the same menu.",
+        ])
     }
 }
 

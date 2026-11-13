@@ -260,6 +260,84 @@ def cart(L):
     return out
 
 
+def keys_pt(ks):
+    return [{'id': k['id'], 'rect': rect(k['rect'])} for k in ks]
+
+
+def selectors_pt(ss):
+    return [{'c': [pt(v) for v in s_['c']], 'r': pt(s_['r']), 'base': s_['base'], 'labels': [rect(q) for q in s_['labels']]} for s_ in ss]
+
+
+def wheels(L, W):
+    """(11-12) The thumbwheels: module 0's window showing each figure, cut to the window, as one sheet (the deck
+    counter's way: every window of the unit shows these); each module's window and buttons."""
+    c0 = W['crop']; r0 = W['windows'][0]
+    x0, y0 = int(round(min(r0[0], r0[2]) - c0[0])), int(round(min(r0[1], r0[3]) - c0[1]))
+    x1, y1 = int(round(max(r0[0], r0[2]) - c0[0])), int(round(max(r0[1], r0[3]) - c0[1]))
+    figs = [Image.open(os.path.join(RD, '%s-figure-%d.png' % (L['picture'], d))).convert('RGBA').crop((x0, y0, x1, y1)) for d in range(10)]
+    sh = Image.new('RGBA', ((x1 - x0) * 10, y1 - y0))
+    for d, f in enumerate(figs): sh.paste(f, (d * (x1 - x0), 0))
+    nm = L['picture'] + '-figures'; save(sh, nm)
+    return {'picture': nm, 'windows': [rect(q) for q in W['windows']], 'plus': [rect(q) for q in W['plus']],
+            'minus': [rect(q) for q in W['minus']], 'kinds': W['kinds'], 'groups': W['groups']}
+
+
+def cover(L):
+    """(11-12) The smoked cover. The render of the whole cover shut (A) over the base, and of its hardware alone (C):
+    under the pane A = C * tint + sheen. The tint is A / C taken over the pane where C is bright enough to measure,
+    smoothed over about a centimetre (it is a smoked sheet: an even colour, a little lighter where the room shows in it);
+    the sheen is what is left. The app multiplies the live controls by the tint, adds the sheen, then draws the hardware."""
+    from scipy.ndimage import gaussian_filter
+    Cv = L['cover']; box = L['solo']['cover']['box_px']
+    A = np.asarray(Image.open(os.path.join(RD, L['picture'] + '-cover.png')).convert('RGB'), np.float32)
+    C = np.asarray(Image.open(os.path.join(RD, L['picture'] + '-cover-hw.png')).convert('RGB'), np.float32)
+    q = Cv['pane']; px0, px1 = sorted((q[0], q[2])); py0, py1 = sorted((q[1], q[3]))
+    ix0, iy0, ix1, iy1 = int(np.floor(px0 - box[0])), int(np.floor(py0 - box[1])), int(np.ceil(px1 - box[0])), int(np.ceil(py1 - box[1]))
+    A, C = A[iy0:iy1, ix0:ix1], C[iy0:iy1, ix0:ix1]
+    hh, ww = A.shape[:2]
+    ss = 4; rr = Cv['r_cm'] * PXCM
+    m = Image.new('L', (ww * ss, hh * ss), 0)
+    ImageDraw.Draw(m).rounded_rectangle([(px0 - box[0] - ix0) * ss, (py0 - box[1] - iy0) * ss, (px1 - box[0] - ix0) * ss, (py1 - box[1] - iy0) * ss], rr * ss, fill=255)
+    pane = np.asarray(m.resize((ww, hh), Image.LANCZOS), np.float32) / 255
+    lum = C.mean(-1)
+    w = ((lum > 28) & (np.abs(A - C).max(-1) < 200)).astype(np.float32) * (pane > 0.99)
+    sig = 0.9 * PXCM
+    tint = np.stack([gaussian_filter(A[..., i] * w, sig) / np.maximum(gaussian_filter(C[..., i] * w, sig), 1e-3) for i in range(3)], -1)
+    wd = gaussian_filter(w, sig)
+    glob = np.array([np.median((A[..., i] / np.maximum(C[..., i], 1))[w > 0]) for i in range(3)])
+    k = np.clip(wd / 0.15, 0, 1)[..., None]
+    tint = np.clip(tint * k + glob[None, None, :] * (1 - k), 0.05, 1.0)    # a multiply cannot brighten: the rest is sheen
+    tint = tint * pane[..., None] + (1 - pane[..., None])
+    sheen = np.clip(A - C * tint, 0, 255) * pane[..., None]
+    rec = C * tint + sheen
+    err = np.abs(rec - A).mean(-1)[pane > 0.99]
+    tim = Image.fromarray(np.clip(tint * 255 + 0.5, 0, 255).astype(np.uint8), 'RGB')
+    save(tim, L['picture'] + '-cover-tint')
+    save(Image.fromarray(np.clip(sheen + 0.5, 0, 255).astype(np.uint8), 'RGB'), L['picture'] + '-cover-sheen')
+    r_ = (box[0] + ix0, box[1] + iy0, ww, hh)
+    print('  cover: tint %s (median), rebuilt within %.1f / 255 (mean), %.1f (99th pc)' % (np.round(glob, 3), err.mean(), np.percentile(err, 99)))
+    return {'pane': rect(Cv['pane']), 'radius': pt(rr), 'rect': [pt(r_[0]), pt(r_[1]), pt(r_[2]), pt(r_[3])],
+            'tint': L['picture'] + '-cover-tint', 'tintScale': 1.0, 'sheen': L['picture'] + '-cover-sheen',
+            'latch': rect(Cv['latch']), 'hinges': [rect(h_) for h_ in Cv['hinges']]}
+
+
+def plotter(L):
+    """(11-12) The plotter's moving parts, each rendered alone (its own alpha) where it parks: saved cut tight, their
+    rects in the base's points; the paper, its grid, the title line's places."""
+    Pz = L['plotter']; out = {'paper': rect(Pz['paper']), 'grid': rect(Pz['grid']), 'plot': Pz['plot'], 'title': Pz['title'],
+                              'keys': keys_pt(Pz['keys']), 'park': pt(Pz['park']), 'travel': [pt(v) for v in Pz['travel']],
+                              'penPark': pt(Pz['penPark']), 'penAt': [pt(v) for v in Pz['penAt']], 'inks': Pz['inks'], 'parts': {}}
+    for nm, LL in L['solo'].items():
+        im = Image.open(os.path.join(RD, LL['picture'] + '.png')).convert('RGBA')
+        bb = im.getchannel('A').point(lambda v: 255 if v > 2 else 0).getbbox()
+        if bb is None: print('  plotter %s: empty' % nm); continue
+        im = im.crop(bb); save(im, LL['picture'])
+        b = LL['box_px']
+        out['parts'][nm] = {'picture': LL['picture'], 'rect': [pt(b[0] + bb[0]), pt(b[1] + bb[1]), pt(im.size[0]), pt(im.size[1])]}
+    print('  plotter: %d parts' % len(out['parts']))
+    return out
+
+
 for key, L in lay.get('units', {}).items():
     base = Image.open(os.path.join(RD, L['picture'] + '.png')).convert('RGBA')
     save(base, L['picture'])
@@ -292,6 +370,24 @@ for key, L in lay.get('units', {}).items():
     if 'deck' in L: u['deck'] = deck(L)
     if 'cart' in L: u['cart'] = cart(L)
     if 'preflight' in L: u['preflight'] = {'sheet': rect(L['preflight']['sheet']), 'form': L['preflight']['form']}
+    if 'connect' in L:
+        Cn = L['connect']
+        u['connect'] = {'keys': keys_pt(Cn['keys']), 'selectors': selectors_pt(Cn['selectors']),
+                        'vfd': {'cells': rect(Cn['vfd']['cells']), 'mtx': Cn['vfd']['mtx'], 'n': Cn['vfd']['n']},
+                        'select': {'c': [pt(v) for v in Cn['select']['c']], 'r': pt(Cn['select']['r'])},
+                        'wheels': wheels(L, Cn['wheels'])}
+    if 'files' in L:
+        u['files'] = {'sheet': rect(L['files']['sheet']), 'form': L['files']['form'], 'keys': keys_pt(L['files']['keys'])}
+    for nm_ in ('sweep', 'formats'):
+        if nm_ in L:
+            S_ = L[nm_]; o_ = {'wheels': wheels(L, S_['wheels'])}
+            if 'selectors' in S_: o_['selectors'] = selectors_pt(S_['selectors'])
+            if 'keys' in S_: o_['keys'] = keys_pt(S_['keys'])
+            if 'toggles' in S_:
+                o_['toggles'] = [{'c': [pt(v) for v in t['c']], 'up': rect(t['up']), 'down': rect(t['down'])} for t in S_['toggles']]
+            o_['cover'] = cover(L)
+            u[nm_] = o_
+    if 'plotter' in L: u['plotter'] = plotter(L)
     J['units'][key] = u
     print(key, base.size, len(u['layers']), 'layers')
 

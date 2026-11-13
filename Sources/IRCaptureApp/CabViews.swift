@@ -21,14 +21,18 @@ struct CabJob: View {
                 RackStepStrip(steps: [("Connect", connected), ("Set levels", levelsDone), ("Capture", m.result != nil), ("Results", m.result != nil)])
                 // (Phase 7a) the chart panel: the hook-up drawing and the card, in place of the Connect step's drawing
                 if RackChartUnit.available { RackChartUnit() }
-                CabConnectStep(done: connected)
-                // (Phase 7a) the patch unit: a three-way toggle for each input, in place of the inputs grid; under the
-                // Connect panel, since the interface is chosen there
+                // (Phase 7a, the fourth proof) the connect unit: the interface on its VFD, OUT TO AMP, REFERENCE
+                if RackConnectUnit.available { RackConnectUnit().id("connect") } else { CabConnectStep(done: connected) }
+                // (Phase 7a) the patch unit: a three-way toggle for each input, in place of the inputs grid
                 RackPatchBay()
+                if RackConnectUnit.available { CabConnectLeftovers() }
                 if TapePieces.deck != nil || RackDeck.available {
                     // Phase 7: the reel deck replaces the Set levels and Capture panels. The capture's name and files
                     // come first, the guidance beside the deck, the meters under it.
-                    CabFilesStep()
+                    if RackFilesUnit.available { RackFilesUnit().id("files") } else { CabFilesStep() }
+                    // (the fourth proof) the old Advanced disclosures, under their smoked covers
+                    if RackSweepUnit.available { RackSweepUnit().id("sweep") }
+                    if RackFormatsUnit.available { RackFormatsUnit() } else if RackFilesUnit.available { AdvancedOutput().onPanel() }
                     // (Phase 7a) the meter bridge: a 5U rack unit, one channel module for each input in use
                     if RackMeterBridge.available { RackMeterBay() }
                     if RackPreflightUnit.available {
@@ -50,16 +54,19 @@ struct CabJob: View {
                     CabLevelStep(done: levelsDone)
                     CabCaptureStep()
                 }
-                HStack(alignment: .center, spacing: 10) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Engraved("Recorded in a DAW instead?", size: 12)
-                        Note("Play the test signal from Logic, Reaper, Ableton, Pro Tools or GarageBand. Record the mics in the DAW. Import the files here.")
+                // (the fourth proof) IMPORT DAW is on the connect unit, RE-EXPORT OLD on the files unit
+                if !(RackConnectUnit.available && RackFilesUnit.available) {
+                    HStack(alignment: .center, spacing: 10) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Engraved("Recorded in a DAW instead?", size: 12)
+                            Note("Play the test signal from Logic, Reaper, Ableton, Pro Tools or GarageBand. Record the mics in the DAW. Import the files here.")
+                        }
+                        Spacer()
+                        Button("Import DAW recordings…") { m.cabImport = true }.buttonStyle(KeyButtonStyle(key: "Import DAW recordings…"))
+                        Button("Re-export a past capture…") { m.chooseReexportFolder() }.buttonStyle(KeyButtonStyle(key: "Re-export a past capture…"))
                     }
-                    Spacer()
-                    Button("Import DAW recordings…") { m.cabImport = true }.buttonStyle(KeyButtonStyle(key: "Import DAW recordings…"))
-                    Button("Re-export a past capture…") { m.chooseReexportFolder() }.buttonStyle(KeyButtonStyle(key: "Re-export a past capture…"))
+                    .onPanel(padding: 16)
                 }
-                .onPanel(padding: 16)
             }
         }
     }
@@ -87,6 +94,30 @@ struct CabFilesStep: View {
             CaptureNameFields()
             TargetsPicker()
             AdvancedOutput()
+        }
+    }
+}
+
+/// (the fourth proof) What the connect unit does not hold: an interface with more inputs than the patch units take keeps
+/// the old inputs grid and the reference's input menu; without the sweep unit, the old Advanced.
+struct CabConnectLeftovers: View {
+    @EnvironmentObject var m: AppModel
+    var body: some View {
+        let patch = m.device.map { RackPatchBay.available && RackPatchBay.holds($0.inputChannels) } ?? false
+        if let dev = m.device, !patch || !RackSweepUnit.available {
+            VStack(alignment: .leading, spacing: 12) {
+                if !patch {
+                    InputsGrid()
+                    if m.refSource != .none {
+                        GlassMenu(title: "Reference connected to", selection: Binding(get: { m.refInput ?? -1 }, set: { m.setRefInput($0 < 0 ? nil : $0) }),
+                                  options: [(-1, "Choose…")] + (0..<dev.inputChannels).map { ($0, "Input \($0 + 1)") })
+                    }
+                }
+                if !RackSweepUnit.available { CabAdvanced() }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .onPanel(padding: 16)
+            .disabled(m.audioActive)
         }
     }
 }

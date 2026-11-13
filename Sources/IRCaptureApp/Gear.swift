@@ -307,6 +307,33 @@ final class PopUpMenu: NSObject {
         }
         menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
     }
+
+    /// (11-12) A menu with headings and separators (PRINT's): a heading is a disabled line, a choice may be disabled.
+    enum Item {
+        case header(String)
+        case separator
+        case choice(String, checked: Bool, enabled: Bool, action: () -> Void)
+    }
+    static func show(_ items: [Item]) {
+        let t = PopUpMenu()
+        current = t
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        for it in items {
+            switch it {
+            case .header(let s):
+                let mi = NSMenuItem(title: s, action: nil, keyEquivalent: ""); mi.isEnabled = false; menu.addItem(mi)
+            case .separator:
+                menu.addItem(.separator())
+            case .choice(let s, let checked, let enabled, let action):
+                let mi = NSMenuItem(title: s, action: #selector(PopUpMenu.fire(_:)), keyEquivalent: "")
+                mi.target = t; mi.tag = t.actions.count; mi.state = checked ? .on : .off; mi.isEnabled = enabled
+                t.actions.append(action)
+                menu.addItem(mi)
+            }
+        }
+        menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
+    }
 }
 
 /// The small downward chevron drawn on glass (no symbol fonts in the gear).

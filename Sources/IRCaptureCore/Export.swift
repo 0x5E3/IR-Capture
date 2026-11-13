@@ -180,6 +180,19 @@ public func responseCurves(_ res: AnalysisResult, gain: Double = 1) -> (fc: [Dou
     return (fc, curves)
 }
 
+/// (11-12) The automatic mixes' responses (makeMixes, as exported), 1/6-octave smoothed as responseCurves, for the
+/// plotter's printed charts. Display only: nothing here is written to the capture.
+public func mixResponseCurves(_ res: AnalysisResult, gain: Double = 1) -> [(label: String, curve: [Double])] {
+    let mixes = makeMixes(res)
+    guard !mixes.isEmpty else { return [] }
+    var tmp = res
+    tmp.names = mixes.map(\.label)
+    tmp.irs = Dictionary(uniqueKeysWithValues: mixes.map { ($0.label, $0.ir) })
+    tmp.onsets = Dictionary(uniqueKeysWithValues: mixes.map { m in (m.label, m.mics.compactMap { res.onsets[$0] }.min() ?? 0) })
+    let c = responseCurves(tmp, gain: gain)
+    return mixes.map { ($0.label, c.curves[$0.label] ?? []) }
+}
+
 /// report.json, same fields and order as the page's.
 public func reportJSON(_ res: AnalysisResult, spec: SweepSpec, capture: String, extra: [(String, JSON)] = []) -> String {
     let iso = ISO8601DateFormatter()

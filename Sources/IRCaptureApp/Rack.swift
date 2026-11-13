@@ -35,6 +35,12 @@ struct RackKit: Decodable {
         let nammeters: NAMMeters?    // the NAM meter bridge's own parts (RackNAMMeters.swift)
         let deck: Deck?              // the reel deck's own parts (RackMachines.swift)
         let cart: Cart?              // the cart machine's own parts (RackMachines.swift)
+        // (11-12) the fourth proof's units (RackSetup.swift, RackPlotter.swift)
+        var connect: Connect? = nil
+        var files: Files? = nil
+        var sweep: Setup? = nil
+        var formats: Setup? = nil
+        var plotter: Plotter? = nil
     }
     /// The pre-flight (4U): BEFORE CAPTURE, a printed form with a ruled table (ITEM, READING, OK), typed by the app.
     struct Preflight: Decodable {
@@ -159,6 +165,7 @@ struct RackKit: Decodable {
         if let m = u.meters { files += [m.eye.picture, m.needle.picture] }
         if let r = u.results { files += r.stamps.values.map(\.picture) }
         if let d = u.deck { files += d.pictures }
+        files += k.setupPictures(u)
         guard files.allSatisfy({ SwellPictures.shared.cgImage($0 + ".webp") != nil }) else { return nil }
         return (k, u)
     }
@@ -261,6 +268,8 @@ struct RackUnitPicture: View {
     var own: (String) -> Bool = { _ in false }
     /// Drawn over the picture, in the picture's points (origin its top left).
     var overlay: AnyView? = nil
+    /// (11-12) Layers that switch at once whatever `filament` says (a selector turned, a toggle thrown).
+    var instant: (String) -> Bool = { _ in false }
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var body: some View {
         let p = unit.panel
@@ -275,7 +284,7 @@ struct RackUnitPicture: View {
                         .frame(width: l.rect[2], height: l.rect[3])
                         .offset(x: l.rect[0], y: l.rect[1])
                         .opacity(lit ? 1 : 0)
-                        .animation(filament && !reduceMotion ? SwellMotion.filament(lit) : nil, value: lit)
+                        .animation(filament && !reduceMotion && !instant(k) ? SwellMotion.filament(lit) : nil, value: lit)
                 }
             }
             if let overlay { overlay }

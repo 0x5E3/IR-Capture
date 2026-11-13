@@ -171,10 +171,22 @@ struct ContentView: View {
                 c
             }
             .clipped()     // (under View › Page Size's scale the scroll view's own clip runs short; this one holds)
-            .onChange(of: m.result?.folder) { _ in withAnimation { proxy.scrollTo("results", anchor: .top) } }
+            .onChange(of: m.result?.folder) { _ in
+                withAnimation { proxy.scrollTo("results", anchor: .top) }
+                // CI hook (11-12): on to the plotter 4 s after the results (screenshot-plotter*.png)
+                if ProcessInfo.processInfo.arguments.contains("--then-plotter") {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 4) { proxy.scrollTo("plotter", anchor: .top) }
+                }
+            }
             .task {
-                // CI hook: open scrolled to the tape machine (screenshot-deck.png, screenshot-cart.png).
-                guard ProcessInfo.processInfo.arguments.contains("--scroll-to-machine") else { return }
+                // CI hook: open scrolled to the tape machine (screenshot-deck.png, screenshot-cart.png), or (11-12) to a
+                // unit by its id (--scroll-to connect, files, sweep).
+                let args = ProcessInfo.processInfo.arguments
+                if let i = args.firstIndex(of: "--scroll-to"), i + 1 < args.count {
+                    try? await Task.sleep(nanoseconds: 1_500_000_000)
+                    proxy.scrollTo(args[i + 1], anchor: .top)
+                }
+                guard args.contains("--scroll-to-machine") else { return }
                 try? await Task.sleep(nanoseconds: 1_500_000_000)
                 proxy.scrollTo("machine", anchor: .top)
             }
@@ -185,6 +197,10 @@ struct ContentView: View {
     /// CI hooks: process the simulated recordings, render the diagrams, or open a given view.
     private func runAutomation() {
         let args = ProcessInfo.processInfo.arguments
+        // CI hook (11-12): the set-up units' smoked covers shut or lifted
+        if let i = args.firstIndex(of: "--covers"), i + 1 < args.count {
+            for k in ["rack.cover.sweep", "rack.cover.formats"] { UserDefaults.standard.set(args[i + 1] != "open", forKey: k) }
+        }
         if let i = args.firstIndex(of: "--demo"), i + 1 < args.count {
             // `IR Capture --demo <sim_out>` processes the simulated Logic recordings through Import DAW recordings.
             m.job = .cab; m.cabImport = true
@@ -507,17 +523,32 @@ struct Shelf: View {
     /// The VFD's line: the status (or, during a Cab IR level check, the advice for the input that most needs it), the
     /// interface shortened to fit, the rate.
     func vfdText(_ st: (Lamp.Glow, String)) -> String {
-        let advice = m.job == .cab && m.levelRunning && RackMeterBridge.available ? m.levelGuidance : nil
+        var advice = m.job == .cab && m.levelRunning && RackMeterBridge.available ? m.levelGuidance : nil
+        // (the fourth proof) an unused input with signal: the line asks what it is; the input's own toggle answers
+        if m.job == .cab, RackConnectUnit.available, m.busy == nil, advice == nil || advice == "LEVELS OK", let s = idleLine { advice = s }
         let left = advice ?? st.1
         let room = left.count + rateText.count + 1 <= VFDStatusLine.n
         return vfdLine(left: left, middle: advice == nil ? (m.device?.name ?? "No interface") : "",
                        right: m.device == nil || !room ? "" : rateText, n: VFDStatusLine.n)
     }
+    /// (the fourth proof) "SIGNAL ON IN 5  MIC OR REF" for an unused input that showed signal in the level check, or
+    /// "IN 5 IS PROBABLY A REF" for one that looks like a reference tap (it arrives first, with no cab or room in it).
+    var idleLine: String? {
+        if let c = m.refCandidate, m.refInput == nil, m.inputs.first(where: { $0.id == c })?.role != .ref { return "IN \(c + 1) IS PROBABLY A REF" }
+        if let r = m.idleSignals.first { return "SIGNAL ON IN \(r.channel + 1)  MIC OR REF" }
+        return nil
+    }
+    var idleHelp: String? {
+        if let c = m.refCandidate, m.refInput == nil { return "Input \(c + 1) is probably a reference tap. Its signal arrives first and contains no cab or room sound. Set its switch on the inputs unit to REF." }
+        if let r = m.idleSignals.first { return "Signal on Input \(r.channel + 1) (\(Int(r.peakDBFS.rounded())) dBFS). Set its switch on the inputs unit to MIC or REF." }
+        return nil
+    }
     var body: some View {
         let st = status
         if let p = RackShelf.parts {
             // (Phase 7a, 11-12) the shelf from below at the bay's scale
-            RackShelf(parts: p, job: m.job, jobsLocked: m.busy != nil, lamp: st.0, vfdText: vfdText(st), vfdHelp: rig,
+            RackShelf(parts: p, job: m.job, jobsLocked: m.busy != nil, lamp: st.0, vfdText: vfdText(st),
+                      vfdHelp: m.job == .cab && RackConnectUnit.available ? (idleHelp.map { $0 + "\n" } ?? "") + rig : rig,
                       statusLabel: st.1, setJob: { m.job = $0 }, openHelp: { m.helpPage = .quickStart })
         } else {
             oldShelf(st)
@@ -968,7 +999,8 @@ struct ResultsView: View {
                                 reexport: { m.reexportMessage = nil; m.reexportFolder = r.folder },
                                 recordAgain: { m.startCapture() },
                                 recordAgainEnabled: r.direct && m.busy == nil && m.captureProblem == nil)
-                scope.frame(maxWidth: .infinity, alignment: .leading).onPanel()
+                // (the fourth proof) the X-Y recorder in place of the scope
+                if RackPlotterUnit.available { RackPlotterUnit(r: r).id("plotter") } else { scope.frame(maxWidth: .infinity, alignment: .leading).onPanel() }
             }
         } else {
             classic

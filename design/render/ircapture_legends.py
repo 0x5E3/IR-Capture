@@ -78,7 +78,32 @@ LEGENDS = {
     'help-wiring':   ('WIRING', 'std', ['Wiring']),
     'help-tap':      ('REF TAP', 'std', ['The reference tap']),                # (?)
     'help-trouble':  ('TROUBLE', 'std', ['Troubleshooting']),                  # (?)
+    # (11-12) the fourth proof's rack units (approved): rendered as part of their unit (ircapture_rack_layers.py), not
+    # as printed keys of their own. The files unit's latching keys and the plotter's PRINT
+    'f-universal':   ('UNIVERSAL', 'std', ['Universal']),
+    'f-allrates':    ('ALL RATES', 'std', ['All sample rates']),
+    'f-iridium':     ('IRIDIUM', 'std', ['Strymon Iridium']),
+    'f-minphase':    ('MIN PHASE', 'std', ['Minimum-phase versions']),
+    'f-mixes':       ('MIXES', 'std', ['Mixes of two mics']),
+    'print':         ('PRINT', 'std', ['Print']),
+    # the file options unit's custom files (latching); figures keep their fill (ircapture_rack.key)
+    'c-441':         ('44.1', 'std', ['custom 44.1']),
+    'c-48':          ('48', 'std', ['custom 48']),
+    'c-882':         ('88.2', 'std', ['custom 88.2']),
+    'c-96':          ('96', 'std', ['custom 96']),
+    'c-full':        ('FULL', 'std', ['custom FULL']),
+    'c-1024':        ('1024', 'std', ['custom 1024']),
+    'c-2048':        ('2048', 'std', ['custom 2048']),
+    'c-4096':        ('4096', 'std', ['custom 4096']),
+    'c-16':          ('16', 'std', ['custom 16']),
+    'c-24':          ('24', 'std', ['custom 24']),
+    'c-32f':         ('32 FLOAT', 'std', ['custom 32 FLOAT']),
+    'c-set':         ('KEEP TIMING', 'std', ['custom KEEP TIMING']),
+    'c-individual':  ('EACH MIC', 'std', ['custom EACH MIC']),
 }
+# the ids above that are rendered only inside a rack unit (ircapture_kit.py's `legends` and ircapture_lettering_post.py
+# skip them: they have no printed-key picture of their own)
+RACK_ONLY = {k for k in LEGENDS if k.startswith(('f-', 'c-')) or k == 'print'}
 
 KEY_SALT = 14007
 VARIANTS = 'abcdef'

@@ -142,11 +142,17 @@ jobs:
           set -x
           EXE="dist/IR Capture.app/Contents/MacOS/IR Capture"
           OUT="$(python -c 'import tempfile;print(tempfile.gettempdir())')/IRCaptureDemo/demo"
-          "$EXE" --demo "$PWD/reference/sim_out" 2> dist/demo-stderr.txt & PID=$!
+          "$EXE" --demo "$PWD/reference/sim_out" --then-plotter 2> dist/demo-stderr.txt & PID=$!
           for i in $(seq 1 60); do [ -f "$OUT/report.json" ] && break; sleep 1; done
           sleep 3
           kill -0 $PID || { wait $PID; echo "exit status $?" >> dist/demo-stderr.txt; ls -R "$(dirname "$OUT")" >> dist/demo-stderr.txt 2>&1; echo "::error title=Smoke test::The app quit or crashed during the demo run"; exit 1; }
           screencapture -x dist/screenshot-results.png || echo "screenshot failed"
+          # (11-12) the X-Y recorder: scrolled to 4 s after the results; drawing, then parked
+          sleep 3.5
+          screencapture -x dist/screenshot-plotter-drawing.png || echo "screenshot failed"
+          sleep 5
+          kill -0 $PID || { echo "::error title=Smoke test::The app quit or crashed drawing the response"; exit 1; }
+          screencapture -x dist/screenshot-plotter.png || echo "screenshot failed"
           kill $PID; sleep 1
           [ -f "$OUT/report.json" ] || { echo "::error title=Smoke test::The app didn't write report.json"; exit 1; }
           python reference/check_app_demo.py "$OUT" reference/sim_out
@@ -194,6 +200,15 @@ jobs:
           kill -0 $PID || { echo "::error title=Smoke test::The app quit or crashed scrolling to the cart machine"; exit 1; }
           screencapture -x dist/screenshot-cart.png || echo "screenshot failed"
           kill $PID; sleep 1
+          # (11-12) the set-up units: connect and files; sweep and file options with the covers shut, then lifted
+          for shot in "connect open connect" "sweep shut setup-shut" "sweep open setup-open"; do
+            set -- $shot
+            "$EXE" --cab-tab --scroll-to $1 --covers $2 & PID=$!
+            sleep 7
+            kill -0 $PID || { echo "::error title=Smoke test::The app quit or crashed scrolling to the $1 unit"; exit 1; }
+            screencapture -x dist/screenshot-$3.png || echo "screenshot failed"
+            kill $PID; sleep 1
+          done
           # (11-10) View › Page Size: the reel deck drawn 1.5 times larger (check the text and pictures stay sharp)
           "$EXE" --cab-tab --scroll-to-machine --page-scale 1.5 & PID=$!
           sleep 7

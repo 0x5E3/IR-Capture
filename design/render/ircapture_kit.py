@@ -1448,7 +1448,7 @@ def main():
         elif pc.startswith('gas-'): piece_gas(pc[4:])
         elif pc.startswith('panel-'): panel_piece(pc, 'nam' if pc.startswith('panel-nam') else 'fine')
         elif pc.startswith('legend-') or pc == 'legends':
-            ids = list(LG.LEGENDS) if pc == 'legends' else [pc[7:]]
+            ids = [l for l in LG.LEGENDS if l not in getattr(LG, 'RACK_ONLY', ())] if pc == 'legends' else [pc[7:]]
             for lid in ids:
                 t1 = time.time(); piece_legend(lid); print('legend', lid, '%.1fs' % (time.time() - t1), flush=True)
             json.dump({'pxcm': PXCM, 'samples': SAMPLES, 'pt_per_cm': LG.PT_PER_CM,

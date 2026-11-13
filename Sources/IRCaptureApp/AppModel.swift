@@ -68,6 +68,8 @@ struct ResultSummary {
     var warnings: [String]
     var referenced: Bool
     var curves: (fc: [Double], curves: [String: [Double]])
+    /// (11-12) The automatic mixes' responses, for the plotter's printed charts.
+    var mixCurves: [(label: String, curve: [Double])] = []
     var folder: URL
     var fileCount: Int
     var polarityNotes: [String] = []
@@ -839,6 +841,7 @@ final class AppModel: ObservableObject {
                                referenced: p.result.referenced, curves: p.curves, folder: p.folder, fileCount: p.fileCount,
                                polarityNotes: p.polarityNotes, exportNotes: p.exportNotes, topFiles: p.files.filter { !$0.contains("/") }, droppedOut: droppedOut,
                                interface: interface, fs: fs > 0 ? fs : p.result.fs, notes: notes, direct: direct)
+        result?.mixCurves = p.mixCurves
     }
 
     func revealResult() {
