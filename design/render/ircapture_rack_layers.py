@@ -2053,7 +2053,9 @@ def unit_formats():
     _cover_layers(s, cam, L, cv)
 
 
-def unit_plotter():
+def unit_plotter(only_shadows=False):
+    """only_shadows: rebuild the scene and render only the arm's and the carriage's shadows into an earlier run's
+    rack-layers-plotter.json (11-12: the first carriage shadow was cut off by its box)."""
     K.set_seed('rack-plotter')
     s, cam, h = R.unit_scene(6)
     studio = set(s.objects)
@@ -2104,8 +2106,14 @@ def unit_plotter():
         pen.hide_render = True; pens.append(pen)
     for o in armg + carg: o.hide_render = True
     R.finish_glass()
-    L = shoot_base(s, cam, 'rack-plotter', R.PW, h)
-    L['u'] = 6; L['layers'] = {}; L['solo'] = {}
+    if only_shadows:
+        jp = os.path.join(OUT, 'rack-layers-plotter.json')
+        LAY.update(json.load(open(jp))); L = LAY['units']['plotter']
+        global WHAT
+        WHAT = 'plotter'
+    else:
+        L = shoot_base(s, cam, 'rack-plotter', R.PW, h)
+        L['u'] = 6; L['layers'] = {}; L['solo'] = {}
     P_ = lambda x, y: TK.proj(s, cam, (x, y, 0.0))
     pr = _rect(s, cam, xp, by, pw_, ph_)
     grid = _rect(s, cam, xp - pw_ / 2 + PL_['L'] + (pw_ - PL_['L'] - PL_['R']) / 2, by + ph_ / 2 - PL_['T'] - (ph_ - PL_['T'] - PL_['B']) / 2,
@@ -2115,26 +2123,30 @@ def unit_plotter():
                 keys=_keys_info(s, cam, [kp]), park=P_(ax, by)[0],
                 travel=[P_(xp - pw_ / 2 + PL_['L'], by)[0], P_(xp + pw_ / 2 - PL_['R'], by)[0]],
                 penPark=P_(ax, pyy)[1], penAt=P_(ax, pyy - 0.2)[0:2], inks=PEN_INKS)
-    L['plotter'] = info
-    LAY['units']['plotter'] = L; _save()
-    _keys_layers(s, cam, L, [kp])
+    if not only_shadows:
+        L['plotter'] = info
+        LAY['units']['plotter'] = L; _save()
+        _keys_layers(s, cam, L, [kp])
     # alone (their own alpha), at their parked place: the app moves them
     snap = _snapshot(s)
     static = [o for o, (hr, vc) in snap.items() if not hr and o not in studio]
     cat = TK.catcher(zp + 0.002); cat.hide_render = True
     abox = box_px(s, cam, ax, by, 2.4, bh / 2 + 0.4)
     pbox = box_px(s, cam, ax, pyy, 1.9, 1.9)
-    abox_sh = box_px(s, cam, ax, by, 3.4, bh / 2 + 1.2)
-    pbox_sh = box_px(s, cam, ax, pyy, 2.9, 2.9)
+    abox_sh = box_px(s, cam, ax, by, 4.6, bh / 2 + 1.6)          # the shadows reach about 2.5 cm right and down
+    pbox_sh = box_px(s, cam, ax, pyy, 5.0, 5.0)
     for o in armg: o.hide_render = False
     for o in carg: o.hide_render = False
     pens[0].hide_render = False
     jobs = [('arm', armg, static, (), abox), ('armshadow', [], armg, (cat,), abox_sh),
             ('carriage', carg, static + armg, (), pbox), ('penshadow', [], carg + [pens[0]], (cat,), pbox_sh)]
+    if only_shadows: jobs = [j for j in jobs if j[0].endswith('shadow')]
     for nm, vis, ctx, ca, bx_ in jobs:
         _solo(s, studio, vis, ctx, ca)
         L['solo'][nm] = shoot_crop(s, cam, 'rack-plotter-' + nm, bx_)
         _restore(snap); _save()
+    if only_shadows:
+        L['plotter']['boxes'].update(armshadow=abox_sh, penshadow=pbox_sh); _save(); return
     for i, pen in enumerate(pens):
         for p_ in pens: p_.hide_render = True
         pen.hide_render = False
@@ -2152,7 +2164,8 @@ UNITS = {'step-cab': unit_step_cab, 'step-nam': unit_step_nam, 'cheeks': unit_ch
          'shelf-boxes': unit_shelf, 'shelf-plank': unit_shelf_plank,
          'shelf-jobs': lambda: shelf_box_unit('jobs'), 'shelf-status': lambda: shelf_box_unit('status'),
          'shelf-help': lambda: shelf_box_unit('help'),
-         'connect': unit_connect, 'files': unit_files, 'sweep': unit_sweep, 'formats': unit_formats, 'plotter': unit_plotter}
+         'connect': unit_connect, 'files': unit_files, 'sweep': unit_sweep, 'formats': unit_formats, 'plotter': unit_plotter,
+         'plotter-shadows': lambda: unit_plotter(only_shadows=True)}
 
 
 if __name__ == '__main__':

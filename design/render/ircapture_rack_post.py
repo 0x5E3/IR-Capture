@@ -44,7 +44,7 @@ def save(im, name):
     im.save(os.path.join(PIC, name + '.webp'))
 
 
-def layer(base, crop_path, box, whole=False):
+def layer(base, crop_path, box, whole=False, clip=None):
     """The pixels of a live state that differ from the base: a mask from the difference, opened out and feathered, the
     layer cut to the mask's box. Returns (RGBA picture, box in the base's pixels) or None when nothing changed.
     whole: the crop entire (a part that replaces everything in its box, as a blank plate over a module: where the two
@@ -60,6 +60,13 @@ def layer(base, crop_path, box, whole=False):
         m = np.clip((d - 3.0) / 9.0, 0, 1)                    # under 3 of 255: render noise; full from 12
         mi = Image.fromarray((m * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(7)).filter(ImageFilter.GaussianBlur(2.5))
         m = np.asarray(mi, dtype=np.float32) / 255.0
+    if clip:
+        # (11-12) only inside these rects (base pixels, x0 y0 x1 y1): a cover's hardware changes the reflections in the
+        # glossy knobs under it just past the threshold, and those must not travel with the layer
+        cm_ = Image.new('L', (m.shape[1], m.shape[0]), 0); dr = ImageDraw.Draw(cm_)
+        for q in clip:
+            dr.rectangle([min(q[0], q[2]) - x0, min(q[1], q[3]) - y0, max(q[0], q[2]) - x0, max(q[1], q[3]) - y0], fill=255)
+        m = m * np.asarray(cm_.filter(ImageFilter.GaussianBlur(3)), np.float32) / 255
     # the crop's own edge: the denoiser saw only the crop, so its outer rows may differ from the base; fade them out
     e = 4
     ramp = np.ones_like(m)
@@ -284,10 +291,12 @@ def wheels(L, W):
 
 def cover(L):
     """(11-12) The smoked cover. The render of the whole cover shut (A) over the base, and of its hardware alone (C):
-    under the pane A = C * tint + sheen. The tint is A / C taken over the pane where C is bright enough to measure,
-    smoothed over about a centimetre (it is a smoked sheet: an even colour, a little lighter where the room shows in it);
-    the sheen is what is left. The app multiplies the live controls by the tint, adds the sheen, then draws the hardware."""
-    from scipy.ndimage import gaussian_filter
+    under the pane A = C * tint + sheen, both smooth (a sheet of smoked acrylic: an even colour, the room's light in
+    it). Fitted locally, as a guided filter: over a window of about 1 cm, per colour, the line through (C, A) gives the
+    tint (its slope, pulled toward the pane's median where C is flat) and the sheen (its offset). Neither then holds
+    any of the controls' detail, so the controls can change under the cover without a ghost of their rendered state.
+    The pane's chamfered rim (its sharp highlights) is kept as rendered, in the outer 0.35 cm. The app multiplies the
+    live controls by the tint, adds the sheen, then draws the hardware."""
     Cv = L['cover']; box = L['solo']['cover']['box_px']
     A = np.asarray(Image.open(os.path.join(RD, L['picture'] + '-cover.png')).convert('RGB'), np.float32)
     C = np.asarray(Image.open(os.path.join(RD, L['picture'] + '-cover-hw.png')).convert('RGB'), np.float32)
@@ -296,23 +305,37 @@ def cover(L):
     A, C = A[iy0:iy1, ix0:ix1], C[iy0:iy1, ix0:ix1]
     hh, ww = A.shape[:2]
     ss = 4; rr = Cv['r_cm'] * PXCM
-    m = Image.new('L', (ww * ss, hh * ss), 0)
-    ImageDraw.Draw(m).rounded_rectangle([(px0 - box[0] - ix0) * ss, (py0 - box[1] - iy0) * ss, (px1 - box[0] - ix0) * ss, (py1 - box[1] - iy0) * ss], rr * ss, fill=255)
-    pane = np.asarray(m.resize((ww, hh), Image.LANCZOS), np.float32) / 255
-    lum = C.mean(-1)
-    w = ((lum > 28) & (np.abs(A - C).max(-1) < 200)).astype(np.float32) * (pane > 0.99)
-    sig = 0.9 * PXCM
-    tint = np.stack([gaussian_filter(A[..., i] * w, sig) / np.maximum(gaussian_filter(C[..., i] * w, sig), 1e-3) for i in range(3)], -1)
-    wd = gaussian_filter(w, sig)
-    glob = np.array([np.median((A[..., i] / np.maximum(C[..., i], 1))[w > 0]) for i in range(3)])
-    k = np.clip(wd / 0.15, 0, 1)[..., None]
-    tint = np.clip(tint * k + glob[None, None, :] * (1 - k), 0.05, 1.0)    # a multiply cannot brighten: the rest is sheen
+    def rounded(inset):
+        m = Image.new('L', (ww * ss, hh * ss), 0)
+        ImageDraw.Draw(m).rounded_rectangle([(px0 - box[0] - ix0 + inset) * ss, (py0 - box[1] - iy0 + inset) * ss,
+                                             (px1 - box[0] - ix0 - inset) * ss, (py1 - box[1] - iy0 - inset) * ss], max(1, rr - inset) * ss, fill=255)
+        return np.asarray(m.resize((ww, hh), Image.LANCZOS), np.float32) / 255
+    pane = rounded(0); inner = rounded(0.35 * PXCM)
+    # one tint for the whole sheet (it is one sheet of smoked acrylic), fitted across the pane: A = T * C + R0
+    ok = (pane > 0.99) & (inner > 0.99) & (np.abs(A - C).max(-1) < 160)
+    T = np.empty(3); R0 = np.empty(3)
+    for i in range(3):
+        x, y = C[..., i][ok], A[..., i][ok]
+        T[i], R0[i] = np.polyfit(x, y, 1)
+    T = np.clip(T, 0.05, 1.0); glob = T
+    # the reflection: what is left, its median over about 2 cm (worked at a quarter size), then softened: nothing of
+    # the controls (a knob, a key) is wide enough to survive it
+    res = A - C * T[None, None, :]
+    q4 = 4
+    small = np.stack([np.asarray(Image.fromarray(res[..., i]).resize((max(1, ww // q4), max(1, hh // q4)), Image.BOX), np.float32) for i in range(3)], -1)
+    from scipy.ndimage import median_filter, gaussian_filter
+    k_ = max(3, int(round(2.0 * PXCM / q4)) | 1)
+    small = np.stack([gaussian_filter(median_filter(small[..., i], size=k_, mode='nearest'), k_ / 4) for i in range(3)], -1)
+    refl = np.stack([np.asarray(Image.fromarray(small[..., i]).resize((ww, hh), Image.BICUBIC), np.float32) for i in range(3)], -1)
+    refl = np.maximum(refl, 0)
+    print('  cover fit: T %s R0 %s, reflection %.1f to %.1f (median %.1f)' % (np.round(T, 3), np.round(R0, 1), refl.min(), refl.max(), np.median(refl)))
+    tint = np.ones_like(A) * T[None, None, :]
+    rim = np.clip(A - C * tint - refl, 0, 255) * (pane - inner)[..., None]
+    sheen = (refl * inner[..., None] + rim) * pane[..., None]
     tint = tint * pane[..., None] + (1 - pane[..., None])
-    sheen = np.clip(A - C * tint, 0, 255) * pane[..., None]
     rec = C * tint + sheen
-    err = np.abs(rec - A).mean(-1)[pane > 0.99]
-    tim = Image.fromarray(np.clip(tint * 255 + 0.5, 0, 255).astype(np.uint8), 'RGB')
-    save(tim, L['picture'] + '-cover-tint')
+    err = np.abs(rec - A).mean(-1)[inner > 0.99]
+    save(Image.fromarray(np.clip(tint * 255 + 0.5, 0, 255).astype(np.uint8), 'RGB'), L['picture'] + '-cover-tint')
     save(Image.fromarray(np.clip(sheen + 0.5, 0, 255).astype(np.uint8), 'RGB'), L['picture'] + '-cover-sheen')
     r_ = (box[0] + ix0, box[1] + iy0, ww, hh)
     print('  cover: tint %s (median), rebuilt within %.1f / 255 (mean), %.1f (99th pc)' % (np.round(glob, 3), err.mean(), np.percentile(err, 99)))
@@ -345,7 +368,12 @@ for key, L in lay.get('units', {}).items():
     u = {'picture': L['picture'], 'u': L['u'], 'size': [pt(base.size[0]), pt(base.size[1])],
          'panel': [pt(tl[0]), pt(tl[1]), pt(br[0] - tl[0]), pt(br[1] - tl[1])], 'layers': {}}
     for lk, LL in L.get('layers', {}).items():
-        r = layer(base, os.path.join(RD, LL['picture'] + '.png'), LL['box_px'], whole=key in ('meters', 'nammeters') and lk.startswith('b'))
+        clip = None
+        if lk.startswith('cover-hw') and 'cover' in L:
+            g_ = 0.6 * PXCM
+            grow = lambda q, g: [min(q[0], q[2]) - g, min(q[1], q[3]) - g, max(q[0], q[2]) + g, max(q[1], q[3]) + g]
+            clip = [grow(h_, g_) for h_ in L['cover']['hinges']] + ([grow(L['cover']['latch'], 0.4 * PXCM)] if lk == 'cover-hw' else [])
+        r = layer(base, os.path.join(RD, LL['picture'] + '.png'), LL['box_px'], whole=key in ('meters', 'nammeters') and lk.startswith('b'), clip=clip)
         if r is None:
             print('  %s %s: no change from the base' % (key, lk)); continue
         im, (x, y, w, h) = r
