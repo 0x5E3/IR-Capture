@@ -36,7 +36,7 @@ import shelf_gear as SG
 import parts as P
 import gas_disp as GD
 from parts import mat, srgb, lathe, _rring
-from gear_kit import rbox, cut, chamfer, node, mix_into, noise, mul, add_bump, surface_wear, obj_coords, cyl_cutter, screw
+from gear_kit import rbox, cut, chamfer, node, mix_into, noise, mul, add_bump, surface_wear, obj_coords, cyl_cutter, screw, thumb_nut
 from instrument import grimy, prism
 for M in (TK, K, V):
     M.OUT, M.PXCM, M.SAMPLES = OUT, PXCM, SAMPLES
@@ -328,12 +328,20 @@ def strip(v, L, text, name):
     return o
 
 
-def key(lid, lit=False, down=False, text=None, size=None):
-    """ircapture_kit.piece_legend's printed key. Returns its outer size."""
+def key(lid, lit=False, down=False, text=None, size=None, vname=None):
+    """ircapture_kit.piece_legend's printed key. Returns its outer size. (11-12) A key not yet in the legends table
+    (a proof's new key) passes its text, size and app name (vname, which picks its wear) with lid None."""
     import ircapture_legends as LG
-    t0, s0, names = LG.LEGENDS[lid]
+    if lid is None:
+        t0, s0, names = text, size or 'std', [vname or text]
+        lid = 'new-' + LG.norm(names[0]).replace(' ', '-')
+    else:
+        t0, s0, names = LG.LEGENDS[lid]
     text = text or t0; size = size or s0
     z = LG.SIZES[size]; v = LG.variant(names[0]); look = K.KEY_LOOK[v]
+    if lid.startswith('new-') and any(c.isdigit() for c in text):
+        # (11-12) a figure worn thin reads as another (48 as 43, 96 as 36): keys with figures keep their fill
+        look = dict(look, use=min(look['use'], 0.2))
     h = z['cap_h']; w = K.legend_width(text, size)
     bz = TK.KEY['bezel'] * (1.3 if size == 'big' else 1.0); r = TK.KEY['r'] * (1.4 if size == 'big' else 1.0)
     rng = K.set_seed('legend-' + lid)
@@ -1348,9 +1356,454 @@ def unit_cart():
     shoot(s, cam, 'unit-cart', PW, h, {'prog': prog})
 
 
+# ---------------------------------------------------------------------------------------------------------------------
+# (11-12, eighth chat; proofs) the Cab IR units no proof drew: Connect's pickers, the capture's name and files, Advanced,
+# the scope. Every control the old panels had is kept; the explanations move to Help and to the printed forms.
+#
+#   connect   2U  the interface on a VFD with its SELECT knob, OUT TO AMP on a push-button thumbwheel, REFERENCE on a
+#                 three-way rotary, the AUDIO SETUP and IMPORT DAW keys
+#   files     4U  the capture card (a printed form the app types into: name, notes, save folder), the files to make as
+#                 latching keys, CHANGE (the save folder) and RE-EXPORT OLD
+#   sweep     2U  (Advanced) RATE and LEVEL rotaries, SWEEPS / LENGTH / GAP / WARM-UP thumbwheels, under a hinged
+#                 smoked cover (set and forget: the old disclosure, closed by default); sweep-open: the cover lifted
+#   formats   3U  (Advanced file options) POLARITY and CUSTOM toggles, the custom rates, lengths, bits and trimming as
+#                 latching keys, FULL ms on a thumbwheel, under the same cover; formats-open: the cover lifted
+#   plotter   6U  (the scope) an X-Y recorder: printed response chart paper, the arm and its pen carriage parked off
+#                 the paper at the right; the app inks each mic's curve (the arm drawing it), as the take sheet's typing
+
+_RK = []
+
+
+def rig_knobs():
+    if not _RK:
+        a = sys.argv; sys.argv = [a[0], FONTS, OUT]
+        import rig_knobs as RK_
+        sys.argv = a; _RK.append(RK_)
+    return _RK[0]
+
+
+def paint(name='tickpaint', color='#d8d0bd'):
+    return mat(name, srgb(color), rough=0.6, spec=0.3)
+
+
+def selector(x, y, labels, pos, step=32.0, color='cream', scale=1.0, r_tick=2.25, r_lab=2.85, cap=0.44, legend=None):
+    """A rotary selector: a chicken head (rig_knobs, real size) over engraved positions, a tick and a legend each,
+    pointing at labels[pos]; its name engraved under it. Positions run clockwise from the left, centred on the top."""
+    n = len(labels); a0 = -step * (n - 1) / 2
+    pm = paint()
+    for i, t in enumerate(labels):
+        a = math.radians(a0 + step * i); sx, sy = math.sin(a), math.cos(a)
+        tk = rbox('tick', 0.08, 0.42, 0.01, 0.0, 0.03)
+        tk.location = (x + sx * r_tick, y + sy * r_tick, 0.002); tk.rotation_euler = (0, 0, -a)
+        tk.data.materials.append(pm)
+        e = engrave(t, 0, 0, cap, track=0.1)
+        tw = (e.dimensions.x - 0.2) * 0.8
+        e.location.x = x + sx * r_lab + sx * abs(sx) * tw / 2 * 1.05
+        e.location.y = y + sy * r_lab + max(0.0, sy) * cap * 0.15 - max(0.0, -sy) * cap * 0.6
+    k = rig_knobs().build('chicken' + color); k.location = (x, y, 0.0); k.scale = (scale, scale, scale)
+    k.rotation_euler = (0, 0, -math.radians(a0 + step * pos))
+    if legend: engrave(legend, x, y - 1.95 * scale, cap, track=0.14)
+
+
+def select_knob(x, y, scale=1.0, legend='SELECT'):
+    """A plain fluted black knob (an encoder: it steps a list); its name engraved under it."""
+    k = rig_knobs().build('flutedblack'); k.location = (x, y, 0.0); k.scale = (scale, scale, scale)
+    if legend: engrave(legend, x, y - 1.95 * scale, 0.44, track=0.14)
+
+
+TW = dict(pitch=1.32, h=4.3, win_w=1.02, win_h=1.2, btn_w=1.0, btn_h=0.78, btn_y=1.38, end=0.3, R=1.6, d=0.62)
+
+
+def wheel_tex(path, legends, idx, R, arc, px=240):
+    """A thumbwheel drum's print: white figures on black round the drum, legends[idx] facing the window; the strip covers
+    the drum's visible arc (rows are arc length, so the drum's curve does the foreshortening)."""
+    L = R * arc; Hh = int(L * px); Ww = int(1.2 * px)
+    im = Image.new('RGB', (Ww, Hh), (14, 13, 12)); d = ImageDraw.Draw(im)
+    f = ImageFont.truetype(os.path.join(FONTS, 'BarlowSemiCondensed-600-normal.ttf'), int(0.8 / 0.7 * px))   # figures 0.8 cm
+    n = len(legends); step = 2 * math.pi / n
+    for k in range(-n, n + 1):
+        th = k * step
+        if abs(th) > arc / 2 + step: continue
+        t = legends[(idx + k) % n]
+        yy = Hh / 2 - th * R * px          # +theta: above the window
+        d.text((Ww / 2, yy), t, font=f, fill=(236, 230, 214), anchor='mm')
+    im.save(path)
+
+
+def thumbwheel(x, y, groups, name, legend=None):
+    """Push-button thumbwheel switches (one module a figure: a + button, the drum in its window, a - button) ganged in
+    one black frame. groups: list of (legends, idx) per module; a '.' module is a printed point between drums.
+    Returns the frame's width."""
+    P_ = TW; mods = [g for g in groups]
+    nmod = sum(1 for g in mods if not isinstance(g, str))
+    npt = sum(1 for g in mods if g == '.'); nfx = sum(1 for g in mods if isinstance(g, str) and g.startswith('='))
+    W = nmod * P_['pitch'] + npt * 0.35 + nfx * 0.85 + 2 * P_['end']; H = P_['h']
+    fr = rbox('twframe', W, H, P_['d'], 0.0, 0.14, roll=0.05); fr.location = (x, y, 0)
+    bm = SG.black_cast('twframe-' + name)
+    cuts = []; xs = []
+    xx = x - W / 2 + P_['end']
+    for g in mods:
+        if g == '.':
+            xs.append(('.', xx + 0.175)); xx += 0.35; continue
+        if isinstance(g, str):
+            xs.append((g, xx + 0.4)); xx += 0.85; continue
+        cx = xx + P_['pitch'] / 2; xs.append((g, cx)); xx += P_['pitch']
+        c = rbox('twwin', P_['win_w'], P_['win_h'], 2, -1, 0.06); c.location = (cx, y, 0); cuts.append(c)
+        for sy in (1, -1):
+            c = rbox('twbh', P_['btn_w'] + 0.08, P_['btn_h'] + 0.08, 2, -1, 0.08); c.location = (cx, y + sy * P_['btn_y'], 0); cuts.append(c)
+    for c in cuts: bpy.context.view_layer.update(); cut(fr, c)
+    chamfer(fr, 0.015, 2); TK.flat_faces(fr); fr.data.materials.append(bm)
+    cm = mat('twcap', srgb('#1b1a19'), rough=0.38, coat=0.3, coat_rough=0.2, spec=0.4)
+    surface_wear(cm, dust=0.3, smudge=0.6, scuff=0.4)
+    R_ = P_['R']; arc = math.radians(80)
+    for g, cx in xs:
+        if g == '.':
+            engrave('.', cx, y - 0.45, 0.9, z=P_['d'], color='#e8e2d4', wear=False); continue
+        if isinstance(g, str):
+            engrave(g[1:], cx, y, 0.62, z=P_['d'], color='#e8e2d4', wear=False); continue
+        legends, idx = g
+        tp = os.path.join(OUT, 'wheel-%s-%s-%d.png' % (name, ''.join(legends)[:6].replace('.', 'p'), idx))
+        wheel_tex(tp, legends, idx, R_, arc)
+        bpy.ops.mesh.primitive_grid_add(x_subdivisions=4, y_subdivisions=48, size=1, location=(0, 0, 0))
+        dr = bpy.context.active_object; dr.name = 'drum'
+        dr.scale = (P_['win_w'] + 0.1, R_ * arc, 1); bpy.ops.object.transform_apply(scale=True)
+        zf = P_['d'] - 0.22
+        for v in dr.data.vertices:
+            th = v.co.y / R_; v.co.y = R_ * math.sin(th); v.co.z = R_ * math.cos(th) - R_ + zf
+        bpy.ops.object.shade_smooth()
+        dr.location = (cx, y, 0)
+        dm = mat('drum-%s-%s' % (name, cx), (1, 1, 1), rough=0.42, spec=0.35)
+        nt = dm.node_tree; b = nt.nodes['Principled BSDF']
+        ti = nt.nodes.new('ShaderNodeTexImage'); ti.image = bpy.data.images.load(tp); ti.extension = 'EXTEND'
+        uv = nt.nodes.new('ShaderNodeTexCoord'); nt.links.new(uv.outputs['UV'], ti.inputs['Vector'])
+        nt.links.new(ti.outputs['Color'], b.inputs['Base Color'])
+        dr.data.materials.append(dm)
+        back = rbox('twback', P_['win_w'] + 0.2, P_['win_h'] + 0.6, 0.05, -0.6, 0.0); back.location = (cx, y, 0)
+        back.data.materials.append(mat('twback', srgb('#050505'), rough=0.9))
+        for sy, t in ((1, '+'), (-1, '-')):
+            cp = rbox('twcap', P_['btn_w'], P_['btn_h'], 0.42, P_['d'] - 0.27, 0.12, roll=0.05)
+            cp.location = (cx, y + sy * P_['btn_y'], 0); TK.flat_faces(cp); cp.data.materials.append(cm)
+            engrave(t, cx, y + sy * P_['btn_y'], 0.46, z=P_['d'] + 0.15, color='#e8e2d4', track=0.0, wear=False)
+    if legend: engrave(legend, x, y - H / 2 - 0.55, 0.44, track=0.14)
+    return W
+
+
+def vfd_window(plate, xc, yc, n, text, pitch=0.105):
+    """ircapture_shelf.py's VFD (the bench's blue-green status line) in a window cut in a rack panel at (xc, yc)."""
+    import gas_disp as GD
+    _, _, Wu, Hu = GD.mtx_geom(n, 1)
+    ww, wh = Wu * pitch + 0.6, Hu * pitch + 0.6
+    hole = rbox('vhole', ww, wh, T + 2, -T - 1, 0.08); hole.location = (xc, yc, 0)
+    bpy.context.view_layer.update(); cut(plate, hole)
+    with moved(xc, yc, 0):
+        bw = K.GAS_BEZEL
+        bez = rbox('gbezel', ww + 2 * bw, wh + 2 * bw, 0.14, 0.0, 0.12, roll=0.05)
+        bh = rbox('gbezh', ww - 0.04, wh - 0.04, 1.0, -0.5, 0.06)
+        bpy.context.view_layer.update(); cut(bez, bh); chamfer(bez, 0.02, 2); TK.flat_faces(bez)
+        bez.data.materials.append(K.gas_bezel_mat())
+        rd = os.path.join(OUT, 'gas'); os.makedirs(rd, exist_ok=True)
+        RA = K._RackAdapter(T, rd)
+        old = GD.DEMO, GD.demo_text, GD.matrix_maps, GD.thin_glass
+        GD.DEMO = bool(text); GD.demo_text = lambda eid: [text]
+        _tg = GD.thin_glass
+        GD.matrix_maps = lambda b, e, n_, nl, **kw: K.vfd_matrix_maps(GD, b, e, n_, nl, **kw)
+        GD.thin_glass = lambda RA_, name, tint='#c8b49e', dust=0.5, rough=0.03: _tg(RA_, name, K.VFD_GLASS if name.endswith('pane') else tint, dust, rough)
+        L = []
+        try:
+            GD.gas_window(RA, L, 'vfd-%d' % int(xc * 10), 'matrix', -ww / 2, -wh / 2, ww / 2, wh / 2, SG.nickel('gscrew', seed=3), 3,
+                          n=n, lines=1)
+        finally:
+            GD.DEMO, GD.demo_text, GD.matrix_maps, GD.thin_glass = old
+    for o in bpy.data.objects:
+        if o.name.endswith('pane') or o.name.endswith('env'):
+            o.visible_shadow = False
+            if o not in GLASS: GLASS.append(o)
+    return ww + 2 * K.GAS_BEZEL, wh + 2 * K.GAS_BEZEL
+
+
+def bat_toggle(x, y, pos, up, down, legend=None, cap=0.44):
+    """The patch unit's bat toggle, two-way, its positions engraved beside it and its name above."""
+    with moved(x, y, 0): toggle(pos)
+    for t, yy in ((up, y + 1.2), (down, y - 1.2)):
+        o = engrave(t, 0, 0, cap, track=0.12); tw = (o.dimensions.x - 0.2) * 0.8
+        o.location = (x + 0.95 + tw / 2, yy, o.location.z)
+    if legend: engrave(legend, x, y + 2.45, cap, track=0.14)
+
+
+def smoked_cover(x0, x1, y0, y1, z=2.75, name='cover', hinge_in=1.8):
+    """A hinged smoked acrylic cover over a unit's set-and-forget controls (the old Advanced disclosure): hinged along
+    its top on two black brackets, a knurled latch at the bottom. Straight on, the controls show through it, dimmed."""
+    w, h = x1 - x0, y1 - y0; cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+    pane = rbox(name, w, h, 0.32, z, 0.35, roll=0.08); pane.location = (cx, cy, 0)
+    chamfer(pane, 0.02, 2); TK.flat_faces(pane)
+    m = mat('smoke-' + name, srgb(os.environ.get('IRC_COVER_TINT', '#b3ada2')), rough=0.06, transm=1.0, ior=1.45, spec=0.5)
+    pane.data.materials.append(m); pane.visible_shadow = False; GLASS.append(pane)
+    blk = SG.black_cast('cvbr-' + name); ni = SG.nickel('cvhinge', seed=2)
+    for hx in (x0 + hinge_in, x1 - hinge_in):
+        br = rbox('cvbr', 1.6, 0.55, z + 0.1, 0.0, 0.08); br.location = (hx, y1 - 0.25, 0); br.data.materials.append(blk)
+        bpy.ops.mesh.primitive_cylinder_add(radius=0.2, depth=2.6, location=(hx, y1 - 0.12, z + 0.32), rotation=(0, math.pi / 2, 0))
+        hg = bpy.context.active_object; hg.name = 'cvhinge'; bpy.ops.object.shade_smooth(); hg.data.materials.append(ni)
+    thumb_nut(cx, y0 + 0.75, z + 0.32, ni)
+
+
+def unit_connect():
+    """2U: the interface (VFD, SELECT), the output to the amp, the reference, Audio MIDI Setup, Import DAW."""
+    K.set_seed('rack-connect')
+    s, cam, h = unit_scene(2)
+    backing(h)
+    pl, ph = rack_panel(2, 'bronze', 'connect')
+    xv, yv = -12.6, 1.05
+    vw, vh = vfd_window(pl, xv, yv, 20, os.environ.get('IRC_CONNECT_VFD', 'SCARLETT 18I20 USB'))
+    pl.data.materials.append(K.hammertone_fine(name='hf-connect'))
+    engrave('INTERFACE', xv - vw / 2 + 1.55, yv + vh / 2 + 0.5, 0.44, track=0.14)
+    select_knob(-2.4, yv, 1.25)
+    x = -21.05
+    for lid in ('midi-setup', 'import-daw'):
+        import ircapture_legends as LG
+        wk = K.legend_width(LG.LEGENDS[lid][0], 'std') + 2 * TK.KEY['bezel']
+        with moved(x + wk / 2 + 1.5, -2.6, 0): key(lid)
+        x += wk + 0.6
+    thumbwheel(5.4, 0.55, [(['%d' % i for i in range(10)], 0), (['%d' % i for i in range(10)], 1)], 'out', legend='OUT TO AMP')
+    selector(15.6, 0.15, ['NONE', 'LOAD BOX', 'TAP OR PAD'], int(os.environ.get('IRC_CONNECT_REF', '2')), step=55.0,
+             scale=1.2, r_tick=2.55, r_lab=3.15, legend='REFERENCE')
+    finish_glass()
+    shoot(s, cam, 'unit-connect', PW, h)
+
+
+def capture_card(path, w, h, px=110):
+    """The capture card: a printed form (oxblood) the app types into: the capture's name, notes, the save folder."""
+    P_ = Pen(w, h, px, (246, 234, 200), 21); d = P_.d
+    ox = (104, 30, 24); rule = (150, 120, 104)
+    fh = P_.font('BarlowSemiCondensed-700-normal.ttf', 0.8); fl = P_.font('BarlowSemiCondensed-600-normal.ttf', 0.48)
+    ft = P_.font(TYPED, 0.74)
+    m = 1.2
+    P_.spaced(m, 1.05, 'CAB IR  CAPTURE', fh, ox, 0.14)
+    P_.spaced(w - m, 1.15, 'CARD', fl, ox, 0.16, 'r')
+    d.line([P_.p(m, 1.85), P_.p(w - m, 1.85)], fill=ox, width=P_.c(0.07))
+    d.line([P_.p(m, 1.98), P_.p(w - m, 1.98)], fill=ox, width=max(1, P_.c(0.02)))
+    def field(y, label, lines, note=None):
+        P_.spaced(m, y, label, fl, ox, 0.14)
+        if note: P_.spaced(w - m, y, note, fl, rule, 0.1, 'r')
+        yy = y + 1.0
+        for t in lines:
+            if t: P_.typed(m + 0.1, yy, t, ft)
+            d.line([P_.p(m, yy + 0.42), P_.p(w - m, yy + 0.42)], fill=rule, width=max(1, P_.c(0.02)))
+            yy += 0.95
+        return yy
+    y = field(2.75, 'CAPTURE NAME', [os.environ.get('IRC_CARD_NAME', 'Mesa_4x12_V30_PosA')], 'EVERY FILE NAME STARTS WITH IT')
+    y = field(y + 0.35, 'NOTES', ['SM57 1 in back, cap edge. R121 6 in,', 'centre. Master on 3, bright off.', ''],
+              'SAVED IN REPORT.JSON')
+    field(y + 0.35, 'SAVE TO', ['~/Music/IR Capture'])
+    age_paper(P_.im, P_.rng).save(path)
+
+
+def unit_files():
+    """4U: the capture card in its frame; the files to make as latching keys; CHANGE (the save folder), RE-EXPORT OLD."""
+    import ircapture_legends as LG
+    K.set_seed('rack-files')
+    s, cam, h = unit_scene(4)
+    backing(h)
+    rack_panel(4, 'bronze', 'files')
+    cw_, ch_ = 24.2, 13.6
+    xc_, ysh = -21.3 + 0.8 + cw_ / 2, 0.75
+    fp = os.path.join(OUT, 'card-capture-print.png'); capture_card(fp, cw_, ch_)
+    with moved(xc_, ysh, 0): sheet(cw_, ch_, fp, 'capcard', curl=0.2)
+    card_frame(cw_, ch_, ysh, xc_, 'cfcap')
+    on = set(os.environ.get('IRC_FILES_ON', 'universal,minphase').split(','))
+    cols = [('FILES', 9.3, [('UNIVERSAL', 'Universal', 'universal'), ('ALL RATES', 'All sample rates', 'everything'),
+                            ('IRIDIUM', 'Strymon Iridium', 'iridium')]),
+            ('ALSO MAKE', 17.6, [('MIN PHASE', 'Minimum-phase versions', 'minphase'), ('MIXES', 'Mixes of two mics', 'mixes')])]
+    for head, cx, keys in cols:
+        engrave(head, cx, 5.75, 0.44, track=0.14)
+        for i, (t, nm, tid) in enumerate(keys):
+            with moved(cx, 3.85 - i * 2.75, 0): key(None, lit=tid in on, text=t, vname=nm)
+    y = -6.55; x = 5.3
+    engrave('SAVE TO', x + 1.25, y, 0.44, track=0.14); x += 2.75
+    for lid in ('change', 'reexport-past'):
+        wk = K.legend_width(LG.LEGENDS[lid][0], 'std') + 2 * TK.KEY['bezel']
+        with moved(x + wk / 2, y, 0): key(lid)
+        x += wk + 0.7
+    shoot(s, cam, 'unit-files', PW, h)
+
+
+def unit_sweep(cover=True):
+    """2U: the test signal's set-up (Advanced): RATE and LEVEL rotaries, SWEEPS, LENGTH, GAP and WARM-UP thumbwheels,
+    under the hinged smoked cover."""
+    K.set_seed('rack-sweep')
+    s, cam, h = unit_scene(2)
+    backing(h)
+    rack_panel(2, 'bronze', 'sweep')
+    engrave('SWEEP', -18.7, 0.85, 0.62); engrave('SET-UP', -18.7, -0.45, 0.44, track=0.2, color='#a8a298')
+    selector(-10.9, 0.75, ['AUTO', '44.1', '48', '88.2', '96'], 0, step=30.0, r_lab=2.7, legend='RATE kHz')
+    selector(-3.3, 0.75, ['AUTO', '-6', '-12', '-18', '-24'], 0, step=30.0, r_lab=2.7, legend='LEVEL dBFS')
+    D = ['%d' % i for i in range(10)]; HALF = ['0', '5'] * 5
+    x = 2.6
+    for lab, g in (('SWEEPS', [(D, 0), (D, 5)]), ('LENGTH  S', [(D, 0), (D, 6), '.', (HALF, 0)]),
+                   ('GAP  S', [(D, 0), (D, 2), '.', (HALF, 0)]), ('WARM-UP', [(D, 1)])):
+        nm = sum(1 for q in g if q != '.'); W = nm * TW['pitch'] + (0.35 if '.' in g else 0) + 2 * TW['end']
+        thumbwheel(x + W / 2, 0.55, g, lab.split()[0].lower(), legend=lab)
+        x += W + 0.95
+    if cover: smoked_cover(-15.6, 21.6, -4.05, 3.95, name='cvsweep')
+    finish_glass()
+    shoot(s, cam, 'unit-sweep' + ('' if cover else '-open'), PW, h)
+
+
+def unit_formats(cover=True):
+    """3U: the file options (Advanced file options): POLARITY and CUSTOM toggles; the custom files' rates, lengths, bit
+    depths and trimming as latching keys; FULL (the full-room length, ms) on a thumbwheel; under the smoked cover."""
+    K.set_seed('rack-formats')
+    s, cam, h = unit_scene(3)
+    backing(h)
+    rack_panel(3, 'bronze', 'formats')
+    engrave('FILE', -18.7, 1.5, 0.62); engrave('OPTIONS', -18.7, 0.3, 0.62); engrave('SET-UP', -18.7, -0.95, 0.44, track=0.2, color='#a8a298')
+    bat_toggle(-14.3, 2.2, 1, 'POSITIVE', 'AS RECORDED', 'POLARITY')
+    bat_toggle(-14.3, -3.4, 1, 'ON', 'OFF', 'CUSTOM')
+    on = set(os.environ.get('IRC_FORMATS_ON', '48,96,full,24,set').split(','))
+    rows = [(2.35, [('RATES  kHz', [('44.1', '441'), ('48', '48'), ('88.2', '882'), ('96', '96')]),
+                    ('LENGTHS', [('FULL', 'full'), ('1024', '1024'), ('2048', '2048'), ('4096', '4096')])]),
+            (-3.35, [('BITS', [('16', '16'), ('24', '24'), ('32 FLOAT', '32f')]),
+                     ('TRIMMING', [('KEEP TIMING', 'set'), ('EACH MIC', 'individual')])])]
+    for y, groups in rows:
+        x = -9.6
+        for head, keys in groups:
+            ws = [K.legend_width(t, 'std') + 2 * TK.KEY['bezel'] for t, _ in keys]
+            gw = sum(ws) + 0.3 * (len(ws) - 1)
+            engrave(head, x + gw / 2, y + 1.95, 0.44, track=0.14)
+            for (t, tid), wk in zip(keys, ws):
+                with moved(x + wk / 2, y, 0): key(None, lit=tid in on, text=t, vname='custom ' + t)
+                x += wk + 0.3
+            x += 0.8
+        xe = x
+    D = ['%d' % i for i in range(10)]; HALF = ['0', '5'] * 5
+    g = [(['0', '1'] * 5, 0), (D, 5), (HALF, 0), '=0']
+    W = 3 * TW['pitch'] + 0.85 + 2 * TW['end']
+    thumbwheel(xe + W / 2 - 0.1, -2.9, g, 'fullms', legend='FULL  ms')
+    if cover: smoked_cover(-16.3, 22.1, -6.2, 5.4, name='cvformats', hinge_in=3.9)
+    finish_glass()
+    shoot(s, cam, 'unit-formats' + ('' if cover else '-open'), PW, h)
+
+
+# the chart paper's frequency and level axes (the plot's: 20 Hz to 20 kHz, 60 dB)
+PLOT = dict(w=38.0, h=20.4, L=2.6, R=1.0, T=1.3, B=3.4)
+
+
+def demo_curves():
+    """Plausible cab responses for the proof: SM57 on the cap edge, R121 at the centre, a room mic."""
+    f = np.geomspace(20, 20000, 220); lf = np.log10(f)
+    def shape(lo, res, pres, pk, hi, slope, tilt, seed):
+        rng = np.random.default_rng(seed)
+        y = -12 * np.log10(1 + (lo / f) ** 4) + res * np.exp(-((lf - math.log10(105)) / 0.09) ** 2)
+        y += pk * np.exp(-((lf - math.log10(pres)) / 0.12) ** 2) - slope * np.log10(1 + (f / hi) ** 6) / 1.5
+        y += tilt * (lf - 3)
+        wig = np.convolve(rng.normal(0, 2.6, len(f)), np.ones(6) / 6, 'same')
+        y += -3.5 * np.exp(-((lf - math.log10(pres * 0.42)) / 0.07) ** 2) + 2.5 * np.exp(-((lf - math.log10(pres * 0.7)) / 0.05) ** 2)
+        return f, y + wig * np.clip((lf - 2.2) / 1.0, 0, 1)
+    return [shape(75, 4, 2800, 5, 5200, 30, 1.0, 1), shape(70, 5, 1500, 2, 3800, 28, -2.5, 2),
+            shape(60, 6, 900, 1, 3000, 22, -4.0, 3)]
+
+
+INKS = [(196, 84, 30), (38, 76, 160), (52, 120, 56)]
+
+
+def plot_paper(path, w, h, px=110, curves=None):
+    """X-Y recorder chart paper: a printed log-frequency grid (oxblood, as the forms), its scales, a title block; the
+    proof's curves inked on it in felt-pen colours and the pens' key typed in (the app does both)."""
+    P_ = Pen(w, h, px, (247, 238, 214), 31); d = P_.d
+    ox = (120, 44, 34); minor = (226, 196, 182); major = (196, 140, 124)
+    L, R_, T_, B_ = PLOT['L'], PLOT['R'], PLOT['T'], PLOT['B']
+    gx0, gx1, gy0, gy1 = L, w - R_, T_, h - B_
+    X = lambda f: gx0 + math.log10(f / 20) / 3 * (gx1 - gx0)
+    Y = lambda db: gy0 + (0 - db) / 60 * (gy1 - gy0)          # 0 at the top, -60 at the bottom
+    for dec in (20, 200, 2000):
+        for k in range(1, 10):
+            f = dec * k
+            if f > 20000: break
+            col = major if k in (1, 5) else minor
+            d.line([P_.p(X(f), gy0), P_.p(X(f), gy1)], fill=col, width=max(1, P_.c(0.025 if col == major else 0.015)))
+    d.line([P_.p(X(20000), gy0), P_.p(X(20000), gy1)], fill=major, width=P_.c(0.025))
+    for db in range(0, -61, -2):
+        col = major if db % 10 == 0 else minor
+        d.line([P_.p(gx0, Y(db)), P_.p(gx1, Y(db))], fill=col, width=max(1, P_.c(0.025 if col == major else 0.015)))
+    d.rectangle([P_.c(gx0), P_.c(gy0), P_.c(gx1), P_.c(gy1)], outline=ox, width=P_.c(0.04))
+    fl = P_.font('BarlowSemiCondensed-600-normal.ttf', 0.45 / 0.7)
+    for f, t in ((20, '20'), (50, '50'), (100, '100'), (200, '200'), (500, '500'), (1000, '1k'), (2000, '2k'), (5000, '5k'),
+                 (10000, '10k'), (20000, '20k')):
+        P_.spaced(X(f), gy1 + 0.55, t, fl, ox, 0.06, 'm')
+    P_.spaced((gx0 + gx1) / 2, gy1 + 1.3, 'Hz', fl, ox, 0.06, 'm')
+    for db in range(0, -61, -10):
+        P_.spaced(gx0 - 0.25, Y(db), str(db) if db else '0', fl, ox, 0.06, 'r')
+    P_.spaced(gx0 - 0.25, gy0 - 0.65, 'dB', fl, ox, 0.06, 'r')
+    fh = P_.font('BarlowSemiCondensed-700-normal.ttf', 0.62)
+    P_.spaced(gx0, h - 0.9, 'RESPONSE  1/6 OCTAVE', fh, ox, 0.14)
+    P_.spaced(gx0 + 9.4, h - 0.9, 'CAPTURE', fl, ox, 0.14)
+    P_.spaced(gx0 + 19.9, h - 0.9, 'PENS', fl, ox, 0.14)
+    if curves:
+        ft = P_.font(TYPED, 0.74)
+        names = ['SM57', 'R121', 'Room']                 # (a fourth would fit: the key ends about 31 cm in)
+        top = max(float(np.max(y[(f >= 40) & (f <= 12000)])) for f, y in curves)
+        topr = math.ceil(top / 10) * 10 + 5 - 5          # the app's: the top line 5 dB over the loudest, rounded
+        for (f, y), ink in zip(curves, INKS):
+            pts = [(X(fi), Y(max(-60.0, min(0.0, yi - topr)))) for fi, yi in zip(f, y)]
+            for k in range(2):
+                col = tuple(int(c * P_.rng.uniform(0.95, 1.05)) for c in ink)
+                P_.line(pts, col, 0.05, 0.004)
+        # the pens' key, typed and inked by the app, at the right of the title line
+        P_.typed(gx0 + 13.1, h - 0.9, 'Mesa_4x12_V30', ft)
+        x = gx0 + 21.7
+        for nm, ink in zip(names, INKS):
+            P_.line([(x, h - 0.95), (x + 0.9, h - 0.95)], ink, 0.07)
+            x = P_.typed(x + 1.15, h - 0.9, nm, ft) + 0.8
+    age_paper(P_.im, P_.rng).save(path)
+
+
+def unit_plotter():
+    """6U: the response plotter, an X-Y recorder. The chart paper on its bed, two chrome rails above and below it, the
+    arm across them parked at the right, past the paper, the pen carriage on the arm."""
+    K.set_seed('rack-plotter')
+    s, cam, h = unit_scene(6)
+    backing(h)
+    pl, ph = rack_panel(6, 'bronze', 'plotter')
+    pw_, ph_ = PLOT['w'], PLOT['h']
+    bw, bh = pw_ + 4.6, ph_ + 2.6
+    bx, by = 0.0, 0.75
+    op = rbox('bedopen', bw, bh, 4, -2, 0.25); op.location = (bx, by, 0); bpy.context.view_layer.update(); cut(pl, op)
+    pl.data.materials.append(K.hammertone_fine(name='hf-plotter'))
+    bed = rbox('bed', bw + 0.4, bh + 0.4, 0.1, -0.9, 0.05); bed.location = (bx, by, 0)
+    bed.data.materials.append(mat('bed', srgb('#4a4842'), rough=0.6, spec=0.3))
+    lip = rbox('bedlip', bw, bh, 0.82, -0.88, 0.25); lip.location = (bx, by, 0)
+    cut(lip, rbox('bedlh', bw - 0.5, bh - 0.5, 2, -1, 0.15)); lip.data.materials.append(SG.black_cast('bedlip'))
+    xp = bx - bw / 2 + 0.6 + pw_ / 2                # the paper to the left, the arm's parking room on the right
+    fp = os.path.join(OUT, 'plot-print.png'); plot_paper(fp, pw_, ph_, curves=demo_curves())
+    with moved(xp, by, -0.78): sheet(pw_, ph_, fp, 'plotpaper', z=0.0)
+    ch = TK.nickel() if hasattr(TK, 'nickel') else SG.nickel('rail')
+    ry = (by + bh / 2 - 0.55, by - bh / 2 + 0.55)
+    for y in ry:
+        bpy.ops.mesh.primitive_cylinder_add(radius=0.22, depth=bw - 0.3, location=(bx, y, 0.25), rotation=(0, math.pi / 2, 0))
+        r = bpy.context.active_object; r.name = 'rail'; bpy.ops.object.shade_smooth(); r.data.materials.append(ch)
+        for sx in (-1, 1):
+            blk = rbox('railblk', 0.8, 0.9, 1.25, -0.9, 0.08); blk.location = (bx + sx * (bw / 2 - 0.55), y, 0)
+            blk.data.materials.append(SG.black_cast('railblk'))
+    # the arm: a brushed aluminium channel between the rails, its carriages on them; the pen carriage on the arm
+    ax = float(os.environ.get('IRC_PLOT_ARM_X', str(bx + bw / 2 - 1.75)))
+    alu = deck_alu('armalu')
+    arm = rbox('arm', 1.25, bh - 0.4, 0.35, 0.55, 0.12, roll=0.05); arm.location = (ax, by, 0); arm.data.materials.append(alu)
+    for y in ry:
+        c = rbox('armcar', 1.9, 1.15, 0.6, 0.35, 0.18, roll=0.06); c.location = (ax, y, 0); c.data.materials.append(SG.black_cast('armcar'))
+        with moved(ax, y, 0.95): small_screws([(0.55, 0.0), (-0.55, 0.0)], r=0.13)
+    pyy = float(os.environ.get('IRC_PLOT_PEN_Y', str(by + 2.0)))
+    pc = rbox('pencar', 2.0, 2.3, 0.7, 0.75, 0.2, roll=0.07); pc.location = (ax, pyy, 0); pc.data.materials.append(SG.black_cast('pencar'))
+    pen = lathe('pen', [(0.36, 0.0), (0.36, 0.5), (0.3, 0.6), (0.0, 0.62)], 64)
+    pen.location = (ax, pyy - 0.2, 1.45); pen.data.materials.append(mat('pencap', srgb('#2f6a34'), rough=0.35, coat=0.4))
+    engrave('RESPONSE', -bw / 2 + 2.6, -h / 2 + 1.05, 0.5)
+    engrave('X-Y RECORDER', bw / 2 - 3.3, -h / 2 + 1.05, 0.44, track=0.2, color='#a8a298')
+    shoot(s, cam, 'unit-plotter', PW, h)
+
+
 UNITS = {'step': unit_step, 'patch': unit_patch, 'meters': unit_meters, 'gap': unit_gap, 'deck': unit_deck,
          'results': unit_results, 'cheeks': unit_cheeks, 'chart': unit_chart, 'preflight': unit_preflight,
-         'nammeters': unit_nammeters, 'cart': unit_cart}
+         'nammeters': unit_nammeters, 'cart': unit_cart,
+         'connect': unit_connect, 'files': unit_files, 'sweep': unit_sweep, 'sweep-open': lambda: unit_sweep(False),
+         'formats': unit_formats, 'formats-open': lambda: unit_formats(False), 'plotter': unit_plotter}
 
 
 def main():
