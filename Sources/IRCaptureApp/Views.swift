@@ -19,6 +19,7 @@ struct IRCaptureApp: App {
         WindowGroup(Product.name) {
             ContentView().environmentObject(model)
                 .frame(minWidth: 780, minHeight: 640)
+                .background(WindowFiller())
         }
         .defaultSize(width: 920, height: 960)
         // The wall runs to the top of the window, behind the traffic lights; the shelf stands below them.
@@ -30,6 +31,7 @@ struct IRCaptureApp: App {
             }
             CommandGroup(after: .toolbar) {
                 PageSizeMenu()
+                FillScreenToggle()
             }
             CommandGroup(replacing: .help) {
                 Button("Quick Start") { model.helpPage = .quickStart }
@@ -45,6 +47,30 @@ struct IRCaptureApp: App {
             }
         }
     }
+}
+
+/// The window opens filling the screen (all of it but the menu bar and the Dock) unless View › Open Filling the
+/// Screen is turned off; then it opens at the size it last had.
+struct WindowFiller: NSViewRepresentable {
+    static let key = "openFillingScreen"
+    func makeNSView(context: Context) -> NSView {
+        let v = NSView()
+        // after the window is shown, so the window's restored frame does not replace this one
+        DispatchQueue.main.async {
+            // not in CI's runs (any "--" switch), whose screenshots are taken at the default size
+            guard !CommandLine.arguments.dropFirst().contains(where: { $0.hasPrefix("--") }),
+                  UserDefaults.standard.object(forKey: Self.key) as? Bool ?? true,
+                  let w = v.window, let screen = w.screen ?? NSScreen.main else { return }
+            w.setFrame(screen.visibleFrame, display: true, animate: false)
+        }
+        return v
+    }
+    func updateNSView(_ v: NSView, context: Context) {}
+}
+
+struct FillScreenToggle: View {
+    @AppStorage(WindowFiller.key) private var on = true
+    var body: some View { Toggle("Open Filling the Screen", isOn: $on) }
 }
 
 /// View › Page Size: how large the page is drawn. Fit to Window (the default) grows it with the window's width.
