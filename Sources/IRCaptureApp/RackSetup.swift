@@ -215,13 +215,13 @@ struct RackSelectorControl: View {
         ZStack(alignment: .topLeading) {
             ForEach(Array(sel.labels.enumerated()), id: \.offset) { j, r in
                 Button { if available(j) { set(j) } else { NSSound.beep() } } label: {
-                    Color.clear.frame(width: r[2], height: r[3])
+                    Color.clear.frame(width: r[2], height: r[3]).contentShape(Rectangle())
                 }
                 .buttonStyle(.plain).contentShape(Rectangle())
                 .help(j < names.count ? "\(label): \(names[j])\(available(j) ? "" : " (not offered by this interface)")" : "")
                 .offset(x: r[0], y: r[1])
             }
-            Button { next() } label: { Circle().fill(Color.clear).frame(width: 2 * sel.r, height: 2 * sel.r) }
+            Button { next() } label: { Circle().fill(Color.clear).frame(width: 2 * sel.r, height: 2 * sel.r).contentShape(Circle()) }
                 .buttonStyle(.plain).contentShape(Circle())
                 .help("\(label): \(pos < names.count ? names[pos] : "")")
                 .offset(x: sel.c[0] - sel.r, y: sel.c[1] - sel.r)
@@ -292,6 +292,7 @@ struct RackCoverControl: View {
                 let p = cover.pane
                 Button { shut = false } label: {
                     RoundedRectangle(cornerRadius: cover.radius).fill(Color.clear).frame(width: p[2], height: p[3])
+                        .contentShape(RoundedRectangle(cornerRadius: cover.radius))
                 }
                 .buttonStyle(.plain).contentShape(RoundedRectangle(cornerRadius: cover.radius))
                 .help("Lift the cover to change these settings")
@@ -301,7 +302,7 @@ struct RackCoverControl: View {
                 .accessibilityHint("Lifts the cover")
             } else {
                 ForEach(Array(cover.hinges.enumerated()), id: \.offset) { i, h in
-                    Button { shut = true } label: { Color.clear.frame(width: h[2], height: h[3]) }
+                    Button { shut = true } label: { Color.clear.frame(width: h[2], height: h[3]).contentShape(Rectangle()) }
                         .buttonStyle(.plain).contentShape(Rectangle())
                         .help("Shut the cover")
                         .offset(x: h[0], y: h[1])
@@ -612,7 +613,7 @@ struct CaptureCardFields: View {
                 } else {
                     Button {
                         if f.key == "folder" { m.chooseOutputFolder() } else { editing = f.key; DispatchQueue.main.async { focus = f.key } }
-                    } label: { Color.clear.frame(width: w, height: h) }
+                    } label: { Color.clear.frame(width: w, height: h).contentShape(Rectangle()) }
                     .buttonStyle(.plain).contentShape(Rectangle())
                     .help(help(f.key))
                     .offset(x: x0, y: y0)
@@ -792,10 +793,10 @@ struct RackFormatsUnit: View {
             let names = i == 0 ? ("Positive", "As recorded") : ("On", "Off")
             let set: (Bool) -> Void = { u in if i == 0 { m.keepPolarity = !u } else { m.customOn = u } }
             ZStack(alignment: .topLeading) {
-                Button { set(true) } label: { Color.clear.frame(width: t.up[2], height: t.up[3]) }
+                Button { set(true) } label: { Color.clear.frame(width: t.up[2], height: t.up[3]).contentShape(Rectangle()) }
                     .buttonStyle(.plain).contentShape(Rectangle()).offset(x: t.up[0], y: t.up[1])
                     .help(i == 0 ? "Each IR is made with its main peak positive, as in commercial IR packs, so mics blend without cancellation" : "Make the custom files chosen on the keys")
-                Button { set(false) } label: { Color.clear.frame(width: t.down[2], height: t.down[3]) }
+                Button { set(false) } label: { Color.clear.frame(width: t.down[2], height: t.down[3]).contentShape(Rectangle()) }
                     .buttonStyle(.plain).contentShape(Rectangle()).offset(x: t.down[0], y: t.down[1])
                     .help(i == 0 ? "Keep each IR's polarity as recorded" : "No custom files")
             }

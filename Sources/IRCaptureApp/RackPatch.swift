@@ -99,7 +99,7 @@ struct RackPatchUnit: View {
                 let ch = channel(i), c = patch.toggles[i]
                 VStack(spacing: 0) {
                     ForEach(order, id: \.self) { r in
-                        Button { set(r, ch) } label: { Color.clear.frame(width: patch.column, height: rowH) }
+                        Button { set(r, ch) } label: { Color.clear.frame(width: patch.column, height: rowH).contentShape(Rectangle()) }
                             .buttonStyle(.plain)
                             .contentShape(Rectangle())
                             .help("Input \(ch + 1): \(r.label)")

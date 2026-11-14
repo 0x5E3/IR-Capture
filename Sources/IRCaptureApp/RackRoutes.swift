@@ -264,7 +264,7 @@ struct RackTracksUnit: View {
             // the toggle: three columns under MIC, OFF, REF
             HStack(spacing: 0) {
                 ForEach(order, id: \.self) { r in
-                    Button { m.setLogicRole(r, for: c.id) } label: { Color.clear.frame(width: tracks.column, height: lineH) }
+                    Button { m.setLogicRole(r, for: c.id) } label: { Color.clear.frame(width: tracks.column, height: lineH).contentShape(Rectangle()) }
                         .buttonStyle(.plain).contentShape(Rectangle())
                         .help("Track \(bank * F.rows + i + 1): \(r == .off ? "Off (not used)" : r.label)")
                 }
@@ -305,7 +305,7 @@ struct RackTracksUnit: View {
                         .accessibilityLabel("Mic name, track \(bank * F.rows + i + 1)")
                 } else {
                     Button { editing = c.id; DispatchQueue.main.async { focus = c.id } } label: {
-                        Color.clear.frame(width: nameW, height: F.pitch * k)
+                        Color.clear.frame(width: nameW, height: F.pitch * k).contentShape(Rectangle())
                     }
                     .buttonStyle(.plain).contentShape(Rectangle())
                     .help("The mic's name, used in the file names. Click to type. Right-click for common names.")
