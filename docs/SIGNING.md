@@ -51,6 +51,8 @@ Do not copy anything else before step 4. Delete `cert.p12` from the Desktop afte
 | `NOTARY_KEY_ID` | The Key ID |
 | `NOTARY_ISSUER_ID` | The Issuer ID |
 
+The desktop bench's names also work: `MAC_CERTS_P12` and `MAC_CERTS_PASSWORD` in place of the first two, and `NOTARY_KEY_P8` as the base64 of the `.p8` file (`base64 -i AuthKey_….p8 | pbcopy`). `MAC_TEAM_ID` is not used here and may stay.
+
 Setup is complete. The next build is signed and notarized. If signing succeeded, the release notes of the `latest` release contain "Signed with Developer ID".
 
 ## 5. Publishing a real release

@@ -78,10 +78,12 @@ jobs:
 
       # P0.1: signing and notarization run only when the Apple secrets exist (docs/SIGNING.md).
       # Without them the build is signed ad hoc, as before, and everything else still runs.
+      # The desktop bench's names (MAC_CERTS_P12, MAC_CERTS_PASSWORD) are accepted too, and NOTARY_KEY_P8
+      # may be the .p8 file's text or its base64 (the bench's form).
       - name: Import the Developer ID certificate
         env:
-          MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
-          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+          MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 || secrets.MAC_CERTS_P12 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD || secrets.MAC_CERTS_PASSWORD }}
         run: |
           if [ -z "$MACOS_CERT_P12" ]; then echo "No signing certificate in the secrets: ad hoc build."; exit 0; fi
           KC="$RUNNER_TEMP/signing.keychain-db"; KCPW="$(uuidgen)"
@@ -204,7 +206,7 @@ jobs:
           NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
         run: |
           if [ -z "$CODESIGN_IDENTITY" ] || [ -z "$NOTARY_KEY_P8" ]; then echo "Not signed for distribution: notarization skipped."; exit 0; fi
-          export NOTARY_KEY_PATH="$RUNNER_TEMP/notary.p8"; printf '%s' "$NOTARY_KEY_P8" > "$NOTARY_KEY_PATH"
+          export NOTARY_KEY_PATH="$RUNNER_TEMP/notary.p8"; scripts/write_notary_key.sh "$NOTARY_KEY_PATH"
           scripts/notarize.sh dist/IR-Capture.zip "dist/IR Capture.app"
           rm dist/IR-Capture.zip && ditto -c -k --keepParent "dist/IR Capture.app" dist/IR-Capture.zip
 
@@ -218,7 +220,7 @@ jobs:
           if [ -n "$CODESIGN_IDENTITY" ]; then
             codesign --force --timestamp --sign "$CODESIGN_IDENTITY" dist/IR-Capture.dmg
             if [ -n "$NOTARY_KEY_P8" ]; then
-              export NOTARY_KEY_PATH="$RUNNER_TEMP/notary.p8"; printf '%s' "$NOTARY_KEY_P8" > "$NOTARY_KEY_PATH"
+              export NOTARY_KEY_PATH="$RUNNER_TEMP/notary.p8"; scripts/write_notary_key.sh "$NOTARY_KEY_PATH"
               scripts/notarize.sh dist/IR-Capture.dmg
             fi
           fi
